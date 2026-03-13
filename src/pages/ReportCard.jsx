@@ -29,7 +29,7 @@ export default function ReportCard() {
                 getDocs(query(collection(db, 'batches'), where('teacherId', '==', uid))),
                 getDocs(query(collection(db, 'attendance'), where('teacherId', '==', uid))),
                 getDocs(query(collection(db, 'exams'), where('teacherId', '==', uid))),
-                getDocs(query(collection(db, 'homework'), where('teacherId', '==', uid))),
+                getDocs(query(collection(db, 'homeworks'), where('teacherId', '==', uid))),
             ]);
             setStudents(studentSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
             setBatches(batchSnap.docs.map((d) => ({ id: d.id, ...d.data() })));

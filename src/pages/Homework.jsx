@@ -33,7 +33,7 @@ export default function Homework() {
         try {
             const uid = currentUser.uid;
             const [hwSnap, batchSnap, studentSnap] = await Promise.all([
-                getDocs(query(collection(db, 'homework'), where('teacherId', '==', uid))),
+                getDocs(query(collection(db, 'homeworks'), where('teacherId', '==', uid))),
                 getDocs(query(collection(db, 'batches'), where('teacherId', '==', uid))),
                 getDocs(query(collection(db, 'students'), where('teacherId', '==', uid))),
             ]);
@@ -87,7 +87,7 @@ export default function Homework() {
             } else {
                 data.createdAt = serverTimestamp();
                 data.completedBy = [];
-                await addDoc(collection(db, 'homework'), data);
+                await addDoc(collection(db, 'homeworks'), data);
                 toast.success('Assignment created!');
             }
             setShowModal(false);
@@ -101,7 +101,7 @@ export default function Homework() {
     async function handleDelete(id) {
         if (!confirm('Delete this assignment?')) return;
         try {
-            await deleteDoc(doc(db, 'homework', id));
+            await deleteDoc(doc(db, 'homeworks', id));
             loadData();
             toast.success('Deleted successfully');
         } catch (err) {
@@ -120,7 +120,7 @@ export default function Homework() {
                 ? currentCompleted.filter(id => id !== studentId) 
                 : [...currentCompleted, studentId];
             
-            await updateDoc(doc(db, 'homework', trackingAssignment.id), { completedBy: newCompleted });
+            await updateDoc(doc(db, 'homeworks', trackingAssignment.id), { completedBy: newCompleted });
             
             setTrackingAssignment({ ...trackingAssignment, completedBy: newCompleted });
             

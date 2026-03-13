@@ -25,7 +25,8 @@ import {
     FileSignature,
     BookCheck,
     Award,
-    BrainCircuit
+    BrainCircuit,
+    History
 } from 'lucide-react';
 
 const mainNavItems = [

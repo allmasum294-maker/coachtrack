@@ -329,41 +329,55 @@ export default function Dashboard() {
             <div className="dashboard-grid" style={{ alignItems: 'start' }}>
                 
                 {/* Students At Risk */}
-                <div className="card dashboard-risk-card">
-                    <div className="card-header" style={{ borderBottom: '1px solid var(--color-border)', paddingBottom: 'var(--space-4)' }}>
+                <div className="card dashboard-risk-card" style={{ border: '1px solid var(--color-danger-soft)', boxShadow: '0 4px 15px rgba(239, 68, 68, 0.05)' }}>
+                    <div className="card-header" style={{ borderBottom: '1px solid var(--color-border)', paddingBottom: 'var(--space-4)', background: 'linear-gradient(to right, var(--color-danger-soft), transparent)', borderTopLeftRadius: 'var(--radius-lg)', borderTopRightRadius: 'var(--radius-lg)' }}>
                         <div>
                             <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                <div style={{ background: 'var(--color-danger-soft)', padding: '6px', borderRadius: 'var(--radius-md)' }}>
-                                    <AlertTriangle size={20} style={{ color: 'var(--color-danger)' }} />
+                                <div style={{ background: 'var(--color-danger)', padding: '8px', borderRadius: 'var(--radius-full)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <AlertTriangle size={20} />
                                 </div>
-                                Required Attention
+                                <span style={{ color: 'var(--color-danger)', fontWeight: 800 }}>Predictive "At-Risk" Alerts</span>
                             </div>
-                            <div className="card-subtitle">Students needing intervention based on performance & attendance.</div>
+                            <div className="card-subtitle" style={{ marginLeft: '40px' }}>Students needing immediate intervention based on recent attendance and grade drops (Last 3 Weeks).</div>
                         </div>
                     </div>
-                    <div style={{ padding: 'var(--space-4)' }}>
+                    <div style={{ padding: 'var(--space-5)' }}>
                         {atRiskList.length === 0 ? (
                             <div className="empty-state" style={{ padding: 'var(--space-6) 0' }}>
-                                <div className="empty-state-title">No students at risk</div>
-                                <div className="empty-state-text">All your active students are performing well above the threshold!</div>
+                                <div style={{ background: 'var(--color-success-soft)', padding: '16px', borderRadius: 'var(--radius-full)', color: 'var(--color-success)', display: 'inline-flex', marginBottom: 'var(--space-4)' }}>
+                                    <PlayCircle size={32} />
+                                </div>
+                                <div className="empty-state-title" style={{ color: 'var(--color-success)' }}>Zero Students At Risk!</div>
+                                <div className="empty-state-text">All your active students are performing well above the threshold. Keep up the great work!</div>
                             </div>
                         ) : (
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 'var(--space-4)' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 'var(--space-4)' }}>
                                 {atRiskList.map(risk => (
                                     <div key={risk.studentId} style={{ 
-                                        background: 'var(--color-bg-elevated)', 
-                                        padding: 'var(--space-4)', 
+                                        background: 'var(--color-surface-1)', 
+                                        padding: 'var(--space-5)', 
                                         borderRadius: 'var(--radius-lg)', 
+                                        border: `1px solid ${risk.score >= 2 ? 'rgba(239, 68, 68, 0.3)' : 'rgba(245, 158, 11, 0.3)'}`,
                                         borderLeft: `4px solid ${risk.score >= 2 ? 'var(--color-danger)' : 'var(--color-warning)'}`,
-                                        boxShadow: 'var(--shadow-sm)'
-                                    }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--space-3)' }}>
-                                            <h4 style={{ fontWeight: 600, fontSize: 'var(--font-size-md)' }}>{risk.name}</h4>
-                                            <span className={`badge ${risk.score >= 2 ? 'badge-red' : 'badge-yellow'}`} style={{ fontSize: 'var(--font-size-xs)' }}>
+                                        boxShadow: 'var(--shadow-sm)',
+                                        transition: 'transform 0.2s',
+                                    }}
+                                    onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+                                    onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+                                    >
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--space-4)' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+                                                 <div style={{ width: 40, height: 40, borderRadius: 'var(--radius-full)', background: 'var(--color-bg-elevated)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '18px', color: 'var(--color-text-primary)' }}>
+                                                    {risk.name.charAt(0)}
+                                                </div>
+                                                <h4 style={{ fontWeight: 700, fontSize: '16px' }}>{risk.name}</h4>
+                                            </div>
+                                            <span className={`badge ${risk.score >= 2 ? 'badge-red' : 'badge-yellow'}`} style={{ fontSize: '11px', fontWeight: 700, padding: '4px 8px' }}>
                                                 {risk.score >= 2 ? 'High Risk' : 'Medium Risk'}
                                             </span>
                                         </div>
-                                        <ul style={{ margin: 0, paddingLeft: '20px', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                        <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 'var(--space-2)' }}>Flagged Reasons:</div>
+                                        <ul style={{ margin: 0, paddingLeft: '16px', fontSize: '13px', color: 'var(--color-text-secondary)', display: 'flex', flexDirection: 'column', gap: '6px', lineHeight: 1.4 }}>
                                             {risk.reasons.map((r, i) => (
                                                 <li key={i}>{r}</li>
                                             ))}

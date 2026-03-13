@@ -5,7 +5,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import {
-    Users, Plus, Edit2, Trash2, Search, X, Eye, Phone, Mail, School, MapPin, BookOpen, User, Calendar, Upload, Download, ChevronUp, ChevronDown, ChevronLeft, ChevronRight
+    Users, Plus, Edit2, Trash2, Search, X, Eye, Phone, Mail, School, MapPin, BookOpen, User, Calendar, Upload, Download, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Activity, Award, CheckCircle
 } from 'lucide-react';
 import Papa from 'papaparse';
 import toast from 'react-hot-toast';
@@ -26,6 +26,9 @@ export default function Students() {
     const [showImportModal, setShowImportModal] = useState(false);
     const [csvPreview, setCsvPreview] = useState([]);
     const [isImporting, setIsImporting] = useState(false);
+    const [attendance, setAttendance] = useState([]);
+    const [exams, setExams] = useState([]);
+    const [homeworks, setHomeworks] = useState([]);
     const [form, setForm] = useState({
         name: '', email: '', phone: '', guardianName: '', guardianPhone: '',
         school: '', grade: '', address: '', notes: '', batchIds: [],
@@ -37,12 +40,19 @@ export default function Students() {
 
     async function loadData() {
         try {
-            const [studentSnap, batchSnap] = await Promise.all([
-                getDocs(query(collection(db, 'students'), where('teacherId', '==', currentUser.uid))),
-                getDocs(query(collection(db, 'batches'), where('teacherId', '==', currentUser.uid))),
+            const uid = currentUser.uid;
+            const [studentSnap, batchSnap, attSnap, examSnap, hwSnap] = await Promise.all([
+                getDocs(query(collection(db, 'students'), where('teacherId', '==', uid))),
+                getDocs(query(collection(db, 'batches'), where('teacherId', '==', uid))),
+                getDocs(query(collection(db, 'attendance'), where('teacherId', '==', uid))),
+                getDocs(query(collection(db, 'exams'), where('teacherId', '==', uid))),
+                getDocs(query(collection(db, 'homeworks'), where('teacherId', '==', uid))),
             ]);
             setStudents(studentSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
             setBatches(batchSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
+            setAttendance(attSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
+            setExams(examSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
+            setHomeworks(hwSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
         } catch (err) {
             console.error('Error loading students:', err);
         } finally {
@@ -165,6 +175,100 @@ export default function Students() {
         const names = students.map((s) => s.school).filter(Boolean);
         return [...new Set(names)];
     }, [students]);
+
+    const viewingStats = useMemo(() => {
+        if (!viewingStudent) return null;
+
+        let totalClasses = 0;
+        let presentClasses = 0;
+        
+        attendance.forEach((a) => {
+            if (viewingStudent.batchIds?.includes(a.batchId)) {
+                (a.records || []).forEach(r => {
+                    if (r.studentId === viewingStudent.id) {
+                        totalClasses++;
+                        if (r.status === 'present') presentClasses++;
+                    }
+                });
+            }
+        });
+
+        const attRate = totalClasses > 0 ? Math.round((presentClasses / totalClasses) * 100) : 0;
+
+        let totalExamMarks = 0;
+        let totalMarksEarned = 0;
+
+        exams.forEach(e => {
+            if (viewingStudent.batchIds?.includes(e.batchId)) {
+                const sScore = (e.scores || []).find(sc => sc.studentId === viewingStudent.id);
+                if (sScore) {
+                    totalExamMarks += e.totalMarks;
+                    totalMarksEarned += sScore.marksObtained;
+                }
+            }
+        });
+
+        const avgScore = totalExamMarks > 0 ? Math.round((totalMarksEarned / totalExamMarks) * 100) : 0;
+
+        let totalHomeworks = 0;
+        let completedHomeworks = 0;
+
+        homeworks.forEach(hw => {
+            if (viewingStudent.batchIds?.includes(hw.batchId)) {
+                totalHomeworks++;
+                if ((hw.completedBy || []).includes(viewingStudent.id)) {
+                    completedHomeworks++;
+                }
+            }
+        });
+
+        const hwRate = totalHomeworks > 0 ? Math.round((completedHomeworks / totalHomeworks) * 100) : 0;
+
+        const topicsPerformance = {};
+        exams.forEach(e => {
+            if (viewingStudent.batchIds?.includes(e.batchId)) {
+                const sScore = (e.scores || []).find(sc => sc.studentId === viewingStudent.id);
+                if (sScore && sScore.topicMarks) {
+                    const batchTopicSums = {};
+                    const batchTopicCounts = {};
+                    e.scores.forEach(score => {
+                        if (score.topicMarks) {
+                            Object.entries(score.topicMarks).forEach(([topic, mark]) => {
+                                const val = parseFloat(mark) || 0;
+                                batchTopicSums[topic] = (batchTopicSums[topic] || 0) + val;
+                                batchTopicCounts[topic] = (batchTopicCounts[topic] || 0) + 1;
+                            });
+                        }
+                    });
+
+                    Object.entries(sScore.topicMarks).forEach(([topic, mark]) => {
+                        const studentVal = parseFloat(mark) || 0;
+                        const batchAvg = batchTopicSums[topic] / (batchTopicCounts[topic] || 1); 
+                        const diff = studentVal - batchAvg;
+                        
+                        if (!topicsPerformance[topic]) {
+                            topicsPerformance[topic] = { count: 0, diffSum: 0 };
+                        }
+                        topicsPerformance[topic].diffSum += diff;
+                        topicsPerformance[topic].count += 1;
+                    });
+                }
+            }
+        });
+
+        const analyzedTopics = Object.entries(topicsPerformance).map(([topic, data]) => {
+            return { topic, avgDiff: data.diffSum / data.count };
+        });
+        analyzedTopics.sort((a, b) => b.avgDiff - a.avgDiff);
+
+        return {
+            attRate,
+            avgScore,
+            hwRate,
+            strengths: analyzedTopics.filter(t => t.avgDiff >= 0).slice(0, 3).map(t => t.topic),
+            weaknesses: [...analyzedTopics].reverse().filter(t => t.avgDiff < 0).slice(0, 3).map(t => t.topic)
+        };
+    }, [viewingStudent, attendance, exams, homeworks]);
 
     function handleFileUpload(event) {
         const file = event.target.files[0];
@@ -498,108 +602,145 @@ export default function Students() {
             {/* View Student Detail Modal */}
             {viewingStudent && (
                 <div className="modal-overlay" onClick={() => setViewingStudent(null)}>
-                    <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 560 }}>
-                        <div className="modal-header">
-                            <h2 className="modal-title">Student Profile</h2>
-                            <button className="btn btn-ghost btn-icon" onClick={() => setViewingStudent(null)}>
+                    <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 700, padding: 0, overflow: 'hidden' }}>
+                        <div style={{ background: 'linear-gradient(135deg, var(--color-primary), var(--color-accent))', padding: 'var(--space-6)', color: 'white', position: 'relative' }}>
+                            <button className="btn btn-ghost btn-icon" onClick={() => setViewingStudent(null)} style={{ position: 'absolute', top: 'var(--space-4)', right: 'var(--space-4)', color: 'white' }}>
                                 <X size={20} />
                             </button>
-                        </div>
-                        <div className="modal-body">
-                            {/* Avatar & Name */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)', marginBottom: 'var(--space-6)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
                                 <div style={{
-                                    width: 56, height: 56, borderRadius: 'var(--radius-full)',
-                                    background: 'linear-gradient(135deg, var(--color-accent), var(--color-gold))',
+                                    width: 72, height: 72, borderRadius: 'var(--radius-full)',
+                                    background: 'rgba(255,255,255,0.2)', backdropFilter: 'blur(10px)',
                                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    fontSize: 'var(--font-size-xl)', fontWeight: 800, color: '#fff',
+                                    fontSize: '28px', fontWeight: 800, color: '#fff', border: '2px solid rgba(255,255,255,0.4)'
                                 }}>
                                     {viewingStudent.name?.charAt(0).toUpperCase()}
                                 </div>
                                 <div>
-                                    <div style={{ fontSize: 'var(--font-size-lg)', fontWeight: 700 }}>{viewingStudent.name}</div>
-                                    <div style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)' }}>Class {viewingStudent.grade}</div>
+                                    <h2 style={{ fontSize: '24px', fontWeight: 700, margin: 0 }}>{viewingStudent.name}</h2>
+                                    <div style={{ opacity: 0.9, fontSize: 'var(--font-size-sm)', marginTop: '4px' }}>Class {viewingStudent.grade} | {viewingStudent.school || 'No School specified'}</div>
+                                    <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', marginTop: 'var(--space-2)' }}>
+                                        {(viewingStudent.batchIds || []).map((bid) => (
+                                            <span key={bid} style={{ background: 'rgba(255,255,255,0.2)', padding: '2px 8px', borderRadius: '12px', fontSize: '12px' }}>{getBatchName(bid)}</span>
+                                        ))}
+                                    </div>
                                 </div>
                             </div>
-
-                            {/* Info Grid */}
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)', marginBottom: 'var(--space-5)' }}>
-                                {viewingStudent.email && (
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                                        <Mail size={15} style={{ color: 'var(--color-accent)', flexShrink: 0 }} />
-                                        <div>
-                                            <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>Email</div>
-                                            <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: 500 }}>{viewingStudent.email}</div>
-                                        </div>
-                                    </div>
-                                )}
-                                {viewingStudent.phone && (
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                                        <Phone size={15} style={{ color: 'var(--color-accent)', flexShrink: 0 }} />
-                                        <div>
-                                            <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>Phone</div>
-                                            <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: 500 }}>{viewingStudent.phone}</div>
-                                        </div>
-                                    </div>
-                                )}
-                                {viewingStudent.school && (
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                                        <School size={15} style={{ color: 'var(--color-accent)', flexShrink: 0 }} />
-                                        <div>
-                                            <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>School/College</div>
-                                            <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: 500 }}>{viewingStudent.school}</div>
-                                        </div>
-                                    </div>
-                                )}
-                                {viewingStudent.address && (
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                                        <MapPin size={15} style={{ color: 'var(--color-accent)', flexShrink: 0 }} />
-                                        <div>
-                                            <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>Address</div>
-                                            <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: 500 }}>{viewingStudent.address}</div>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Guardian Info */}
-                            {(viewingStudent.guardianName || viewingStudent.guardianPhone) && (
-                                <div style={{
-                                    background: 'var(--color-surface-2)', borderRadius: 'var(--radius-lg)',
-                                    padding: 'var(--space-4)', marginBottom: 'var(--space-5)',
-                                }}>
-                                    <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 'var(--space-2)' }}>Guardian</div>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                        <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: 600 }}>{viewingStudent.guardianName || '—'}</div>
-                                        {viewingStudent.guardianPhone && (
-                                            <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>{viewingStudent.guardianPhone}</div>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Batches */}
-                            <div style={{ marginBottom: 'var(--space-4)' }}>
-                                <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 'var(--space-2)' }}>Assigned Batches</div>
-                                <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
-                                    {(viewingStudent.batchIds || []).length > 0
-                                        ? viewingStudent.batchIds.map((bid) => (
-                                            <span key={bid} className="badge badge-teal">{getBatchName(bid)}</span>
-                                        ))
-                                        : <span className="badge badge-red">Unassigned</span>
-                                    }
-                                </div>
-                            </div>
-
-                            {/* Notes */}
-                            {viewingStudent.notes && (
-                                <div>
-                                    <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 'var(--space-2)' }}>Notes</div>
-                                    <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', lineHeight: 1.6 }}>{viewingStudent.notes}</div>
-                                </div>
-                            )}
                         </div>
-                        <div className="modal-footer">
+
+                        <div className="modal-body" style={{ maxHeight: '70vh', overflowY: 'auto', padding: 'var(--space-6)' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.2fr) minmax(0, 1fr)', gap: 'var(--space-6)' }}>
+                                
+                                {/* Left Column: System Stats */}
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
+                                    
+                                    {/* Performance Overview */}
+                                    <div>
+                                        <h3 style={{ fontSize: '14px', color: 'var(--color-text-muted)', fontWeight: 600, textTransform: 'uppercase', marginBottom: 'var(--space-3)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            <Activity size={16} /> Performance Overview
+                                        </h3>
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 'var(--space-3)' }}>
+                                            <div style={{ background: 'var(--color-surface-2)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
+                                                <div style={{ color: 'var(--color-teal)', marginBottom: '4px', display: 'flex', justifyContent: 'center' }}><Calendar size={20} /></div>
+                                                <div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--color-text-primary)' }}>{viewingStats?.attRate}%</div>
+                                                <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>Attendance</div>
+                                            </div>
+                                            <div style={{ background: 'var(--color-surface-2)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
+                                                <div style={{ color: 'var(--color-blue)', marginBottom: '4px', display: 'flex', justifyContent: 'center' }}><Award size={20} /></div>
+                                                <div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--color-text-primary)' }}>{viewingStats?.avgScore}%</div>
+                                                <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>Avg Score</div>
+                                            </div>
+                                            <div style={{ background: 'var(--color-surface-2)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
+                                                <div style={{ color: 'var(--color-purple)', marginBottom: '4px', display: 'flex', justifyContent: 'center' }}><CheckCircle size={20} /></div>
+                                                <div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--color-text-primary)' }}>{viewingStats?.hwRate}%</div>
+                                                <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>Homework</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Strengths & Weaknesses */}
+                                    <div>
+                                        <h3 style={{ fontSize: '14px', color: 'var(--color-text-muted)', fontWeight: 600, textTransform: 'uppercase', marginBottom: 'var(--space-3)' }}>Topic Analysis</h3>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+                                            <div style={{ background: 'var(--color-success-soft)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--color-success)', fontWeight: 600, fontSize: '13px', marginBottom: '8px' }}>
+                                                    <TrendingUp size={16} /> Top Strengths
+                                                </div>
+                                                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                                    {viewingStats?.strengths?.length > 0 ? viewingStats.strengths.map(t => (
+                                                        <span key={t} style={{ background: '#fff', color: 'var(--color-success)', padding: '2px 8px', borderRadius: '4px', fontSize: '12px', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>{t}</span>
+                                                    )) : <span style={{ fontSize: '12px', color: 'var(--color-success)' }}>Not enough data</span>}
+                                                </div>
+                                            </div>
+                                            <div style={{ background: 'var(--color-danger-soft)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--color-danger)', fontWeight: 600, fontSize: '13px', marginBottom: '8px' }}>
+                                                    <TrendingDown size={16} /> Areas to Improve
+                                                </div>
+                                                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                                    {viewingStats?.weaknesses?.length > 0 ? viewingStats.weaknesses.map(t => (
+                                                        <span key={t} style={{ background: '#fff', color: 'var(--color-danger)', padding: '2px 8px', borderRadius: '4px', fontSize: '12px', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>{t}</span>
+                                                    )) : <span style={{ fontSize: '12px', color: 'var(--color-danger)' }}>Not enough data</span>}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Right Column: Contact & Personal Info */}
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', borderLeft: '1px solid var(--color-border)', paddingLeft: 'var(--space-5)' }}>
+                                    
+                                    <div>
+                                        <h3 style={{ fontSize: '14px', color: 'var(--color-text-muted)', fontWeight: 600, textTransform: 'uppercase', marginBottom: 'var(--space-3)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            <User size={16} /> Contact Details
+                                        </h3>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+                                            {viewingStudent.email && (
+                                                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-2)' }}>
+                                                    <Mail size={15} style={{ color: 'var(--color-text-muted)', marginTop: '2px' }} />
+                                                    <div style={{ fontSize: '13px', color: 'var(--color-text-primary)' }}>{viewingStudent.email}</div>
+                                                </div>
+                                            )}
+                                            {viewingStudent.phone && (
+                                                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-2)' }}>
+                                                    <Phone size={15} style={{ color: 'var(--color-text-muted)', marginTop: '2px' }} />
+                                                    <div style={{ fontSize: '13px', color: 'var(--color-text-primary)' }}>{viewingStudent.phone}</div>
+                                                </div>
+                                            )}
+                                            {viewingStudent.address && (
+                                                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-2)' }}>
+                                                    <MapPin size={15} style={{ color: 'var(--color-text-muted)', marginTop: '2px' }} />
+                                                    <div style={{ fontSize: '13px', color: 'var(--color-text-primary)' }}>{viewingStudent.address}</div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {(viewingStudent.guardianName || viewingStudent.guardianPhone) && (
+                                        <div>
+                                            <h3 style={{ fontSize: '14px', color: 'var(--color-text-muted)', fontWeight: 600, textTransform: 'uppercase', marginBottom: 'var(--space-2)' }}>Guardian</h3>
+                                            <div style={{ background: 'var(--color-surface-2)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)' }}>
+                                                <div style={{ fontSize: '13px', fontWeight: 600 }}>{viewingStudent.guardianName || '—'}</div>
+                                                {viewingStudent.guardianPhone && (
+                                                    <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '2px' }}>{viewingStudent.guardianPhone}</div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {viewingStudent.notes && (
+                                        <div>
+                                            <h3 style={{ fontSize: '14px', color: 'var(--color-text-muted)', fontWeight: 600, textTransform: 'uppercase', marginBottom: 'var(--space-2)' }}>Notes</h3>
+                                            <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)', lineHeight: 1.5, background: 'var(--color-surface-2)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)' }}>
+                                                {viewingStudent.notes}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div className="modal-footer" style={{ background: 'var(--color-surface-2)', borderTop: '1px solid var(--color-border)', margin: 0 }}>
                             <button className="btn btn-secondary" onClick={() => { setViewingStudent(null); openEdit(viewingStudent); }}>Edit Profile</button>
                             <button className="btn btn-primary" onClick={() => setViewingStudent(null)}>Close</button>
                         </div>

@@ -26,6 +26,8 @@ import StudentAnalytics from './pages/StudentAnalytics';
 import StudentTimeline from './pages/StudentTimeline';
 import ReportCard from './pages/ReportCard';
 import Homework from './pages/Homework';
+import Leaderboard from './pages/Leaderboard';
+import StudyPlans from './pages/StudyPlans';
 
 // Protected route wrapper
 function ProtectedRoute({ children }) {
@@ -178,6 +180,8 @@ function App() {
               <Route path="/timeline" element={<StudentTimeline />} />
               <Route path="/report-card" element={<ReportCard />} />
               <Route path="/homework" element={<Homework />} />
+              <Route path="/leaderboard" element={<Leaderboard />} />
+              <Route path="/study-plans" element={<StudyPlans />} />
               <Route path="/export" element={<Export />} />
               <Route path="/notifications" element={<Notifications />} />
               <Route path="/admin" element={<AdminPanel />} />

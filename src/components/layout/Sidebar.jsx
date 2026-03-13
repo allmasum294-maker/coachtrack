@@ -22,9 +22,10 @@ import {
     Moon,
     FileEdit,
     LineChart,
-    History,
     FileSignature,
     BookCheck,
+    Award,
+    BrainCircuit
 } from 'lucide-react';
 
 const mainNavItems = [
@@ -45,8 +46,10 @@ const managementNavItems = [
 const insightNavItems = [
     { path: '/analytics', icon: BarChart3, label: 'Analytics' },
     { path: '/student-analytics', icon: LineChart, label: 'Student Analytics' },
-    { path: '/timeline', icon: History, label: 'Timeline' },
     { path: '/report-card', icon: FileSignature, label: 'Report Cards' },
+    { path: '/leaderboard', icon: Award, label: 'Leaderboard' },
+    { path: '/study-plans', icon: BrainCircuit, label: 'AI Study Plans' },
+    { path: '/timeline', icon: History, label: 'Timeline' },
     { path: '/export', icon: Download, label: 'Export' },
     { path: '/notifications', icon: Bell, label: 'Notifications' },
 ];

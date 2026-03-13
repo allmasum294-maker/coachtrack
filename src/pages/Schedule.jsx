@@ -9,7 +9,7 @@ import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
-import { Plus, X, Calendar as CalIcon, Clock, AlertCircle, RefreshCw } from 'lucide-react';
+import { Plus, X, Calendar as CalIcon, Clock, AlertCircle, RefreshCw, Info } from 'lucide-react';
 import { format, eachDayOfInterval, getDay } from 'date-fns';
 import toast from 'react-hot-toast';
 
@@ -22,6 +22,8 @@ export default function Schedule() {
     const [students, setStudents] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
+    const [showQuickView, setShowQuickView] = useState(false);
+    const [selectedEvent, setSelectedEvent] = useState(null);
     const [showRecurringModal, setShowRecurringModal] = useState(false);
     const [showCompleteModal, setShowCompleteModal] = useState(false);
     const [editingSchedule, setEditingSchedule] = useState(null);
@@ -301,11 +303,10 @@ export default function Schedule() {
                     events={getCalendarEvents()}
                     dateClick={(info) => openCreate(info.dateStr)}
                     eventClick={(info) => {
-                        if (info.event.extendedProps.type === 'exam') {
-                            navigate('/exams');
-                        } else {
-                            openEdit(info.event.extendedProps.schedule);
-                        }
+                        const props = info.event.extendedProps;
+                        const eventData = props.type === 'exam' ? props.exam : props.schedule;
+                        setSelectedEvent({ ...eventData, displayType: props.type });
+                        setShowQuickView(true);
                     }}
                     height="auto"
                     aspectRatio={1.8}

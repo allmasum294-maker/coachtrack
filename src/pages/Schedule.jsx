@@ -18,10 +18,14 @@ export default function Schedule() {
     const navigate = useNavigate();
     const [schedules, setSchedules] = useState([]);
     const [batches, setBatches] = useState([]);
+    const [students, setStudents] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [showRecurringModal, setShowRecurringModal] = useState(false);
+    const [showCompleteModal, setShowCompleteModal] = useState(false);
     const [editingSchedule, setEditingSchedule] = useState(null);
+    const [attendanceRecords, setAttendanceRecords] = useState({});
+    const [completeForm, setCompleteForm] = useState({ topicsCovered: '', notes: '', homeworkAssigned: '' });
     const [form, setForm] = useState({
         title: '', batchId: '', date: '', startTime: '', endTime: '', status: 'scheduled', notes: '',
     });
@@ -40,12 +44,14 @@ export default function Schedule() {
 
     async function loadData() {
         try {
-            const [schedSnap, batchSnap] = await Promise.all([
+            const [schedSnap, batchSnap, studentSnap] = await Promise.all([
                 getDocs(query(collection(db, 'schedules'), where('teacherId', '==', currentUser.uid))),
                 getDocs(query(collection(db, 'batches'), where('teacherId', '==', currentUser.uid))),
+                getDocs(query(collection(db, 'students'), where('teacherId', '==', currentUser.uid))),
             ]);
             setSchedules(schedSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
             setBatches(batchSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
+            setStudents(studentSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
         } catch (err) {
             console.error('Error loading schedules:', err);
         } finally {
@@ -187,6 +193,58 @@ export default function Schedule() {
         }
     }
 
+    function openCompleteSession() {
+        if (!editingSchedule) return;
+        setCompleteForm({ topicsCovered: '', notes: '', homeworkAssigned: '' });
+        const recs = {};
+        students.filter(s => (s.batchIds || []).includes(editingSchedule.batchId)).forEach(s => {
+            recs[s.id] = 'present';
+        });
+        setAttendanceRecords(recs);
+        setShowModal(false);
+        setShowCompleteModal(true);
+    }
+
+    async function handleSaveCompleteSession(e) {
+        e.preventDefault();
+        try {
+            const batch = batches.find(b => b.id === editingSchedule.batchId);
+            const dateVal = editingSchedule.date;
+
+            const sessionData = {
+                batchId: editingSchedule.batchId,
+                batchName: batch?.name || '',
+                scheduleId: editingSchedule.id,
+                date: dateVal,
+                topicsCovered: completeForm.topicsCovered,
+                notes: completeForm.notes,
+                homeworkAssigned: completeForm.homeworkAssigned,
+                teacherId: currentUser.uid,
+                createdAt: serverTimestamp()
+            };
+            await addDoc(collection(db, 'sessionLogs'), sessionData);
+
+            const recordsArray = Object.entries(attendanceRecords).map(([studentId, status]) => ({ studentId, status }));
+            const attData = {
+                batchId: editingSchedule.batchId,
+                teacherId: currentUser.uid,
+                date: dateVal,
+                records: recordsArray,
+                createdAt: serverTimestamp()
+            };
+            await addDoc(collection(db, 'attendance'), attData);
+
+            await updateDoc(doc(db, 'schedules', editingSchedule.id), { status: 'completed' });
+
+            setShowCompleteModal(false);
+            loadData();
+            toast.success('Session and Attendance logged successfully!');
+        } catch (err) {
+            console.error('Error saving complete session:', err);
+            toast.error('Failed to log session.');
+        }
+    }
+
     if (loading) {
         return <div className="loading-page"><div className="loading-spinner" /></div>;
     }
@@ -291,8 +349,8 @@ export default function Schedule() {
                                         <button type="button" className="btn btn-danger" onClick={handleDelete}>
                                             Delete
                                         </button>
-                                        <button type="button" className="btn btn-secondary" onClick={() => navigate(`/sessions?scheduleId=${editingSchedule.id}&batchId=${editingSchedule.batchId}`)}>
-                                            Log Session
+                                        <button type="button" className="btn btn-secondary" onClick={openCompleteSession}>
+                                            Complete Session & Attendance
                                         </button>
                                     </div>
                                 )}
@@ -366,6 +424,58 @@ export default function Schedule() {
                             <div className="modal-footer">
                                 <button type="button" className="btn btn-secondary" onClick={() => setShowRecurringModal(false)}>Cancel</button>
                                 <button type="submit" className="btn btn-primary">Generate Classes</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+            {/* Complete Session Modal */}
+            {showCompleteModal && editingSchedule && (
+                <div className="modal-overlay" onClick={() => setShowCompleteModal(false)}>
+                    <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 800 }}>
+                        <div className="modal-header">
+                            <h2 className="modal-title">Log Session & Attendance</h2>
+                            <button className="btn btn-ghost btn-icon" onClick={() => setShowCompleteModal(false)}><X size={20} /></button>
+                        </div>
+                        <form onSubmit={handleSaveCompleteSession}>
+                            <div className="modal-body" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 'var(--space-6)' }}>
+                                {/* Left Side: Session Log */}
+                                <div>
+                                    <h3 style={{ fontSize: 'var(--font-size-md)', fontWeight: 600, marginBottom: 'var(--space-4)' }}>Session Details</h3>
+                                    <div className="form-group">
+                                        <label className="form-label">Topics Covered *</label>
+                                        <input className="form-input" value={completeForm.topicsCovered} onChange={(e) => setCompleteForm({...completeForm, topicsCovered: e.target.value})} placeholder="e.g., Intro to Algebra" required />
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">Homework Assigned</label>
+                                        <textarea className="form-textarea" value={completeForm.homeworkAssigned} onChange={(e) => setCompleteForm({...completeForm, homeworkAssigned: e.target.value})} rows={2} />
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">Private Notes</label>
+                                        <textarea className="form-textarea" value={completeForm.notes} onChange={(e) => setCompleteForm({...completeForm, notes: e.target.value})} rows={2} />
+                                    </div>
+                                </div>
+
+                                {/* Right Side: Attendance */}
+                                <div>
+                                    <h3 style={{ fontSize: 'var(--font-size-md)', fontWeight: 600, marginBottom: 'var(--space-4)' }}>Attendance</h3>
+                                    <div style={{ maxHeight: '400px', overflowY: 'auto', paddingRight: 'var(--space-2)' }}>
+                                        {students.filter(s => (s.batchIds || []).includes(editingSchedule.batchId)).map(student => (
+                                            <div key={student.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--space-3) 0', borderBottom: '1px solid var(--color-border)' }}>
+                                                <div style={{ fontWeight: 500, fontSize: 'var(--font-size-sm)' }}>{student.name}</div>
+                                                <div style={{ display: 'flex', gap: 'var(--space-1)' }}>
+                                                    <button type="button" onClick={() => setAttendanceRecords({...attendanceRecords, [student.id]: 'present'})} className={`btn btn-sm ${attendanceRecords[student.id] === 'present' ? 'btn-primary' : 'btn-ghost'}`} style={{ padding: '4px 8px' }}>P</button>
+                                                    <button type="button" onClick={() => setAttendanceRecords({...attendanceRecords, [student.id]: 'absent'})} className={`btn btn-sm ${attendanceRecords[student.id] === 'absent' ? 'btn-danger' : 'btn-ghost'}`} style={{ padding: '4px 8px' }}>A</button>
+                                                    <button type="button" onClick={() => setAttendanceRecords({...attendanceRecords, [student.id]: 'late'})} className={`btn btn-sm ${attendanceRecords[student.id] === 'late' ? 'btn-secondary' : 'btn-ghost'}`} style={{ padding: '4px 8px' }}>L</button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="modal-footer">
+                                <button type="button" className="btn btn-secondary" onClick={() => setShowCompleteModal(false)}>Cancel</button>
+                                <button type="submit" className="btn btn-primary">Save Session & Attendance</button>
                             </div>
                         </form>
                     </div>

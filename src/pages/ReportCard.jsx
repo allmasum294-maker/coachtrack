@@ -2,9 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { User, FileSignature, Download } from 'lucide-react';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import { User, FileSignature, Printer } from 'lucide-react';
 import { format } from 'date-fns';
 
 export default function ReportCard() {
@@ -15,6 +13,7 @@ export default function ReportCard() {
     const [exams, setExams] = useState([]);
     const [homework, setHomework] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [selectedBatchId, setSelectedBatchId] = useState('');
     const [selectedStudentId, setSelectedStudentId] = useState('');
     const [remarks, setRemarks] = useState('');
 
@@ -43,6 +42,14 @@ export default function ReportCard() {
             setLoading(false);
         }
     }
+
+    const filteredStudents = selectedBatchId ? students.filter(s => s.batchIds?.includes(selectedBatchId)) : students;
+
+    useEffect(() => {
+        if (selectedStudentId && !filteredStudents.find(s => s.id === selectedStudentId)) {
+            setSelectedStudentId('');
+        }
+    }, [selectedBatchId, filteredStudents, selectedStudentId]);
 
     const selectedStudent = students.find((s) => s.id === selectedStudentId);
 
@@ -106,112 +113,9 @@ export default function ReportCard() {
         return { totalClasses, presentClasses, attRate, studentExams, avgScore, totalHomework, completedHomework, hwCompletionRate };
     }
 
-    function generatePDF() {
-        const stats = getStudentStats();
-        if (!stats) return;
-
-        const doc = new jsPDF();
-        const pageWidth = doc.internal.pageSize.width;
-        const pageHeight = doc.internal.pageSize.height;
-
-        // Title
-        doc.setFontSize(22);
-        doc.setTextColor(20, 184, 166); // Teal
-        doc.text("Student Performance Report", pageWidth / 2, 20, { align: "center" });
-
-        // Instructor Name
-        doc.setFontSize(12);
-        doc.setTextColor(100);
-        doc.text(`Instructor: ${userProfile?.displayName || 'Teacher'}`, pageWidth / 2, 28, { align: "center" });
-        doc.text(`Date Generated: ${format(new Date(), 'MMM d, yyyy')}`, pageWidth / 2, 34, { align: "center" });
-
-        doc.setDrawColor(20, 184, 166);
-        doc.setLineWidth(1);
-        doc.line(14, 40, pageWidth - 14, 40);
-
-        // Student Details
-        doc.setFontSize(14);
-        doc.setTextColor(30);
-        doc.text(`Student Name: ${selectedStudent.name}`, 14, 52);
-        doc.text(`Grade/Class: ${selectedStudent.grade || 'N/A'}`, 14, 60);
-        doc.text(`School: ${selectedStudent.school || 'N/A'}`, 14, 68);
-
-        const assignedBatches = batches.filter(b => selectedStudent.batchIds?.includes(b.id)).map(b => b.name).join(', ');
-        doc.text(`Batches: ${assignedBatches || 'None'}`, 14, 76);
-
-        // Attendance Summary
-        doc.setFontSize(16);
-        doc.setTextColor(20, 184, 166);
-        doc.text("Attendance Summary", 14, 90);
-        doc.setFontSize(12);
-        doc.setTextColor(50);
-        doc.text(`Total Classes: ${stats.totalClasses}`, 14, 100);
-        doc.text(`Classes Attended: ${stats.presentClasses}`, 14, 108);
-        doc.text(`Attendance Percentage: ${stats.attRate}%`, 14, 116);
-
-        // Homework Summary
-        doc.setFontSize(16);
-        doc.setTextColor(20, 184, 166);
-        doc.text("Homework Completion", pageWidth / 2, 90);
-        doc.setFontSize(12);
-        doc.setTextColor(50);
-        doc.text(`Total Assigned: ${stats.totalHomework}`, pageWidth / 2, 100);
-        doc.text(`Completed: ${stats.completedHomework}`, pageWidth / 2, 108);
-        doc.text(`Completion Rate: ${stats.hwCompletionRate}%`, pageWidth / 2, 116);
-
-        // Academic Performance Table
-        doc.setFontSize(16);
-        doc.setTextColor(20, 184, 166);
-        doc.text("Academic Performance", 14, 136);
-
-        const tableColumn = ["Exam Title", "Date", "Marks Obtained", "Total Marks", "Percentage"];
-        const tableRows = [];
-
-        stats.studentExams.forEach(e => {
-            const rowData = [
-                e.title,
-                e.date,
-                e.marks.toString(),
-                e.total.toString(),
-                `${e.percent}%`
-            ];
-            tableRows.push(rowData);
-        });
-
-        tableRows.push(["OVERALL AVERAGE", "", "", "", `${stats.avgScore}%`]);
-
-        doc.autoTable({
-            startY: 144,
-            head: [tableColumn],
-            body: tableRows,
-            theme: 'grid',
-            headStyles: { fillColor: [20, 184, 166] },
-            styles: { fontSize: 11 },
-            alternateRowStyles: { fillColor: [240, 248, 255] }
-        });
-
-        const finalY = doc.previousAutoTable.finalY || 144;
-
-        // Remarks
-        doc.setFontSize(16);
-        doc.setTextColor(20, 184, 166);
-        doc.text("Instructor Remarks", 14, finalY + 20);
-        
-        doc.setFontSize(12);
-        doc.setTextColor(50);
-        
-        const splitRemarks = doc.splitTextToSize(remarks || "Keep up the excellent effort!", pageWidth - 28);
-        doc.text(splitRemarks, 14, finalY + 30);
-
-        // Footer signature line
-        const sigY = pageHeight - 30;
-        doc.setDrawColor(100);
-        doc.line(pageWidth - 80, sigY, pageWidth - 14, sigY);
-        doc.setFontSize(10);
-        doc.text("Authorized Signature", pageWidth - 47, sigY + 6, { align: "center" });
-
-        doc.save(`${selectedStudent.name.replace(/\s+/g, '_')}_ReportCard.pdf`);
-    }
+    const handlePrint = () => {
+        window.print();
+    };
 
     const stats = getStudentStats();
 
@@ -219,20 +123,49 @@ export default function ReportCard() {
 
     return (
         <div className="animate-fade-in">
-            <div className="page-header">
+            <style>
+                {`
+                @media print {
+                    @page { margin: 0; }
+                    body { margin: 1cm; background: white; }
+                    .app-layout { grid-template-columns: 1fr; }
+                    .sidebar, .topbar, .page-header, .no-print { display: none !important; }
+                    .main-content { padding: 0 !important; margin: 0 !important; width: 100% !important; max-width: 100% !important; overflow: visible !important; }
+                    .print-section {
+                        margin: 0;
+                        padding: 0;
+                        width: 100%;
+                        max-width: 100%;
+                        background: white !important;
+                        color: black !important;
+                        box-shadow: none !important;
+                        border: none !important;
+                    }
+                    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+                }
+                `}
+            </style>
+            <div className="page-header no-print">
                 <div>
                     <h1 className="page-title">Report Card Generator</h1>
                     <p className="page-subtitle">Create downloadable PDF performance summaries</p>
                 </div>
             </div>
 
-            <div className="card" style={{ marginBottom: 'var(--space-6)' }}>
-                <div style={{ padding: 'var(--space-4)' }}>
-                    <div className="form-group" style={{ maxWidth: 400 }}>
+            <div className="card no-print" style={{ marginBottom: 'var(--space-6)' }}>
+                <div style={{ padding: 'var(--space-4)', display: 'flex', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
+                    <div className="form-group" style={{ flex: '1 1 300px' }}>
+                        <label className="form-label">Filter by Batch</label>
+                        <select className="form-select" value={selectedBatchId} onChange={(e) => setSelectedBatchId(e.target.value)}>
+                            <option value="">-- All Batches --</option>
+                            {batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                        </select>
+                    </div>
+                    <div className="form-group" style={{ flex: '1 1 300px' }}>
                         <label className="form-label">Select Student</label>
                         <select className="form-select" value={selectedStudentId} onChange={(e) => setSelectedStudentId(e.target.value)}>
                             <option value="">-- Choose a Student --</option>
-                            {students.map(s => <option key={s.id} value={s.id}>{s.name} (Class {s.grade})</option>)}
+                            {filteredStudents.map(s => <option key={s.id} value={s.id}>{s.name} (Class {s.grade})</option>)}
                         </select>
                     </div>
                 </div>
@@ -240,14 +173,14 @@ export default function ReportCard() {
 
             {selectedStudent && stats ? (
                 <div className="dashboard-grid">
-                    <div className="card" style={{ gridColumn: '1 / -1' }}>
-                        <div className="card-header">
+                    <div className="card print-section" style={{ gridColumn: '1 / -1' }}>
+                        <div className="card-header no-print">
                             <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <FileSignature size={18} style={{ color: 'var(--color-primary)' }} />
                                 Report Card Preview
                             </div>
                         </div>
-                        <div style={{ padding: 'var(--space-4)' }}>
+                        <div style={{ padding: 'var(--space-4)' }} className="print-section">
                             <div style={{ background: 'var(--color-bg-base)', padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border)' }}>
                                 <div style={{ textAlign: 'center', marginBottom: 'var(--space-6)', borderBottom: '2px solid var(--color-primary)', paddingBottom: 'var(--space-4)' }}>
                                     <h2 style={{ fontSize: '24px', fontWeight: 700, color: 'var(--color-primary)', marginBottom: 'var(--space-2)' }}>Student Performance Report</h2>
@@ -304,9 +237,9 @@ export default function ReportCard() {
                                     />
                                 </div>
 
-                                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 'var(--space-6)' }}>
-                                    <button className="btn btn-primary" onClick={generatePDF} style={{ padding: 'var(--space-3) var(--space-6)' }}>
-                                        <Download size={18} /> Download PDF Report
+                                <div className="no-print" style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 'var(--space-6)' }}>
+                                    <button className="btn btn-primary" onClick={handlePrint} style={{ padding: 'var(--space-3) var(--space-6)' }}>
+                                        <Printer size={18} /> Print PDF Report
                                     </button>
                                 </div>
                             </div>

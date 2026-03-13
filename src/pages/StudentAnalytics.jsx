@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { User, TrendingUp, Calendar, AlertCircle } from 'lucide-react';
+import { User, TrendingUp, TrendingDown, Calendar, AlertCircle } from 'lucide-react';
 import {
     LineChart, Line, BarChart, Bar, AreaChart, Area,
     XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
@@ -208,6 +208,58 @@ export default function StudentAnalytics() {
     const attData = getAttendanceHistory();
     const hwData = getHomeworkHistory();
 
+    const getTopicStats = () => {
+        if (!selectedStudent) return { strengths: [], weaknesses: [] };
+        const topicsPerformance = {};
+        exams.forEach(e => {
+            if (selectedStudent.batchIds?.includes(e.batchId)) {
+                const sScore = (e.scores || []).find(sc => sc.studentId === selectedStudent.id);
+                if (sScore && sScore.topicMarks) {
+                    const batchTopicSums = {};
+                    const batchTopicCounts = {};
+                    e.scores.forEach(score => {
+                        if (score.topicMarks) {
+                            Object.entries(score.topicMarks).forEach(([topic, mark]) => {
+                                const val = parseFloat(mark) || 0;
+                                batchTopicSums[topic] = (batchTopicSums[topic] || 0) + val;
+                                batchTopicCounts[topic] = (batchTopicCounts[topic] || 0) + 1;
+                            });
+                        }
+                    });
+
+                    Object.entries(sScore.topicMarks).forEach(([topic, mark]) => {
+                        const studentVal = parseFloat(mark) || 0;
+                        const batchAvg = batchTopicSums[topic] / (batchTopicCounts[topic] || 1); 
+                        
+                        const diff = studentVal - batchAvg;
+                        
+                        if (!topicsPerformance[topic]) {
+                            topicsPerformance[topic] = { count: 0, diffSum: 0 };
+                        }
+                        topicsPerformance[topic].diffSum += diff;
+                        topicsPerformance[topic].count += 1;
+                    });
+                }
+            }
+        });
+
+        const analyzedTopics = Object.entries(topicsPerformance).map(([topic, data]) => {
+            return {
+                topic,
+                avgDiff: data.diffSum / data.count,
+            };
+        });
+
+        analyzedTopics.sort((a, b) => b.avgDiff - a.avgDiff);
+
+        return {
+            strengths: analyzedTopics.filter(t => t.avgDiff >= 0).slice(0, 3).map(t => t.topic),
+            weaknesses: [...analyzedTopics].reverse().filter(t => t.avgDiff < 0).slice(0, 3).map(t => t.topic)
+        };
+    };
+
+    const topicStats = getTopicStats();
+
     if (loading) return <div className="loading-page"><div className="loading-spinner" /></div>;
 
     return (
@@ -281,6 +333,36 @@ export default function StudentAnalytics() {
                             </div>
                         </div>
                     </div>
+
+                    {/* Topic Strengths & Weaknesses */}
+                    {(topicStats.strengths.length > 0 || topicStats.weaknesses.length > 0) && (
+                        <div className="card" style={{ padding: 'var(--space-4)', marginBottom: 'var(--space-6)' }}>
+                            <div style={{ display: 'flex', gap: 'var(--space-6)', flexWrap: 'wrap' }}>
+                                <div style={{ flex: 1, minWidth: '250px' }}>
+                                    <h3 style={{ fontSize: 'var(--font-size-md)', fontWeight: 600, color: 'var(--color-success)', marginBottom: 'var(--space-3)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                                        <TrendingUp size={18} /> Top Strengths
+                                    </h3>
+                                    <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+                                        {topicStats.strengths.map(t => (
+                                            <span key={t} className="badge" style={{ background: 'var(--color-success-soft)', color: 'var(--color-success)', padding: 'var(--space-2) var(--space-3)', fontSize: 'var(--font-size-sm)' }}>{t}</span>
+                                        ))}
+                                        {topicStats.strengths.length === 0 && <span style={{color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)'}}>Not enough data.</span>}
+                                    </div>
+                                </div>
+                                <div style={{ flex: 1, minWidth: '250px' }}>
+                                    <h3 style={{ fontSize: 'var(--font-size-md)', fontWeight: 600, color: 'var(--color-danger)', marginBottom: 'var(--space-3)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                                        <TrendingDown size={18} /> Areas for Improvement
+                                    </h3>
+                                    <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+                                        {topicStats.weaknesses.map(t => (
+                                            <span key={t} className="badge" style={{ background: 'var(--color-danger-soft)', color: 'var(--color-danger)', padding: 'var(--space-2) var(--space-3)', fontSize: 'var(--font-size-sm)' }}>{t}</span>
+                                        ))}
+                                        {topicStats.weaknesses.length === 0 && <span style={{color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)'}}>No critical weaknesses detected.</span>}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     <div className="analytics-charts" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: 'var(--space-6)' }}>
                         {/* Attendance Trend */}

@@ -25,6 +25,8 @@ export default function Exams() {
         title: '', batchId: '', date: '', totalMarks: 100, topics: '',
     });
 
+    const pastTopics = Array.from(new Set(exams.flatMap(e => e.topics || []))).filter(Boolean).sort();
+
     useEffect(() => {
         if (currentUser) loadData();
     }, [currentUser]);
@@ -65,10 +67,10 @@ export default function Exams() {
     function openScores(exam) {
         setSelectedExam(exam);
         const sc = {};
-        (exam.scores || []).forEach((s) => { sc[s.studentId] = { marks: s.marksObtained, remarks: s.remarks || '' }; });
+        (exam.scores || []).forEach((s) => { sc[s.studentId] = { marks: s.marksObtained, remarks: s.remarks || '', topicMarks: s.topicMarks || {} }; });
         const batchStudents = students.filter((s) => (s.batchIds || []).includes(exam.batchId));
         batchStudents.forEach((s) => {
-            if (!sc[s.id]) sc[s.id] = { marks: '', remarks: '' };
+            if (!sc[s.id]) sc[s.id] = { marks: '', remarks: '', topicMarks: {} };
         });
         setScores(sc);
         setShowScoreModal(true);
@@ -104,13 +106,30 @@ export default function Exams() {
     async function handleSaveScores() {
         if (!selectedExam) return;
         try {
+            const hasTopics = selectedExam.topics && selectedExam.topics.length > 0;
             const scoresArray = Object.entries(scores)
-                .filter(([_, v]) => v.marks !== '')
-                .map(([studentId, v]) => ({
-                    studentId,
-                    marksObtained: parseFloat(v.marks) || 0,
-                    remarks: v.remarks || '',
-                }));
+                .filter(([_, v]) => {
+                    if (hasTopics) {
+                        return selectedExam.topics.some(t => v.topicMarks && v.topicMarks[t] !== undefined && v.topicMarks[t] !== '');
+                    }
+                    return v.marks !== '';
+                })
+                .map(([studentId, v]) => {
+                    let sum = 0;
+                    if (hasTopics) {
+                        for (let t of selectedExam.topics) {
+                            sum += parseFloat(v.topicMarks[t]) || 0;
+                        }
+                    } else {
+                        sum = parseFloat(v.marks) || 0;
+                    }
+                    return {
+                        studentId,
+                        marksObtained: sum,
+                        topicMarks: v.topicMarks || {},
+                        remarks: v.remarks || '',
+                    };
+                });
             await updateDoc(doc(db, 'exams', selectedExam.id), { scores: scoresArray });
             setShowScoreModal(false);
             loadData();
@@ -288,6 +307,23 @@ export default function Exams() {
                                 <div className="form-group">
                                     <label className="form-label">Topics (comma-separated)</label>
                                     <input className="form-input" value={form.topics} onChange={(e) => setForm({ ...form, topics: e.target.value })} placeholder="e.g., Grammar, Comprehension, Writing" />
+                                    {pastTopics.length > 0 && (
+                                        <div style={{ marginTop: 'var(--space-2)', display: 'flex', gap: 'var(--space-1)', flexWrap: 'wrap' }}>
+                                            <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>Suggestions:</span>
+                                            {pastTopics.map(pt => (
+                                                <button key={pt} type="button" 
+                                                    onClick={() => {
+                                                        const cur = form.topics.split(',').map(t=>t.trim()).filter(Boolean);
+                                                        if(!cur.includes(pt)) {
+                                                            setForm(f => ({ ...f, topics: f.topics ? f.topics + ', ' + pt : pt }));
+                                                        }
+                                                    }}
+                                                    className="badge badge-teal" style={{ cursor: 'pointer', border: 'none', background: 'var(--color-bg-elevated)', color: 'var(--color-accent)' }}>
+                                                    + {pt}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                             <div className="modal-footer">
@@ -314,18 +350,42 @@ export default function Exams() {
                             {students
                                 .filter((s) => (s.batchIds || []).includes(selectedExam.batchId))
                                 .map((student) => (
-                                    <div key={student.id} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-3)' }}>
-                                        <div style={{ flex: 1, fontWeight: 600, fontSize: 'var(--font-size-sm)' }}>{student.name}</div>
-                                        <input
-                                            className="form-input"
-                                            type="number"
-                                            min="0"
-                                            max={selectedExam.totalMarks}
-                                            style={{ width: 80 }}
-                                            placeholder="Marks"
-                                            value={scores[student.id]?.marks || ''}
-                                            onChange={(e) => setScores({ ...scores, [student.id]: { ...scores[student.id], marks: e.target.value } })}
-                                        />
+                                    <div key={student.id} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-3)', flexWrap: 'wrap' }}>
+                                        <div style={{ flex: '1 1 120px', fontWeight: 600, fontSize: 'var(--font-size-sm)' }}>{student.name}</div>
+                                        
+                                        {(selectedExam.topics?.length > 0) ? (
+                                            <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', flex: '1 1 auto' }}>
+                                                {selectedExam.topics.map(t => (
+                                                    <div key={t} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                                        <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>{t}</span>
+                                                        <input
+                                                            className="form-input"
+                                                            type="number" min="0"
+                                                            style={{ width: 70, padding: '4px 8px' }}
+                                                            placeholder="Score"
+                                                            value={scores[student.id]?.topicMarks?.[t] || ''}
+                                                            onChange={(e) => setScores(prev => ({
+                                                                ...prev, [student.id]: {
+                                                                    ...prev[student.id], 
+                                                                    topicMarks: { ...prev[student.id].topicMarks, [t]: e.target.value }
+                                                                }
+                                                            }))}
+                                                        />
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <input
+                                                className="form-input"
+                                                type="number"
+                                                min="0"
+                                                max={selectedExam.totalMarks}
+                                                style={{ width: 80 }}
+                                                placeholder="Marks"
+                                                value={scores[student.id]?.marks || ''}
+                                                onChange={(e) => setScores({ ...scores, [student.id]: { ...scores[student.id], marks: e.target.value } })}
+                                            />
+                                        )}
                                         <input
                                             className="form-input"
                                             style={{ width: 140 }}

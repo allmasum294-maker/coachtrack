@@ -107,7 +107,7 @@ function PublicRoute({ children }) {
 
 function App() {
   return (
-    <Router>
+    <Router basename="/coachtrack">
       <AuthProvider>
         <Toaster
           position="top-right"

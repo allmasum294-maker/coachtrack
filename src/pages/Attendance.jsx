@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import {
-    collection, query, where, getDocs, addDoc, updateDoc, doc, serverTimestamp, Timestamp,
+    collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, Timestamp,
 } from 'firebase/firestore';
+import React from 'react';
 import { db } from '../services/firebase';
-import { ClipboardCheck, Check, X as XIcon, Clock, Save } from 'lucide-react';
+import { ClipboardCheck, Check, X as XIcon, Clock, Save, Eye, Trash2, Edit2, ChevronDown, ChevronUp } from 'lucide-react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 
@@ -20,6 +21,7 @@ export default function Attendance() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [tab, setTab] = useState('mark');
+    const [expandedId, setExpandedId] = useState(null);
 
     useEffect(() => {
         if (currentUser) loadData();
@@ -125,6 +127,29 @@ export default function Attendance() {
         } finally {
             setSaving(false);
         }
+    }
+    async function handleDelete(id) {
+        if (!confirm('Are you sure you want to delete this attendance record?')) return;
+        try {
+            await deleteDoc(doc(db, 'attendance', id));
+            toast.success('Record deleted');
+            loadAttendanceForDate();
+        } catch (err) {
+            console.error('Error deleting:', err);
+            toast.error('Failed to delete record');
+        }
+    }
+
+    function handleEdit(att) {
+        setSelectedBatch(att.batchId);
+        const dateVal = att.date?.toDate ? format(att.date.toDate(), 'yyyy-MM-dd') : att.date;
+        setSelectedDate(dateVal);
+        setTab('mark');
+        toast.info('Loaded record for editing');
+    }
+
+    function getStudentName(id) {
+        return students.find(s => s.id === id)?.name || 'Unknown Student';
     }
 
     const batchStudents = getBatchStudents();
@@ -254,31 +279,122 @@ export default function Attendance() {
                                         <th>Absent</th>
                                         <th>Late</th>
                                         <th>Rate</th>
+                                        <th style={{ textAlign: 'right' }}>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {history.map((att) => {
+                                        const isExpanded = expandedId === att.id;
                                         const dateVal = att.date?.toDate ? att.date.toDate() : new Date(att.date);
-                                        const p = (att.records || []).filter((r) => r.status === 'present').length;
-                                        const a = (att.records || []).filter((r) => r.status === 'absent').length;
-                                        const l = (att.records || []).filter((r) => r.status === 'late').length;
-                                        const total = att.records?.length || 0;
+                                        const attRecords = att.records || [];
+                                        const p = attRecords.filter((r) => r.status === 'present').length;
+                                        const a = attRecords.filter((r) => r.status === 'absent').length;
+                                        const l = attRecords.filter((r) => r.status === 'late').length;
+                                        const total = attRecords.length;
                                         const rate = total > 0 ? Math.round((p / total) * 100) : 0;
+                                        
                                         return (
-                                            <tr key={att.id}>
-                                                <td>{format(dateVal, 'MMM d, yyyy')}</td>
-                                                <td><span className="badge badge-green">{p}</span></td>
-                                                <td><span className="badge badge-red">{a}</span></td>
-                                                <td><span className="badge badge-gold">{l}</span></td>
-                                                <td>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                                                        <div className="progress-bar" style={{ width: 80 }}>
-                                                            <div className="progress-bar-fill" style={{ width: `${rate}%` }} />
+                                            <React.Fragment key={att.id}>
+                                                <tr>
+                                                    <td>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                            {format(dateVal, 'MMM d, yyyy')}
+                                                            {att.batchId !== selectedBatch && (
+                                                                <span className="badge" style={{ fontSize: '10px', padding: '2px 6px' }}>
+                                                                    {batches.find(b => b.id === att.batchId)?.name || 'Other'}
+                                                                </span>
+                                                            )}
                                                         </div>
-                                                        <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 600 }}>{rate}%</span>
-                                                    </div>
-                                                </td>
-                                            </tr>
+                                                    </td>
+                                                    <td><span className="badge badge-green">{p}</span></td>
+                                                    <td><span className="badge badge-red">{a}</span></td>
+                                                    <td><span className="badge badge-gold">{l}</span></td>
+                                                    <td>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                                                            <div className="progress-bar" style={{ width: 60 }}>
+                                                                <div className="progress-bar-fill" style={{ width: `${rate}%` }} />
+                                                            </div>
+                                                            <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 600 }}>{rate}%</span>
+                                                        </div>
+                                                    </td>
+                                                    <td style={{ textAlign: 'right' }}>
+                                                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-1)' }}>
+                                                            <button 
+                                                                className="btn btn-ghost btn-icon" 
+                                                                title="View Details"
+                                                                onClick={() => setExpandedId(isExpanded ? null : att.id)}
+                                                            >
+                                                                {isExpanded ? <ChevronUp size={16} /> : <Eye size={16} />}
+                                                            </button>
+                                                            <button 
+                                                                className="btn btn-ghost btn-icon" 
+                                                                title="Edit"
+                                                                onClick={() => handleEdit(att)}
+                                                            >
+                                                                <Edit2 size={16} />
+                                                            </button>
+                                                            <button 
+                                                                className="btn btn-ghost btn-icon" 
+                                                                title="Delete"
+                                                                onClick={() => handleDelete(att.id)}
+                                                            >
+                                                                <Trash2 size={16} style={{ color: 'var(--color-danger)' }} />
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                                {isExpanded && (
+                                                    <tr className="expanded-row">
+                                                        <td colSpan="6" style={{ padding: '0' }}>
+                                                            <div style={{ 
+                                                                padding: 'var(--space-4)', 
+                                                                background: 'var(--color-bg-elevated)',
+                                                                borderBottom: '1px solid var(--color-border)',
+                                                                animation: 'slideDown 0.2s ease-out'
+                                                            }}>
+                                                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-6)' }}>
+                                                                    <div>
+                                                                        <div style={{ color: 'var(--color-teal)', fontWeight: 600, fontSize: '12px', textTransform: 'uppercase', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                                            <Check size={12} /> Present ({p})
+                                                                        </div>
+                                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                                                            {attRecords.filter(r => r.status === 'present').length === 0 ? <span style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>None</span> : 
+                                                                                attRecords.filter(r => r.status === 'present').map(r => (
+                                                                                    <span key={r.studentId} style={{ fontSize: '13px' }}>{getStudentName(r.studentId)}</span>
+                                                                                ))
+                                                                            }
+                                                                        </div>
+                                                                    </div>
+                                                                    <div>
+                                                                        <div style={{ color: 'var(--color-danger)', fontWeight: 600, fontSize: '12px', textTransform: 'uppercase', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                                            <XIcon size={12} /> Absent ({a})
+                                                                        </div>
+                                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                                                            {attRecords.filter(r => r.status === 'absent').length === 0 ? <span style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>None</span> : 
+                                                                                attRecords.filter(r => r.status === 'absent').map(r => (
+                                                                                    <span key={r.studentId} style={{ fontSize: '13px' }}>{getStudentName(r.studentId)}</span>
+                                                                                ))
+                                                                            }
+                                                                        </div>
+                                                                    </div>
+                                                                    <div>
+                                                                        <div style={{ color: 'var(--color-warning)', fontWeight: 600, fontSize: '12px', textTransform: 'uppercase', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                                            <Clock size={12} /> Late ({l})
+                                                                        </div>
+                                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                                                            {attRecords.filter(r => r.status === 'late').length === 0 ? <span style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>None</span> : 
+                                                                                attRecords.filter(r => r.status === 'late').map(r => (
+                                                                                    <span key={r.studentId} style={{ fontSize: '13px' }}>{getStudentName(r.studentId)}</span>
+                                                                                ))
+                                                                            }
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </React.Fragment>
                                         );
                                     })}
                                 </tbody>

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
 import {
     LayoutDashboard,
     Users,
@@ -17,6 +18,13 @@ import {
     Menu,
     X,
     ChevronLeft,
+    Sun,
+    Moon,
+    FileEdit,
+    LineChart,
+    History,
+    FileSignature,
+    BookCheck,
 } from 'lucide-react';
 
 const mainNavItems = [
@@ -28,18 +36,24 @@ const mainNavItems = [
 
 const managementNavItems = [
     { path: '/attendance', icon: ClipboardCheck, label: 'Attendance' },
+    { path: '/homework', icon: BookCheck, label: 'Homework' },
     { path: '/lessons', icon: BookOpen, label: 'Lessons' },
     { path: '/exams', icon: FileText, label: 'Exams' },
+    { path: '/sessions', icon: FileEdit, label: 'Session Logs' },
 ];
 
 const insightNavItems = [
     { path: '/analytics', icon: BarChart3, label: 'Analytics' },
+    { path: '/student-analytics', icon: LineChart, label: 'Student Analytics' },
+    { path: '/timeline', icon: History, label: 'Timeline' },
+    { path: '/report-card', icon: FileSignature, label: 'Report Cards' },
     { path: '/export', icon: Download, label: 'Export' },
     { path: '/notifications', icon: Bell, label: 'Notifications' },
 ];
 
 export default function Sidebar() {
     const { currentUser, userProfile, logout, isAdmin } = useAuth();
+    const { theme, toggleTheme } = useTheme();
     const navigate = useNavigate();
     const [mobileOpen, setMobileOpen] = useState(false);
     const [collapsed, setCollapsed] = useState(false);
@@ -171,6 +185,13 @@ export default function Sidebar() {
                                 </div>
                             </div>
                         )}
+                        <button
+                            className="btn btn-ghost btn-icon"
+                            onClick={toggleTheme}
+                            title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+                        >
+                            {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+                        </button>
                         <button
                             className="btn btn-ghost btn-icon"
                             onClick={handleLogout}

@@ -5,8 +5,10 @@ import {
 } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import {
-    Users, Plus, Edit2, Trash2, Search, X, Eye, Phone, Mail, School, MapPin, BookOpen, User, Calendar,
+    Users, Plus, Edit2, Trash2, Search, X, Eye, Phone, Mail, School, MapPin, BookOpen, User, Calendar, Upload, Download
 } from 'lucide-react';
+import Papa from 'papaparse';
+import toast from 'react-hot-toast';
 
 export default function Students() {
     const { currentUser } = useAuth();
@@ -18,6 +20,9 @@ export default function Students() {
     const [viewingStudent, setViewingStudent] = useState(null);
     const [search, setSearch] = useState('');
     const [filterBatch, setFilterBatch] = useState('');
+    const [showImportModal, setShowImportModal] = useState(false);
+    const [csvPreview, setCsvPreview] = useState([]);
+    const [isImporting, setIsImporting] = useState(false);
     const [form, setForm] = useState({
         name: '', email: '', phone: '', guardianName: '', guardianPhone: '',
         school: '', grade: '', address: '', notes: '', batchIds: [],
@@ -120,6 +125,68 @@ export default function Students() {
         return [...new Set(names)];
     }, [students]);
 
+    function handleFileUpload(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        Papa.parse(file, {
+            header: true,
+            skipEmptyLines: true,
+            complete: (results) => {
+                if (results.errors.length > 0) {
+                    toast.error('Error parsing CSV');
+                    return;
+                }
+                setCsvPreview(results.data);
+            }
+        });
+    }
+
+    function downloadDemoCSV() {
+        const csvContent = "data:text/csv;charset=utf-8,name,email,phone,guardianName,guardianPhone,school,grade,address,notes\nJohn Doe,john@example.com,1234567890,Jane Doe,0987654321,XYZ School,10,123 Main St,Needs extra help in math";
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", "students_demo.csv");
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+    }
+
+    async function handleImportCSV() {
+        if (csvPreview.length === 0) return toast.error('No valid data to import');
+        setIsImporting(true);
+        try {
+            const promises = csvPreview.map(row => {
+                if (!row.name) return Promise.resolve(); // Skip rows without name
+                const data = {
+                    name: row.name || '',
+                    email: row.email || '',
+                    phone: row.phone || '',
+                    guardianName: row.guardianName || '',
+                    guardianPhone: row.guardianPhone || '',
+                    school: row.school || '',
+                    grade: parseInt(row.grade) || 0,
+                    address: row.address || '',
+                    notes: row.notes || '',
+                    batchIds: filterBatch ? [filterBatch] : [],
+                    teacherId: currentUser.uid,
+                    createdAt: serverTimestamp(),
+                };
+                return addDoc(collection(db, 'students'), data);
+            });
+            await Promise.all(promises);
+            toast.success(`Imported ${csvPreview.length} students successfully!`);
+            setShowImportModal(false);
+            setCsvPreview([]);
+            loadData();
+        } catch (err) {
+            console.error('Error importing:', err);
+            toast.error('Failed to import some students');
+        } finally {
+            setIsImporting(false);
+        }
+    }
+
     if (loading) {
         return <div className="loading-page"><div className="loading-spinner" /></div>;
     }
@@ -131,9 +198,14 @@ export default function Students() {
                     <h1 className="page-title">Students</h1>
                     <p className="page-subtitle">Manage your student profiles</p>
                 </div>
-                <button className="btn btn-primary" onClick={openCreate}>
-                    <Plus size={18} /> Add Student
-                </button>
+                <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                    <button className="btn btn-secondary" onClick={() => { setShowImportModal(true); setCsvPreview([]); }}>
+                        <Upload size={18} /> Import CSV
+                    </button>
+                    <button className="btn btn-primary" onClick={openCreate}>
+                        <Plus size={18} /> Add Student
+                    </button>
+                </div>
             </div>
 
             {/* Filters */}
@@ -446,6 +518,76 @@ export default function Students() {
                         <div className="modal-footer">
                             <button className="btn btn-secondary" onClick={() => { setViewingStudent(null); openEdit(viewingStudent); }}>Edit Profile</button>
                             <button className="btn btn-primary" onClick={() => setViewingStudent(null)}>Close</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* Import Modal */}
+            {showImportModal && (
+                <div className="modal-overlay" onClick={() => !isImporting && setShowImportModal(false)}>
+                    <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 800 }}>
+                        <div className="modal-header">
+                            <h2 className="modal-title">Bulk Import Students</h2>
+                            <button className="btn btn-ghost btn-icon" onClick={() => !isImporting && setShowImportModal(false)} disabled={isImporting}>
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="modal-body">
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-4)' }}>
+                                <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
+                                    Upload a CSV file containing your student records.
+                                </p>
+                                <button type="button" className="btn btn-ghost btn-sm" onClick={downloadDemoCSV} disabled={isImporting}>
+                                    <Download size={14} style={{ marginRight: '4px' }} /> Demo Template
+                                </button>
+                            </div>
+                            
+                            <div className="form-group">
+                                <input type="file" accept=".csv" className="form-input" onChange={handleFileUpload} disabled={isImporting} />
+                            </div>
+
+                            {csvPreview.length > 0 && (
+                                <div style={{ marginTop: 'var(--space-4)' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-2)' }}>
+                                        <h4 style={{ fontWeight: 600 }}>Preview ({csvPreview.length} rows)</h4>
+                                    </div>
+                                    <div className="table-container" style={{ maxHeight: 300, overflowY: 'auto' }}>
+                                        <table className="table" style={{ fontSize: 'var(--font-size-xs)' }}>
+                                            <thead>
+                                                <tr>
+                                                    <th>Name</th>
+                                                    <th>Email</th>
+                                                    <th>Phone</th>
+                                                    <th>Grade</th>
+                                                    <th>School</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {csvPreview.slice(0, 50).map((row, i) => (
+                                                    <tr key={i}>
+                                                        <td>{row.name || '—'}</td>
+                                                        <td>{row.email || '—'}</td>
+                                                        <td>{row.phone || '—'}</td>
+                                                        <td>{row.grade || '—'}</td>
+                                                        <td>{row.school || '—'}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                        {csvPreview.length > 50 && (
+                                            <div style={{ textAlign: 'center', padding: 'var(--space-2)', color: 'var(--color-text-muted)', fontSize: '12px' }}>
+                                                Showing first 50 rows...
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                        <div className="modal-footer">
+                            <button className="btn btn-secondary" onClick={() => setShowImportModal(false)} disabled={isImporting}>Cancel</button>
+                            <button className="btn btn-primary" onClick={handleImportCSV} disabled={isImporting || csvPreview.length === 0}>
+                                {isImporting ? 'Importing...' : 'Import Students'}
+                            </button>
                         </div>
                     </div>
                 </div>

@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ThemeProvider } from './context/ThemeContext';
 import { Toaster } from 'react-hot-toast';
 
 // Layout
@@ -20,6 +21,11 @@ import Analytics from './pages/Analytics';
 import Export from './pages/Export';
 import Notifications from './pages/Notifications';
 import AdminPanel from './pages/AdminPanel';
+import SessionLog from './pages/SessionLog';
+import StudentAnalytics from './pages/StudentAnalytics';
+import StudentTimeline from './pages/StudentTimeline';
+import ReportCard from './pages/ReportCard';
+import Homework from './pages/Homework';
 
 // Protected route wrapper
 function ProtectedRoute({ children }) {
@@ -108,73 +114,80 @@ function PublicRoute({ children }) {
 function App() {
   return (
     <Router basename="/coachtrack">
-      <AuthProvider>
-        <Toaster
-          position="top-right"
-          toastOptions={{
-            style: {
-              background: '#1a2235',
-              color: '#f1f5f9',
-              border: '1px solid #2a3654',
-              borderRadius: '10px',
-              fontSize: '14px',
-            },
-            success: { iconTheme: { primary: '#14b8a6', secondary: '#fff' } },
-            error: { iconTheme: { primary: '#ef4444', secondary: '#fff' } },
-          }}
-        />
-        <Routes>
-          {/* Public Routes */}
-          <Route
-            path="/"
-            element={
-              <PublicRoute>
-                <Landing />
-              </PublicRoute>
-            }
+      <ThemeProvider>
+        <AuthProvider>
+          <Toaster
+            position="top-right"
+            toastOptions={{
+              style: {
+                background: 'var(--color-bg-card)',
+                color: 'var(--color-text-primary)',
+                border: '1px solid var(--color-border)',
+                borderRadius: '10px',
+                fontSize: '14px',
+              },
+              success: { iconTheme: { primary: 'var(--color-accent)', secondary: 'var(--color-bg-card)' } },
+              error: { iconTheme: { primary: 'var(--color-danger)', secondary: 'var(--color-bg-card)' } },
+            }}
           />
-          <Route
-            path="/login"
-            element={
-              <PublicRoute>
-                <Login />
-              </PublicRoute>
-            }
-          />
-          <Route
-            path="/register"
-            element={
-              <PublicRoute>
-                <Register />
-              </PublicRoute>
-            }
-          />
+          <Routes>
+            {/* Public Routes */}
+            <Route
+              path="/"
+              element={
+                <PublicRoute>
+                  <Landing />
+                </PublicRoute>
+              }
+            />
+            <Route
+              path="/login"
+              element={
+                <PublicRoute>
+                  <Login />
+                </PublicRoute>
+              }
+            />
+            <Route
+              path="/register"
+              element={
+                <PublicRoute>
+                  <Register />
+                </PublicRoute>
+              }
+            />
 
-          {/* Protected Routes (inside app layout) */}
-          <Route
-            element={
-              <ProtectedRoute>
-                <AppLayout />
-              </ProtectedRoute>
-            }
-          >
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/batches" element={<Batches />} />
-            <Route path="/students" element={<Students />} />
-            <Route path="/schedule" element={<Schedule />} />
-            <Route path="/attendance" element={<Attendance />} />
-            <Route path="/lessons" element={<Lessons />} />
-            <Route path="/exams" element={<Exams />} />
-            <Route path="/analytics" element={<Analytics />} />
-            <Route path="/export" element={<Export />} />
-            <Route path="/notifications" element={<Notifications />} />
-            <Route path="/admin" element={<AdminPanel />} />
-          </Route>
+            {/* Protected Routes (inside app layout) */}
+            <Route
+              element={
+                <ProtectedRoute>
+                  <AppLayout />
+                </ProtectedRoute>
+              }
+            >
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/batches" element={<Batches />} />
+              <Route path="/students" element={<Students />} />
+              <Route path="/schedule" element={<Schedule />} />
+              <Route path="/attendance" element={<Attendance />} />
+              <Route path="/lessons" element={<Lessons />} />
+              <Route path="/exams" element={<Exams />} />
+              <Route path="/sessions" element={<SessionLog />} />
+              <Route path="/analytics" element={<Analytics />} />
+              <Route path="/student-analytics" element={<StudentAnalytics />} />
+              <Route path="/timeline" element={<StudentTimeline />} />
+              <Route path="/report-card" element={<ReportCard />} />
+              <Route path="/homework" element={<Homework />} />
+              <Route path="/export" element={<Export />} />
+              <Route path="/notifications" element={<Notifications />} />
+              <Route path="/admin" element={<AdminPanel />} />
+            </Route>
 
-          {/* Catch all */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </AuthProvider>
+            {/* Catch all */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </AuthProvider>
+      </ThemeProvider>
     </Router>
   );
 }

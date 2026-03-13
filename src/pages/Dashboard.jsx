@@ -252,15 +252,22 @@ export default function Dashboard() {
 
     return (
         <div className="animate-fade-in">
-            {/* Welcome */}
-            <div className="dashboard-welcome">
-                <h1>
-                    {greeting()},{' '}
-                    <span style={{ color: 'var(--color-accent)' }}>
-                        {userProfile?.displayName || 'Teacher'}
-                    </span>
-                </h1>
-                <p>Here's an overview of your coaching activity</p>
+            <div className="dashboard-welcome" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-6)' }}>
+                <div>
+                    <h1>
+                        {greeting()},{' '}
+                        <span style={{ color: 'var(--color-accent)' }}>
+                            {userProfile?.displayName || 'Teacher'}
+                        </span>
+                    </h1>
+                    <p style={{ color: 'var(--color-text-secondary)', marginTop: 'var(--space-1)' }}>Here's an overview of your coaching activity today</p>
+                </div>
+                
+                <div style={{ display: 'flex', gap: 'var(--space-3)', display: 'none' /* hidden on mobile natively via css if needed */ }}>
+                     <Link to="/schedule" className="btn btn-primary" style={{ boxShadow: 'var(--shadow-glow)' }}>
+                         <Calendar size={18} /> Schedule Class
+                     </Link>
+                </div>
             </div>
 
             {/* Stats */}
@@ -311,72 +318,44 @@ export default function Dashboard() {
             </div>
 
             {/* Grid */}
-            <div className="dashboard-grid">
-                {/* Upcoming Classes */}
-                <div className="card">
-                    <div className="card-header">
-                        <div>
-                            <div className="card-title">Upcoming Classes</div>
-                            <div className="card-subtitle">Your next scheduled sessions</div>
-                        </div>
-                        <Link to="/schedule" className="btn btn-ghost btn-sm">
-                            View All <ArrowRight size={14} />
-                        </Link>
-                    </div>
-                    <div className="dashboard-upcoming">
-                        {upcomingClasses.length === 0 ? (
-                            <div className="empty-state" style={{ padding: 'var(--space-8)' }}>
-                                <Calendar size={40} style={{ color: 'var(--color-text-muted)', marginBottom: 'var(--space-3)' }} />
-                                <div className="empty-state-title">No upcoming classes</div>
-                                <div className="empty-state-text">
-                                    Schedule your first class to see it here.
-                                </div>
-                            </div>
-                        ) : (
-                            upcomingClasses.map((cls) => (
-                                <div key={cls.id} className="upcoming-class-item">
-                                    <div className="upcoming-class-time">
-                                        <span className="time">{formatClassTime(cls.startTime)}</span>
-                                        <span className="day">{formatClassDate(cls.date)}</span>
-                                    </div>
-                                    <div className="upcoming-class-info">
-                                        <h4>{cls.title}</h4>
-                                        <p>{cls.batchName || 'No batch assigned'}</p>
-                                    </div>
-                                </div>
-                            ))
-                        )}
-                    </div>
-                </div>
-
+            <div className="dashboard-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', alignItems: 'start' }}>
+                
                 {/* Students At Risk */}
-                <div className="card" style={{ gridColumn: '1 / -1' }}>
-                    <div className="card-header">
+                <div className="card" style={{ gridColumn: 'span 2' }}>
+                    <div className="card-header" style={{ borderBottom: '1px solid var(--color-border)', paddingBottom: 'var(--space-4)' }}>
                         <div>
-                            <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <AlertTriangle size={18} style={{ color: 'var(--color-danger)' }} />
-                                Students At Risk
+                            <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <div style={{ background: 'var(--color-danger-soft)', padding: '6px', borderRadius: 'var(--radius-md)' }}>
+                                    <AlertTriangle size={20} style={{ color: 'var(--color-danger)' }} />
+                                </div>
+                                Required Attention
                             </div>
-                            <div className="card-subtitle">Students needing attention based on performance & attendance</div>
+                            <div className="card-subtitle">Students needing intervention based on performance & attendance.</div>
                         </div>
                     </div>
-                    <div style={{ padding: '0 var(--space-4) var(--space-4)' }}>
+                    <div style={{ padding: 'var(--space-4)' }}>
                         {atRiskList.length === 0 ? (
                             <div className="empty-state" style={{ padding: 'var(--space-6) 0' }}>
                                 <div className="empty-state-title">No students at risk</div>
-                                <div className="empty-state-text">All your active students are doing well!</div>
+                                <div className="empty-state-text">All your active students are performing well above the threshold!</div>
                             </div>
                         ) : (
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 'var(--space-3)' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 'var(--space-4)' }}>
                                 {atRiskList.map(risk => (
-                                    <div key={risk.studentId} style={{ background: 'var(--color-bg-primary)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', border: `1px solid ${risk.score >= 2 ? 'var(--color-danger-soft)' : 'var(--color-warning-soft)'}` }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-2)' }}>
-                                            <h4 style={{ fontWeight: 600 }}>{risk.name}</h4>
-                                            <span className={`badge ${risk.score >= 2 ? 'badge-red' : 'badge-yellow'}`}>
+                                    <div key={risk.studentId} style={{ 
+                                        background: 'var(--color-bg-elevated)', 
+                                        padding: 'var(--space-4)', 
+                                        borderRadius: 'var(--radius-lg)', 
+                                        borderLeft: `4px solid ${risk.score >= 2 ? 'var(--color-danger)' : 'var(--color-warning)'}`,
+                                        boxShadow: 'var(--shadow-sm)'
+                                    }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--space-3)' }}>
+                                            <h4 style={{ fontWeight: 600, fontSize: 'var(--font-size-md)' }}>{risk.name}</h4>
+                                            <span className={`badge ${risk.score >= 2 ? 'badge-red' : 'badge-yellow'}`} style={{ fontSize: 'var(--font-size-xs)' }}>
                                                 {risk.score >= 2 ? 'High Risk' : 'Medium Risk'}
                                             </span>
                                         </div>
-                                        <ul style={{ margin: 0, paddingLeft: '20px', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+                                        <ul style={{ margin: 0, paddingLeft: '20px', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                             {risk.reasons.map((r, i) => (
                                                 <li key={i}>{r}</li>
                                             ))}
@@ -388,27 +367,80 @@ export default function Dashboard() {
                     </div>
                 </div>
 
-                {/* Quick Actions */}
-                <div className="card">
-                    <div className="card-header">
-                        <div className="card-title">Quick Actions</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
+                    {/* Upcoming Classes */}
+                    <div className="card">
+                        <div className="card-header" style={{ borderBottom: '1px solid var(--color-border)', paddingBottom: 'var(--space-4)' }}>
+                            <div>
+                                <div className="card-title">Upcoming Sessions</div>
+                                <div className="card-subtitle">Your agenda for the next few days.</div>
+                            </div>
+                            <Link to="/schedule" className="btn btn-ghost btn-sm" style={{ color: 'var(--color-accent)' }}>
+                                View Calendar <ArrowRight size={16} />
+                            </Link>
+                        </div>
+                        <div className="dashboard-upcoming" style={{ padding: 'var(--space-2) 0' }}>
+                            {upcomingClasses.length === 0 ? (
+                                <div className="empty-state" style={{ padding: 'var(--space-6) var(--space-4)' }}>
+                                    <Calendar size={40} style={{ color: 'var(--color-border)', marginBottom: 'var(--space-3)' }} />
+                                    <div className="empty-state-title">Your schedule is clear</div>
+                                    <div className="empty-state-text">
+                                        You don't have any upcoming classes scheduled.
+                                    </div>
+                                </div>
+                            ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                    {upcomingClasses.map((cls) => (
+                                        <div key={cls.id} className="upcoming-class-item" style={{ 
+                                            padding: 'var(--space-4)', 
+                                            borderBottom: '1px solid var(--color-bg-secondary)',
+                                            margin: 0,
+                                            borderRadius: 0,
+                                            background: 'transparent'
+                                        }}>
+                                            <div className="upcoming-class-time" style={{ background: 'var(--color-bg-elevated)', minWidth: '70px', padding: 'var(--space-2)', borderRadius: 'var(--radius-md)' }}>
+                                                <span className="time" style={{ color: 'var(--color-accent)', fontWeight: 700 }}>{formatClassTime(cls.startTime)}</span>
+                                                <span className="day" style={{ fontSize: 'var(--font-size-xs)', opacity: 0.8 }}>{formatClassDate(cls.date)}</span>
+                                            </div>
+                                            <div className="upcoming-class-info" style={{ flex: 1 }}>
+                                                <h4 style={{ fontWeight: 600, fontSize: 'var(--font-size-base)', marginBottom: '2px' }}>{cls.title}</h4>
+                                                <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
+                                                    Batch: {cls.batchName || 'Unassigned'}
+                                                </p>
+                                            </div>
+                                            <Link to={`/sessions?scheduleId=${cls.id}&batchId=${cls.batchId}`} className="btn btn-ghost btn-icon" title="Log Session">
+                                                <PlayCircle size={18} style={{ color: 'var(--color-text-muted)' }} />
+                                            </Link>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                        <Link to="/attendance" className="btn btn-secondary" style={{ justifyContent: 'flex-start' }}>
-                            <ClipboardCheck size={18} /> Mark Attendance
-                        </Link>
-                        <Link to="/schedule" className="btn btn-secondary" style={{ justifyContent: 'flex-start' }}>
-                            <Calendar size={18} /> Schedule Class
-                        </Link>
-                        <Link to="/students" className="btn btn-secondary" style={{ justifyContent: 'flex-start' }}>
-                            <Users size={18} /> Manage Students
-                        </Link>
-                        <Link to="/lessons" className="btn btn-secondary" style={{ justifyContent: 'flex-start' }}>
-                            <BookOpen size={18} /> Update Lessons
-                        </Link>
-                        <Link to="/analytics" className="btn btn-secondary" style={{ justifyContent: 'flex-start' }}>
-                            <TrendingUp size={18} /> View Analytics
-                        </Link>
+
+                    {/* Quick Actions */}
+                    <div className="card">
+                        <div className="card-header" style={{ paddingBottom: 'var(--space-3)' }}>
+                            <div className="card-title">Quick Links</div>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)', padding: 'var(--space-4)', paddingTop: 0 }}>
+                            <Link to="/attendance" className="btn btn-secondary" style={{ justifyContent: 'center', flexDirection: 'column', gap: '8px', padding: 'var(--space-4)', height: 'auto' }}>
+                                <ClipboardCheck size={24} style={{ color: 'var(--color-accent)' }} /> 
+                                <span style={{ fontSize: 'var(--font-size-sm)' }}>Attendance</span>
+                            </Link>
+                            <Link to="/students" className="btn btn-secondary" style={{ justifyContent: 'center', flexDirection: 'column', gap: '8px', padding: 'var(--space-4)', height: 'auto' }}>
+                                <Users size={24} style={{ color: 'var(--color-info)' }} /> 
+                                <span style={{ fontSize: 'var(--font-size-sm)' }}>Students</span>
+                            </Link>
+                            <Link to="/homework" className="btn btn-secondary" style={{ justifyContent: 'center', flexDirection: 'column', gap: '8px', padding: 'var(--space-4)', height: 'auto' }}>
+                                <BookOpen size={24} style={{ color: 'var(--color-primary)' }} /> 
+                                <span style={{ fontSize: 'var(--font-size-sm)' }}>Homework</span>
+                            </Link>
+                            <Link to="/analytics" className="btn btn-secondary" style={{ justifyContent: 'center', flexDirection: 'column', gap: '8px', padding: 'var(--space-4)', height: 'auto' }}>
+                                <TrendingUp size={24} style={{ color: 'var(--color-gold)' }} /> 
+                                <span style={{ fontSize: 'var(--font-size-sm)' }}>Analytics</span>
+                            </Link>
+                        </div>
                     </div>
                 </div>
             </div>

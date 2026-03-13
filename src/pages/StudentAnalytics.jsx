@@ -15,7 +15,9 @@ export default function StudentAnalytics() {
     const [batches, setBatches] = useState([]);
     const [attendance, setAttendance] = useState([]);
     const [exams, setExams] = useState([]);
+    const [homeworks, setHomeworks] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [selectedBatchId, setSelectedBatchId] = useState('');
     const [selectedStudentId, setSelectedStudentId] = useState('');
 
     useEffect(() => {
@@ -25,22 +27,35 @@ export default function StudentAnalytics() {
     async function loadData() {
         try {
             const uid = currentUser.uid;
-            const [studentSnap, batchSnap, attSnap, examSnap] = await Promise.all([
+            const [studentSnap, batchSnap, attSnap, examSnap, hwSnap] = await Promise.all([
                 getDocs(query(collection(db, 'students'), where('teacherId', '==', uid))),
                 getDocs(query(collection(db, 'batches'), where('teacherId', '==', uid))),
                 getDocs(query(collection(db, 'attendance'), where('teacherId', '==', uid))),
                 getDocs(query(collection(db, 'exams'), where('teacherId', '==', uid))),
+                getDocs(query(collection(db, 'homeworks'), where('teacherId', '==', uid))),
             ]);
             setStudents(studentSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
             setBatches(batchSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
             setAttendance(attSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
             setExams(examSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
+            setHomeworks(hwSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
         } catch (err) {
             console.error('Error loading data:', err);
         } finally {
             setLoading(false);
         }
     }
+
+    const filteredStudents = selectedBatchId
+        ? students.filter(s => s.batchIds?.includes(selectedBatchId))
+        : students;
+
+    // Reset selected student if they are no longer in the filtered list
+    useEffect(() => {
+        if (selectedStudentId && !filteredStudents.find(s => s.id === selectedStudentId)) {
+            setSelectedStudentId('');
+        }
+    }, [selectedBatchId, filteredStudents, selectedStudentId]);
 
     const selectedStudent = students.find((s) => s.id === selectedStudentId);
 
@@ -89,7 +104,29 @@ export default function StudentAnalytics() {
 
         const avgScore = totalExamMarks > 0 ? Math.round((totalMarksEarned / totalExamMarks) * 100) : 0;
 
-        return { studentAttRate, batchAttRate, avgScore, examsTaken };
+        let totalHomeworks = 0;
+        let completedHomeworks = 0;
+        let batchTotalHwCompleted = 0;
+        let batchHwOpportunities = 0;
+
+        homeworks.forEach(hw => {
+            if (selectedStudent.batchIds?.includes(hw.batchId)) {
+                totalHomeworks++;
+                if ((hw.completedBy || []).includes(selectedStudent.id)) {
+                    completedHomeworks++;
+                }
+
+                // calculating batch average hw completion
+                const studentsInBatch = students.filter(s => s.batchIds?.includes(hw.batchId)).length;
+                batchHwOpportunities += studentsInBatch;
+                batchTotalHwCompleted += (hw.completedBy || []).length;
+            }
+        });
+
+        const hwCompletionRate = totalHomeworks > 0 ? Math.round((completedHomeworks / totalHomeworks) * 100) : 0;
+        const batchHwRate = batchHwOpportunities > 0 ? Math.round((batchTotalHwCompleted / batchHwOpportunities) * 100) : 0;
+
+        return { studentAttRate, batchAttRate, avgScore, examsTaken, hwCompletionRate, batchHwRate, totalHomeworks, completedHomeworks };
     };
 
     const stats = getStudentStats();
@@ -147,8 +184,29 @@ export default function StudentAnalytics() {
         return history.slice(-10);
     };
 
+    const getHomeworkHistory = () => {
+        if (!selectedStudent) return [];
+        const history = [];
+        homeworks
+            .filter(hw => selectedStudent.batchIds?.includes(hw.batchId))
+            .sort((a,b) => {
+                const d1 = a.dueDate?.toDate ? a.dueDate.toDate() : new Date(a.dueDate || a.createdAt);
+                const d2 = b.dueDate?.toDate ? b.dueDate.toDate() : new Date(b.dueDate || b.createdAt);
+                return d1 - d2;
+            })
+            .forEach(hw => {
+                const isCompleted = (hw.completedBy || []).includes(selectedStudent.id);
+                history.push({
+                    name: hw.title.substring(0, 15) + (hw.title.length > 15 ? '...' : ''),
+                    Status: isCompleted ? 1 : 0
+                });
+            });
+        return history.slice(-10);
+    };
+
     const examData = getExamHistory();
     const attData = getAttendanceHistory();
+    const hwData = getHomeworkHistory();
 
     if (loading) return <div className="loading-page"><div className="loading-spinner" /></div>;
 
@@ -162,12 +220,24 @@ export default function StudentAnalytics() {
             </div>
 
             <div className="card" style={{ marginBottom: 'var(--space-6)' }}>
-                <div style={{ padding: 'var(--space-4)' }}>
-                    <label className="form-label" style={{ marginBottom: 'var(--space-2)' }}>Select Student to View Analytics</label>
-                    <select className="form-select" value={selectedStudentId} onChange={(e) => setSelectedStudentId(e.target.value)} style={{ maxWidth: 400 }}>
-                        <option value="">-- Choose a Student --</option>
-                        {students.map(s => <option key={s.id} value={s.id}>{s.name} (Class {s.grade})</option>)}
-                    </select>
+                <div style={{ padding: 'var(--space-4)', display: 'flex', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
+                    
+                    <div style={{ flex: '1 1 300px' }}>
+                        <label className="form-label" style={{ marginBottom: 'var(--space-2)' }}>Filter by Batch (Optional)</label>
+                        <select className="form-select" value={selectedBatchId} onChange={(e) => setSelectedBatchId(e.target.value)}>
+                            <option value="">-- All Batches --</option>
+                            {batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                        </select>
+                    </div>
+
+                    <div style={{ flex: '1 1 300px' }}>
+                        <label className="form-label" style={{ marginBottom: 'var(--space-2)' }}>Select Student to View Analytics</label>
+                        <select className="form-select" value={selectedStudentId} onChange={(e) => setSelectedStudentId(e.target.value)}>
+                            <option value="">-- Choose a Student --</option>
+                            {filteredStudents.map(s => <option key={s.id} value={s.id}>{s.name} (Class {s.grade})</option>)}
+                        </select>
+                    </div>
+
                 </div>
             </div>
 
@@ -199,11 +269,22 @@ export default function StudentAnalytics() {
                                 <div className="stat-card-label">Exams Taken</div>
                             </div>
                         </div>
+
+                        <div className="stat-card">
+                            <div className="stat-card-icon" style={{ background: 'var(--color-primary-soft)', color: 'var(--color-primary)' }}>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>
+                            </div>
+                            <div>
+                                <div className="stat-card-value">{stats.hwCompletionRate}%</div>
+                                <div className="stat-card-label">Homework Done</div>
+                                <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>Batch Average: {stats.batchHwRate}%</div>
+                            </div>
+                        </div>
                     </div>
 
-                    <div className="analytics-charts">
+                    <div className="analytics-charts" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: 'var(--space-6)' }}>
                         {/* Attendance Trend */}
-                        <div className="chart-card">
+                        <div className="chart-card card">
                             <div className="chart-card-header">
                                 <div>
                                     <div className="chart-card-title">Recent Attendance</div>
@@ -246,6 +327,34 @@ export default function StudentAnalytics() {
                                     <Bar dataKey="BatchAvg" fill="#64748b" fillOpacity={0.6} radius={[4, 4, 0, 0]} />
                                 </BarChart>
                             </ResponsiveContainer>
+                        </div>
+
+                        {/* Recent Homework Status */}
+                        <div className="chart-card card">
+                            <div className="chart-card-header" style={{ padding: 'var(--space-4)', borderBottom: '1px solid var(--color-border)' }}>
+                                <div>
+                                    <div className="chart-card-title">Recent Homework Tracker</div>
+                                    <div className="chart-card-subtitle">Last 10 assignments (1 = Done, 0 = Pending)</div>
+                                </div>
+                            </div>
+                            <div style={{ padding: 'var(--space-4)' }}>
+                                <ResponsiveContainer width="100%" height={250}>
+                                    <BarChart data={hwData}>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+                                        <XAxis dataKey="name" stroke="var(--color-text-muted)" fontSize={11} tick={{fill: 'var(--color-text-muted)'}} />
+                                        <YAxis stroke="var(--color-text-muted)" fontSize={11} domain={[0, 1]} ticks={[0, 1]} tick={{fill: 'var(--color-text-muted)'}} />
+                                        <Tooltip 
+                                            contentStyle={{ background: 'var(--color-bg-card)', border: '1px solid var(--color-border)', borderRadius: 8, color: 'var(--color-text-primary)' }} 
+                                            formatter={(value) => [value === 1 ? 'Completed' : 'Pending', 'Status']}
+                                        />
+                                        <Bar dataKey="Status" fill="url(#colorAtt)" radius={[4, 4, 0, 0]}>
+                                            {hwData.map((entry, index) => (
+                                                <cell key={`cell-${index}`} fill={entry.Status === 1 ? 'var(--color-success)' : 'var(--color-danger)'} />
+                                            ))}
+                                        </Bar>
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
                         </div>
                     </div>
                 </>

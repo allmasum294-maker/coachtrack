@@ -46,7 +46,7 @@ function ProtectedRoute({ children }) {
     return <Navigate to="/login" replace />;
   }
 
-  if (userProfile && !userProfile.isApproved && userProfile.role !== 'admin') {
+  if (userProfile && userProfile.isApproved === false && userProfile.role !== 'admin') {
     return (
       <div className="auth-page">
         <div className="auth-card" style={{ textAlign: 'center' }}>

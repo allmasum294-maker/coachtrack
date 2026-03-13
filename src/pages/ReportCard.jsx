@@ -13,6 +13,7 @@ export default function ReportCard() {
     const [batches, setBatches] = useState([]);
     const [attendance, setAttendance] = useState([]);
     const [exams, setExams] = useState([]);
+    const [homework, setHomework] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedStudentId, setSelectedStudentId] = useState('');
     const [remarks, setRemarks] = useState('');
@@ -24,16 +25,18 @@ export default function ReportCard() {
     async function loadData() {
         try {
             const uid = currentUser.uid;
-            const [studentSnap, batchSnap, attSnap, examSnap] = await Promise.all([
+            const [studentSnap, batchSnap, attSnap, examSnap, hwSnap] = await Promise.all([
                 getDocs(query(collection(db, 'students'), where('teacherId', '==', uid))),
                 getDocs(query(collection(db, 'batches'), where('teacherId', '==', uid))),
                 getDocs(query(collection(db, 'attendance'), where('teacherId', '==', uid))),
                 getDocs(query(collection(db, 'exams'), where('teacherId', '==', uid))),
+                getDocs(query(collection(db, 'homework'), where('teacherId', '==', uid))),
             ]);
             setStudents(studentSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
             setBatches(batchSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
             setAttendance(attSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
             setExams(examSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
+            setHomework(hwSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
         } catch (err) {
             console.error(err);
         } finally {
@@ -86,7 +89,21 @@ export default function ReportCard() {
 
         const avgScore = totalExamMarks > 0 ? Math.round((totalMarksEarned / totalExamMarks) * 100) : 0;
 
-        return { totalClasses, presentClasses, attRate, studentExams, avgScore };
+        let totalHomework = 0;
+        let completedHomework = 0;
+
+        homework.forEach(hw => {
+            if (selectedStudent.batchIds?.includes(hw.batchId)) {
+                totalHomework++;
+                if ((hw.completedBy || []).includes(selectedStudent.id)) {
+                    completedHomework++;
+                }
+            }
+        });
+
+        const hwCompletionRate = totalHomework > 0 ? Math.round((completedHomework / totalHomework) * 100) : 0;
+
+        return { totalClasses, presentClasses, attRate, studentExams, avgScore, totalHomework, completedHomework, hwCompletionRate };
     }
 
     function generatePDF() {
@@ -132,10 +149,20 @@ export default function ReportCard() {
         doc.text(`Classes Attended: ${stats.presentClasses}`, 14, 108);
         doc.text(`Attendance Percentage: ${stats.attRate}%`, 14, 116);
 
+        // Homework Summary
+        doc.setFontSize(16);
+        doc.setTextColor(20, 184, 166);
+        doc.text("Homework Completion", pageWidth / 2, 90);
+        doc.setFontSize(12);
+        doc.setTextColor(50);
+        doc.text(`Total Assigned: ${stats.totalHomework}`, pageWidth / 2, 100);
+        doc.text(`Completed: ${stats.completedHomework}`, pageWidth / 2, 108);
+        doc.text(`Completion Rate: ${stats.hwCompletionRate}%`, pageWidth / 2, 116);
+
         // Academic Performance Table
         doc.setFontSize(16);
         doc.setTextColor(20, 184, 166);
-        doc.text("Academic Performance", 14, 132);
+        doc.text("Academic Performance", 14, 136);
 
         const tableColumn = ["Exam Title", "Date", "Marks Obtained", "Total Marks", "Percentage"];
         const tableRows = [];
@@ -154,7 +181,7 @@ export default function ReportCard() {
         tableRows.push(["OVERALL AVERAGE", "", "", "", `${stats.avgScore}%`]);
 
         doc.autoTable({
-            startY: 140,
+            startY: 144,
             head: [tableColumn],
             body: tableRows,
             theme: 'grid',
@@ -163,7 +190,7 @@ export default function ReportCard() {
             alternateRowStyles: { fillColor: [240, 248, 255] }
         });
 
-        const finalY = doc.previousAutoTable.finalY || 140;
+        const finalY = doc.previousAutoTable.finalY || 144;
 
         // Remarks
         doc.setFontSize(16);
@@ -235,7 +262,8 @@ export default function ReportCard() {
                                     </div>
                                     <div style={{ textAlign: 'right' }}>
                                         <p><strong>Overall Attendance:</strong> {stats.attRate}%</p>
-                                        <p><strong>Average Score:</strong> {stats.avgScore}%</p>
+                                        <p><strong>Average Exam Score:</strong> {stats.avgScore}%</p>
+                                        <p><strong>Homework Completion:</strong> {stats.hwCompletionRate}%</p>
                                     </div>
                                 </div>
 

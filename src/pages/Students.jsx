@@ -5,7 +5,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import {
-    Users, Plus, Edit2, Trash2, Search, X, Eye, Phone, Mail, School, MapPin, BookOpen, User, Calendar, Upload, Download
+    Users, Plus, Edit2, Trash2, Search, X, Eye, Phone, Mail, School, MapPin, BookOpen, User, Calendar, Upload, Download, ChevronUp, ChevronDown, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import Papa from 'papaparse';
 import toast from 'react-hot-toast';
@@ -20,6 +20,9 @@ export default function Students() {
     const [viewingStudent, setViewingStudent] = useState(null);
     const [search, setSearch] = useState('');
     const [filterBatch, setFilterBatch] = useState('');
+    const [sortConfig, setSortConfig] = useState({ key: 'createdAt', direction: 'desc' });
+    const [currentPage, setCurrentPage] = useState(1);
+    const [studentsPerPage, setStudentsPerPage] = useState(10);
     const [showImportModal, setShowImportModal] = useState(false);
     const [csvPreview, setCsvPreview] = useState([]);
     const [isImporting, setIsImporting] = useState(false);
@@ -109,11 +112,49 @@ export default function Students() {
         }));
     }
 
-    const filteredStudents = students.filter((s) => {
-        const matchesSearch = s.name.toLowerCase().includes(search.toLowerCase());
-        const matchesBatch = !filterBatch || (s.batchIds || []).includes(filterBatch);
-        return matchesSearch && matchesBatch;
-    });
+    function handleSort(key) {
+        let direction = 'asc';
+        if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc';
+        setSortConfig({ key, direction });
+    }
+
+    function renderSortIcon(key) {
+        if (sortConfig.key !== key) return null;
+        return sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />;
+    }
+
+    const filteredStudents = useMemo(() => {
+        return students.filter((s) => {
+            const matchesSearch = s.name.toLowerCase().includes(search.toLowerCase());
+            const matchesBatch = !filterBatch || (s.batchIds || []).includes(filterBatch);
+            return matchesSearch && matchesBatch;
+        });
+    }, [students, search, filterBatch]);
+
+    const sortedStudents = useMemo(() => {
+        let sortable = [...filteredStudents];
+        if (sortConfig !== null) {
+            sortable.sort((a, b) => {
+                if (sortConfig.key === 'createdAt') {
+                    const aTime = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
+                    const bTime = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
+                    return sortConfig.direction === 'asc' ? aTime - bTime : bTime - aTime;
+                }
+                const aVal = a[sortConfig.key] || '';
+                const bVal = b[sortConfig.key] || '';
+                if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+                if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+                return 0;
+            });
+        }
+        return sortable;
+    }, [filteredStudents, sortConfig]);
+
+    const totalPages = Math.ceil(sortedStudents.length / studentsPerPage);
+    const paginatedStudents = useMemo(() => {
+        const start = (currentPage - 1) * studentsPerPage;
+        return sortedStudents.slice(start, start + studentsPerPage);
+    }, [sortedStudents, currentPage, studentsPerPage]);
 
     function getBatchName(batchId) {
         return batches.find((b) => b.id === batchId)?.name || batchId;
@@ -247,20 +288,22 @@ export default function Students() {
                     </div>
                 </div>
             ) : (
-                <div className="table-container">
+                <div>
+                    <div className="table-container">
                     <table className="table">
                         <thead>
                             <tr>
-                                <th>Name</th>
-                                <th>Grade</th>
-                                <th>School</th>
+                                <th onClick={() => handleSort('name')} style={{ cursor: 'pointer', userSelect: 'none' }}>Name {renderSortIcon('name')}</th>
+                                <th onClick={() => handleSort('grade')} style={{ cursor: 'pointer', userSelect: 'none' }}>Grade {renderSortIcon('grade')}</th>
+                                <th onClick={() => handleSort('school')} style={{ cursor: 'pointer', userSelect: 'none' }}>School {renderSortIcon('school')}</th>
                                 <th>Batches</th>
                                 <th>Contact</th>
+                                <th onClick={() => handleSort('createdAt')} style={{ cursor: 'pointer', userSelect: 'none' }}>Added {renderSortIcon('createdAt')}</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {filteredStudents.map((student) => (
+                            {paginatedStudents.map((student) => (
                                 <tr key={student.id}>
                                     <td>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
@@ -297,6 +340,11 @@ export default function Students() {
                                         )}
                                     </td>
                                     <td>
+                                        <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
+                                            {student.createdAt?.toDate ? student.createdAt.toDate().toLocaleDateString() : '—'}
+                                        </div>
+                                    </td>
+                                    <td>
                                         <div style={{ display: 'flex', gap: 'var(--space-1)' }}>
                                             <button className="btn btn-ghost btn-icon" onClick={() => setViewingStudent(student)} title="View details">
                                                 <Eye size={16} />
@@ -313,6 +361,42 @@ export default function Students() {
                             ))}
                         </tbody>
                     </table>
+                    </div>
+                    
+                    {/* Pagination Controls */}
+                    {sortedStudents.length > 0 && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'var(--space-4)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                                <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>Show</span>
+                                <select 
+                                    className="form-select" 
+                                    style={{ width: 70, padding: 'var(--space-1) var(--space-2)' }}
+                                    value={studentsPerPage} 
+                                    onChange={(e) => { setStudentsPerPage(Number(e.target.value)); setCurrentPage(1); }}
+                                >
+                                    <option value={10}>10</option>
+                                    <option value={25}>25</option>
+                                    <option value={50}>50</option>
+                                    <option value={100}>100</option>
+                                </select>
+                                <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginLeft: 'var(--space-2)' }}>
+                                    Showing {(currentPage - 1) * studentsPerPage + 1} to {Math.min(currentPage * studentsPerPage, sortedStudents.length)} of {sortedStudents.length} entries
+                                </span>
+                            </div>
+                            
+                            <div style={{ display: 'flex', gap: 'var(--space-1)' }}>
+                                <button className="btn btn-secondary btn-icon" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>
+                                    <ChevronLeft size={16} />
+                                </button>
+                                <div style={{ display: 'flex', alignItems: 'center', padding: '0 var(--space-3)', fontSize: 'var(--font-size-sm)' }}>
+                                    Page {currentPage} of {totalPages}
+                                </div>
+                                <button className="btn btn-secondary btn-icon" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages || totalPages === 0}>
+                                    <ChevronRight size={16} />
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
 

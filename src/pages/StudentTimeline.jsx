@@ -208,7 +208,7 @@ export default function StudentTimeline() {
                                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 'var(--space-1)' }}>
                                             <h4 style={{ fontWeight: 600 }}>{ev.title}</h4>
                                             <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>
-                                                {format(ev.date, 'MMM d, yyyy h:mm a')}
+                                                {format(ev.date, 'MMM d, yyyy')}
                                             </span>
                                         </div>
                                         <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>

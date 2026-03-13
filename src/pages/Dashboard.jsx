@@ -217,8 +217,11 @@ export default function Dashboard() {
         return format(d, 'EEE, MMM d');
     }
 
-    function formatClassTime(date) {
-        const d = date.toDate ? date.toDate() : new Date(date);
+    function formatClassTime(timeStr) {
+        if (!timeStr) return 'TBD';
+        const [hours, minutes] = timeStr.split(':');
+        const d = new Date();
+        d.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0);
         return format(d, 'h:mm a');
     }
 
@@ -333,7 +336,7 @@ export default function Dashboard() {
                             upcomingClasses.map((cls) => (
                                 <div key={cls.id} className="upcoming-class-item">
                                     <div className="upcoming-class-time">
-                                        <span className="time">{formatClassTime(cls.date)}</span>
+                                        <span className="time">{formatClassTime(cls.startTime)}</span>
                                         <span className="day">{formatClassDate(cls.date)}</span>
                                     </div>
                                     <div className="upcoming-class-info">

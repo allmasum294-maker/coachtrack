@@ -1,0 +1,466 @@
+/* ============================================
+   Page-specific Styles
+   ============================================ */
+
+/* --- Dashboard --- */
+.dashboard-welcome {
+    margin-bottom: var(--space-6);
+}
+
+.dashboard-welcome h1 {
+    font-size: var(--font-size-2xl);
+    font-weight: 800;
+}
+
+.dashboard-welcome p {
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-base);
+    margin-top: var(--space-1);
+}
+
+.dashboard-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--space-4);
+    margin-bottom: var(--space-6);
+}
+
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: var(--space-6);
+}
+
+.dashboard-upcoming {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
+
+.upcoming-class-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    padding: var(--space-4);
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    transition: all var(--transition-fast);
+}
+
+.upcoming-class-item:hover {
+    border-color: var(--color-accent);
+}
+
+.upcoming-class-time {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 60px;
+}
+
+.upcoming-class-time .time {
+    font-size: var(--font-size-sm);
+    font-weight: 700;
+    color: var(--color-accent);
+}
+
+.upcoming-class-time .day {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+}
+
+.upcoming-class-info h4 {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+}
+
+.upcoming-class-info p {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+}
+
+/* --- Attendance Page --- */
+.attendance-grid {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
+
+.attendance-student-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-4);
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    transition: all var(--transition-fast);
+}
+
+.attendance-student-row:hover {
+    border-color: var(--color-border-light);
+}
+
+.attendance-student-info {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+.attendance-student-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-full);
+    background: var(--color-bg-elevated);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: var(--font-size-sm);
+    color: var(--color-accent);
+}
+
+.attendance-status-buttons {
+    display: flex;
+    gap: var(--space-2);
+}
+
+.attendance-status-btn {
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-bg-input);
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    font-family: var(--font-family);
+}
+
+.attendance-status-btn:hover {
+    border-color: var(--color-text-muted);
+}
+
+.attendance-status-btn.present {
+    background: var(--color-success-soft);
+    border-color: var(--color-success);
+    color: var(--color-success);
+}
+
+.attendance-status-btn.absent {
+    background: var(--color-danger-soft);
+    border-color: var(--color-danger);
+    color: var(--color-danger);
+}
+
+.attendance-status-btn.late {
+    background: var(--color-warning-soft);
+    border-color: var(--color-warning);
+    color: var(--color-warning);
+}
+
+/* --- Analytics Page --- */
+.analytics-filters {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    margin-bottom: var(--space-6);
+    flex-wrap: wrap;
+}
+
+.analytics-charts {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-6);
+}
+
+.chart-card {
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-6);
+}
+
+.chart-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--space-4);
+}
+
+.chart-card-title {
+    font-size: var(--font-size-base);
+    font-weight: 700;
+}
+
+.chart-card-subtitle {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+}
+
+.chart-card.full-width {
+    grid-column: 1 / -1;
+}
+
+/* --- Export Page --- */
+.export-options {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-4);
+    margin-bottom: var(--space-6);
+}
+
+.export-option-card {
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-6);
+    cursor: pointer;
+    transition: all var(--transition-base);
+}
+
+.export-option-card:hover {
+    border-color: var(--color-accent);
+    transform: translateY(-2px);
+}
+
+.export-option-card.selected {
+    border-color: var(--color-accent);
+    background: var(--color-accent-soft);
+}
+
+.export-option-card h3 {
+    font-size: var(--font-size-base);
+    font-weight: 700;
+    margin-bottom: var(--space-2);
+}
+
+.export-option-card p {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+}
+
+/* --- Calendar Overrides --- */
+.fc {
+    --fc-border-color: var(--color-border);
+    --fc-bg-color: var(--color-bg-card);
+    --fc-today-bg-color: var(--color-accent-soft);
+    --fc-event-bg-color: var(--color-accent);
+    --fc-event-border-color: var(--color-accent);
+    --fc-neutral-bg-color: var(--color-bg-secondary);
+    --fc-page-bg-color: var(--color-bg-card);
+    --fc-neutral-text-color: var(--color-text-secondary);
+}
+
+.fc .fc-toolbar-title {
+    font-size: var(--font-size-xl) !important;
+    font-weight: 700;
+}
+
+.fc .fc-button {
+    background: var(--color-bg-elevated) !important;
+    border-color: var(--color-border) !important;
+    color: var(--color-text-primary) !important;
+    font-family: var(--font-family) !important;
+    font-size: var(--font-size-sm) !important;
+}
+
+.fc .fc-button:hover {
+    background: var(--color-bg-card-hover) !important;
+}
+
+.fc .fc-button-active {
+    background: var(--color-accent) !important;
+    border-color: var(--color-accent) !important;
+}
+
+.fc .fc-daygrid-day-number,
+.fc .fc-col-header-cell-cushion {
+    color: var(--color-text-primary);
+    text-decoration: none;
+}
+
+.fc .fc-event {
+    border-radius: var(--radius-sm);
+    padding: 2px 4px;
+    font-size: var(--font-size-xs);
+}
+
+.fc .fc-event.google-event {
+    background: var(--color-gold) !important;
+    border-color: var(--color-gold) !important;
+}
+
+/* --- Lesson Page --- */
+.lesson-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+
+.lesson-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-4);
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    transition: all var(--transition-fast);
+}
+
+.lesson-item:hover {
+    border-color: var(--color-border-light);
+}
+
+.lesson-item-order {
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-full);
+    background: var(--color-bg-elevated);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--font-size-sm);
+    font-weight: 700;
+    color: var(--color-text-secondary);
+    flex-shrink: 0;
+}
+
+.lesson-item-order.covered {
+    background: var(--color-accent-soft);
+    color: var(--color-accent);
+}
+
+.lesson-item-content {
+    flex: 1;
+}
+
+.lesson-item-title {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+}
+
+.lesson-item-meta {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    margin-top: 2px;
+}
+
+.lesson-item-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+/* --- Admin Page --- */
+.admin-pending-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
+
+.admin-user-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-4);
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+}
+
+.admin-user-info {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+.admin-user-actions {
+    display: flex;
+    gap: var(--space-2);
+}
+
+/* --- Notification Page --- */
+.notification-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+
+.notification-item {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
+    padding: var(--space-4);
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.notification-item:hover {
+    border-color: var(--color-border-light);
+}
+
+.notification-item.unread {
+    border-left: 3px solid var(--color-accent);
+}
+
+.notification-item-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.notification-item-content {
+    flex: 1;
+}
+
+.notification-item-title {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    margin-bottom: 2px;
+}
+
+.notification-item-text {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+}
+
+.notification-item-time {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    margin-top: var(--space-2);
+}
+
+@media (max-width: 1024px) {
+    .dashboard-stats {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .analytics-charts {
+        grid-template-columns: 1fr;
+    }
+
+    .export-options {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 640px) {
+    .dashboard-stats {
+        grid-template-columns: 1fr;
+    }
+}

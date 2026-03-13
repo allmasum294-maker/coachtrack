@@ -6,6 +6,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { FileText, Plus, Edit2, Trash2, X, Eye, Trophy, TrendingUp, Users } from 'lucide-react';
+import { FileText, Plus, Edit2, Trash2, X, Eye, Trophy, TrendingUp, Users, ClipboardCheck } from 'lucide-react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 
@@ -16,13 +17,15 @@ export default function Exams() {
     const [students, setStudents] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
-    const [showScoreModal, setShowScoreModal] = useState(false);
+    const [showScoresModal, setShowScoresModal] = useState(false); // Renamed from showScoreModal
+    const [showAttendanceModal, setShowAttendanceModal] = useState(false); // New state
     const [editingExam, setEditingExam] = useState(null);
-    const [selectedExam, setSelectedExam] = useState(null);
-    const [scores, setScores] = useState({});
+    const [scoringExam, setScoringExam] = useState(null); // Renamed from selectedExam, used for scores and attendance
+    const [studentScores, setStudentScores] = useState([]); // New state for score entry
+    const [attendanceRecords, setAttendanceRecords] = useState({}); // New state for attendance
     const [filterBatch, setFilterBatch] = useState('');
     const [form, setForm] = useState({
-        title: '', batchId: '', date: '', totalMarks: 100, topics: '',
+        title: '', batchId: '', date: '', startTime: '', endTime: '', totalMarks: 100, topics: '',
     });
 
     const pastTopics = Array.from(new Set(exams.flatMap(e => e.topics || []))).filter(Boolean).sort();
@@ -50,7 +53,10 @@ export default function Exams() {
 
     function openCreate() {
         setEditingExam(null);
-        setForm({ title: '', batchId: '', date: format(new Date(), 'yyyy-MM-dd'), totalMarks: 100, topics: '' });
+        setForm({
+            title: '', batchId: '', date: format(new Date(), 'yyyy-MM-dd'),
+            startTime: '09:00', endTime: '10:00', totalMarks: 100, topics: ''
+        });
         setShowModal(true);
     }
 
@@ -59,31 +65,71 @@ export default function Exams() {
         const dateVal = exam.date?.toDate ? format(exam.date.toDate(), 'yyyy-MM-dd') : exam.date || '';
         setForm({
             title: exam.title, batchId: exam.batchId, date: dateVal,
+            startTime: exam.startTime || '09:00', endTime: exam.endTime || '10:00',
             totalMarks: exam.totalMarks || 100, topics: (exam.topics || []).join(', '),
         });
         setShowModal(true);
     }
 
-    function openScores(exam) {
-        setSelectedExam(exam);
-        const sc = {};
-        (exam.scores || []).forEach((s) => { sc[s.studentId] = { marks: s.marksObtained, remarks: s.remarks || '', topicMarks: s.topicMarks || {} }; });
-        const batchStudents = students.filter((s) => (s.batchIds || []).includes(exam.batchId));
-        batchStudents.forEach((s) => {
-            if (!sc[s.id]) sc[s.id] = { marks: '', remarks: '', topicMarks: {} };
+    function openAttendance(exam) {
+        setScoringExam(exam);
+        const records = {};
+        const studentsInBatch = students.filter(s => (s.batchIds || []).includes(exam.batchId));
+        studentsInBatch.forEach(s => {
+            records[s.id] = (exam.attendance || {})[s.id] || 'present';
         });
-        setScores(sc);
-        setShowScoreModal(true);
+        setAttendanceRecords(records);
+        setShowAttendanceModal(true);
+    }
+
+    async function handleSaveAttendance(e) {
+        e.preventDefault();
+        try {
+            await updateDoc(doc(db, 'exams', scoringExam.id), {
+                attendance: attendanceRecords
+            });
+            setShowAttendanceModal(false);
+            loadData();
+            toast.success('Exam attendance updated');
+        } catch (err) {
+            console.error(err);
+            toast.error('Failed to update attendance');
+        }
+    }
+
+    function openScores(exam) {
+        setScoringExam(exam);
+        const presentStudents = students.filter(s => {
+            const inBatch = (s.batchIds || []).includes(exam.batchId);
+            const attended = exam.attendance?.[s.id] === 'present' || !exam.attendance; // Fallback if no attendance marked yet
+            return inBatch && attended;
+        });
+
+        const scores = presentStudents.map((s) => {
+            const existing = (exam.scores || []).find((sc) => sc.studentId === s.id);
+            return {
+                studentId: s.id,
+                name: s.name,
+                marksObtained: existing ? existing.marksObtained : '',
+                topicMarks: existing ? existing.topicMarks || {} : {},
+                remarks: existing ? existing.remarks : '',
+            };
+        });
+        setStudentScores(scores);
+        setShowScoresModal(true);
     }
 
     async function handleSave(e) {
         e.preventDefault();
         try {
             const data = {
-                title: form.title, batchId: form.batchId,
-                batchName: batches.find((b) => b.id === form.batchId)?.name || '',
+                title: form.title,
                 date: Timestamp.fromDate(new Date(form.date)),
-                totalMarks: parseInt(form.totalMarks) || 100,
+                startTime: form.startTime || '00:00',
+                endTime: form.endTime || '00:00',
+                batchId: form.batchId,
+                batchName: batches.find((b) => b.id === form.batchId)?.name || '',
+                totalMarks: parseFloat(form.totalMarks) || 100,
                 topics: form.topics.split(',').map((t) => t.trim()).filter(Boolean),
                 teacherId: currentUser.uid,
             };
@@ -92,6 +138,7 @@ export default function Exams() {
             } else {
                 data.createdAt = serverTimestamp();
                 data.scores = [];
+                data.attendance = {}; // Initialize attendance
                 await addDoc(collection(db, 'exams'), data);
             }
             setShowModal(false);
@@ -104,34 +151,34 @@ export default function Exams() {
     }
 
     async function handleSaveScores() {
-        if (!selectedExam) return;
+        if (!scoringExam) return;
         try {
-            const hasTopics = selectedExam.topics && selectedExam.topics.length > 0;
-            const scoresArray = Object.entries(scores)
-                .filter(([_, v]) => {
+            const hasTopics = scoringExam.topics && scoringExam.topics.length > 0;
+            const scoresArray = studentScores
+                .filter((v) => {
                     if (hasTopics) {
-                        return selectedExam.topics.some(t => v.topicMarks && v.topicMarks[t] !== undefined && v.topicMarks[t] !== '');
+                        return scoringExam.topics.some(t => v.topicMarks && v.topicMarks[t] !== undefined && v.topicMarks[t] !== '');
                     }
-                    return v.marks !== '';
+                    return v.marksObtained !== '';
                 })
-                .map(([studentId, v]) => {
+                .map((v) => {
                     let sum = 0;
                     if (hasTopics) {
-                        for (let t of selectedExam.topics) {
+                        for (let t of scoringExam.topics) {
                             sum += parseFloat(v.topicMarks[t]) || 0;
                         }
                     } else {
-                        sum = parseFloat(v.marks) || 0;
+                        sum = parseFloat(v.marksObtained) || 0;
                     }
                     return {
-                        studentId,
+                        studentId: v.studentId,
                         marksObtained: sum,
                         topicMarks: v.topicMarks || {},
                         remarks: v.remarks || '',
                     };
                 });
-            await updateDoc(doc(db, 'exams', selectedExam.id), { scores: scoresArray });
-            setShowScoreModal(false);
+            await updateDoc(doc(db, 'exams', scoringExam.id), { scores: scoresArray });
+            setShowScoresModal(false);
             loadData();
             toast.success('Scores saved!');
         } catch (err) {
@@ -219,8 +266,11 @@ export default function Exams() {
                                         <div className="card-subtitle">{getBatchName(exam.batchId)} · {format(dateVal, 'MMM d, yyyy')}</div>
                                     </div>
                                     <div style={{ display: 'flex', gap: 'var(--space-1)' }}>
-                                        <button className="btn btn-ghost btn-icon" onClick={() => openScores(exam)} title="Enter scores">
-                                            <Trophy size={16} style={{ color: 'var(--color-gold)' }} />
+                                        <button className="btn btn-ghost btn-icon" onClick={() => openAttendance(exam)} title="Mark Attendance">
+                                            <Users size={16} />
+                                        </button>
+                                        <button className="btn btn-ghost btn-icon" onClick={() => openScores(exam)} title="Enter Scores">
+                                            <ClipboardCheck size={16} />
                                         </button>
                                         <button className="btn btn-ghost btn-icon" onClick={() => openEdit(exam)}>
                                             <Edit2 size={16} />
@@ -296,8 +346,18 @@ export default function Exams() {
                                         </select>
                                     </div>
                                     <div className="form-group">
-                                        <label className="form-label">Date *</label>
+                                        <label className="form-label">Exam Date *</label>
                                         <input className="form-input" type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
+                                    </div>
+                                </div>
+                                <div className="form-row">
+                                    <div className="form-group">
+                                        <label className="form-label">Start Time</label>
+                                        <input className="form-input" type="time" value={form.startTime} onChange={(e) => setForm({ ...form, startTime: e.target.value })} required />
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">End Time</label>
+                                        <input className="form-input" type="time" value={form.endTime} onChange={(e) => setForm({ ...form, endTime: e.target.value })} required />
                                     </div>
                                 </div>
                                 <div className="form-group">
@@ -400,6 +460,39 @@ export default function Exams() {
                             <button className="btn btn-secondary" onClick={() => setShowScoreModal(false)}>Cancel</button>
                             <button className="btn btn-primary" onClick={handleSaveScores}>Save Scores</button>
                         </div>
+                    </div>
+                </div>
+            )}
+            {/* Attendance Modal */}
+            {showAttendanceModal && scoringExam && (
+                <div className="modal-overlay" onClick={() => setShowAttendanceModal(false)}>
+                    <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 500 }}>
+                        <div className="modal-header">
+                            <h2 className="modal-title">Exam Attendance - {scoringExam.title}</h2>
+                            <button className="btn btn-ghost btn-icon" onClick={() => setShowAttendanceModal(false)}><X size={20} /></button>
+                        </div>
+                        <form onSubmit={handleSaveAttendance}>
+                            <div className="modal-body">
+                                <p style={{ marginBottom: 'var(--space-4)', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)' }}>
+                                    Only present students can be graded for this exam.
+                                </p>
+                                <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                                    {students.filter(s => (s.batchIds || []).includes(scoringExam.batchId)).map(student => (
+                                        <div key={student.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--space-3) 0', borderBottom: '1px solid var(--color-border)' }}>
+                                            <div style={{ fontWeight: 500 }}>{student.name}</div>
+                                            <div style={{ display: 'flex', gap: 'var(--space-1)' }}>
+                                                <button type="button" onClick={() => setAttendanceRecords({...attendanceRecords, [student.id]: 'present'})} className={`btn btn-sm ${attendanceRecords[student.id] === 'present' ? 'btn-primary' : 'btn-ghost'}`}>P</button>
+                                                <button type="button" onClick={() => setAttendanceRecords({...attendanceRecords, [student.id]: 'absent'})} className={`btn btn-sm ${attendanceRecords[student.id] === 'absent' ? 'btn-danger' : 'btn-ghost'}`}>A</button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="modal-footer">
+                                <button type="button" className="btn btn-secondary" onClick={() => setShowAttendanceModal(false)}>Cancel</button>
+                                <button type="submit" className="btn btn-primary">Save Attendance</button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             )}

@@ -17,6 +17,7 @@ export default function Schedule() {
     const { currentUser } = useAuth();
     const navigate = useNavigate();
     const [schedules, setSchedules] = useState([]);
+    const [exams, setExams] = useState([]);
     const [batches, setBatches] = useState([]);
     const [students, setStudents] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -44,14 +45,16 @@ export default function Schedule() {
 
     async function loadData() {
         try {
-            const [schedSnap, batchSnap, studentSnap] = await Promise.all([
+            const [schedSnap, batchSnap, studentSnap, examSnap] = await Promise.all([
                 getDocs(query(collection(db, 'schedules'), where('teacherId', '==', currentUser.uid))),
                 getDocs(query(collection(db, 'batches'), where('teacherId', '==', currentUser.uid))),
                 getDocs(query(collection(db, 'students'), where('teacherId', '==', currentUser.uid))),
+                getDocs(query(collection(db, 'exams'), where('teacherId', '==', currentUser.uid))),
             ]);
             setSchedules(schedSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
             setBatches(batchSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
             setStudents(studentSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
+            setExams(examSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
         } catch (err) {
             console.error('Error loading schedules:', err);
         } finally {
@@ -60,20 +63,40 @@ export default function Schedule() {
     }
 
     function getCalendarEvents() {
-        return schedules.map((s) => {
-            const dateVal = s.date?.toDate ? s.date.toDate() : new Date(s.date);
-            const dateStr = format(dateVal, 'yyyy-MM-dd');
+        const classEvents = schedules.map((s) => {
+            const dateStr = s.date?.toDate ? format(s.date.toDate(), 'yyyy-MM-dd') : s.date;
+            let color = '#3b82f6'; // Blue for scheduled
+            if (s.status === 'completed') color = '#10b981'; // Green
+            if (s.status === 'cancelled') color = '#ef4444'; // Red
+            if (s.status === 'rescheduled') color = '#f59e0b'; // Amber
+
             return {
                 id: s.id,
-                title: s.title || 'Class',
-                start: s.startTime ? `${dateStr}T${s.startTime}` : dateStr,
-                end: s.endTime ? `${dateStr}T${s.endTime}` : undefined,
-                backgroundColor: s.status === 'cancelled' ? 'var(--color-danger)' :
-                    s.status === 'rescheduled' ? 'var(--color-warning)' : 'var(--color-accent)',
-                borderColor: 'transparent',
-                extendedProps: { schedule: s },
+                title: `${s.batchName || ''}: ${s.title}`,
+                start: `${dateStr}T${s.startTime || '00:00:00'}`,
+                end: `${dateStr}T${s.endTime || '23:59:59'}`,
+                backgroundColor: color,
+                borderColor: color,
+                extendedProps: { schedule: s, type: 'class' },
             };
         });
+
+        const examEvents = exams.map((e) => {
+            const dateStr = e.date?.toDate ? format(e.date.toDate(), 'yyyy-MM-dd') : e.date;
+            const color = '#8b5cf6'; // Violet/Purple for Exams
+
+            return {
+                id: e.id,
+                title: `EXAM: ${e.title}`,
+                start: `${dateStr}T${e.startTime || '00:00:00'}`,
+                end: `${dateStr}T${e.endTime || '23:59:59'}`,
+                backgroundColor: color,
+                borderColor: color,
+                extendedProps: { exam: e, type: 'exam' },
+            };
+        });
+
+        return [...classEvents, ...examEvents];
     }
 
     function openRecurringCreate() {
@@ -277,7 +300,13 @@ export default function Schedule() {
                     }}
                     events={getCalendarEvents()}
                     dateClick={(info) => openCreate(info.dateStr)}
-                    eventClick={(info) => openEdit(info.event.extendedProps.schedule)}
+                    eventClick={(info) => {
+                        if (info.event.extendedProps.type === 'exam') {
+                            navigate('/exams');
+                        } else {
+                            openEdit(info.event.extendedProps.schedule);
+                        }
+                    }}
                     height="auto"
                     aspectRatio={1.8}
                 />

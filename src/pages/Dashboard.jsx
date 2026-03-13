@@ -219,9 +219,17 @@ export default function Dashboard() {
 
     function formatClassTime(timeStr) {
         if (!timeStr) return 'TBD';
-        const [hours, minutes] = timeStr.split(':');
+        const [hoursRaw, minutesRaw] = timeStr.split(':');
+        let h = parseInt(hoursRaw, 10);
+        const m = parseInt(minutesRaw, 10);
+        
+        // Handle AM/PM if string natively has it stored
+        const lower = timeStr.toLowerCase();
+        if (lower.includes('pm') && h < 12) h += 12;
+        if (lower.includes('am') && h === 12) h = 0;
+
         const d = new Date();
-        d.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0);
+        d.setHours(h, m, 0);
         return format(d, 'h:mm a');
     }
 
@@ -318,10 +326,10 @@ export default function Dashboard() {
             </div>
 
             {/* Grid */}
-            <div className="dashboard-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', alignItems: 'start' }}>
+            <div className="dashboard-grid" style={{ alignItems: 'start' }}>
                 
                 {/* Students At Risk */}
-                <div className="card" style={{ gridColumn: 'span 2' }}>
+                <div className="card dashboard-risk-card">
                     <div className="card-header" style={{ borderBottom: '1px solid var(--color-border)', paddingBottom: 'var(--space-4)' }}>
                         <div>
                             <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>

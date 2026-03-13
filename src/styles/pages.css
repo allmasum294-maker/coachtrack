@@ -31,6 +31,10 @@
     gap: var(--space-6);
 }
 
+.dashboard-risk-card {
+    grid-column: span 2;
+}
+
 .dashboard-upcoming {
     display: flex;
     flex-direction: column;
@@ -448,6 +452,10 @@
 
     .dashboard-grid {
         grid-template-columns: 1fr;
+    }
+
+    .dashboard-risk-card {
+        grid-column: span 1;
     }
 
     .analytics-charts {

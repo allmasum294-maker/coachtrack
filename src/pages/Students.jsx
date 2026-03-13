@@ -1,12 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Link } from 'react-router-dom';
 import {
     collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import {
-    Users, Plus, Edit2, Trash2, Search, X, Eye, Phone, Mail, School, MapPin,
+    Users, Plus, Edit2, Trash2, Search, X, Eye, Phone, Mail, School, MapPin, BookOpen, User, Calendar,
 } from 'lucide-react';
 
 export default function Students() {
@@ -16,6 +15,7 @@ export default function Students() {
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [editingStudent, setEditingStudent] = useState(null);
+    const [viewingStudent, setViewingStudent] = useState(null);
     const [search, setSearch] = useState('');
     const [filterBatch, setFilterBatch] = useState('');
     const [form, setForm] = useState({
@@ -113,6 +113,12 @@ export default function Students() {
     function getBatchName(batchId) {
         return batches.find((b) => b.id === batchId)?.name || batchId;
     }
+
+    // Collect unique school/college names for autocomplete
+    const schoolSuggestions = useMemo(() => {
+        const names = students.map((s) => s.school).filter(Boolean);
+        return [...new Set(names)];
+    }, [students]);
 
     if (loading) {
         return <div className="loading-page"><div className="loading-spinner" /></div>;
@@ -220,9 +226,9 @@ export default function Students() {
                                     </td>
                                     <td>
                                         <div style={{ display: 'flex', gap: 'var(--space-1)' }}>
-                                            <Link to={`/students/${student.id}`} className="btn btn-ghost btn-icon">
+                                            <button className="btn btn-ghost btn-icon" onClick={() => setViewingStudent(student)} title="View details">
                                                 <Eye size={16} />
-                                            </Link>
+                                            </button>
                                             <button className="btn btn-ghost btn-icon" onClick={() => openEdit(student)}>
                                                 <Edit2 size={16} />
                                             </button>
@@ -287,8 +293,13 @@ export default function Students() {
                                     </div>
                                 </div>
                                 <div className="form-group">
-                                    <label className="form-label">School</label>
-                                    <input className="form-input" value={form.school} onChange={(e) => setForm({ ...form, school: e.target.value })} />
+                                    <label className="form-label">School/College</label>
+                                    <input className="form-input" list="school-suggestions" value={form.school} onChange={(e) => setForm({ ...form, school: e.target.value })} placeholder="Start typing to see suggestions..." />
+                                    <datalist id="school-suggestions">
+                                        {schoolSuggestions.map((name, i) => (
+                                            <option key={i} value={name} />
+                                        ))}
+                                    </datalist>
                                 </div>
                                 <div className="form-group">
                                     <label className="form-label">Address</label>
@@ -324,6 +335,118 @@ export default function Students() {
                                 <button type="submit" className="btn btn-primary">{editingStudent ? 'Save Changes' : 'Add Student'}</button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* View Student Detail Modal */}
+            {viewingStudent && (
+                <div className="modal-overlay" onClick={() => setViewingStudent(null)}>
+                    <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 560 }}>
+                        <div className="modal-header">
+                            <h2 className="modal-title">Student Profile</h2>
+                            <button className="btn btn-ghost btn-icon" onClick={() => setViewingStudent(null)}>
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="modal-body">
+                            {/* Avatar & Name */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)', marginBottom: 'var(--space-6)' }}>
+                                <div style={{
+                                    width: 56, height: 56, borderRadius: 'var(--radius-full)',
+                                    background: 'linear-gradient(135deg, var(--color-accent), var(--color-gold))',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    fontSize: 'var(--font-size-xl)', fontWeight: 800, color: '#fff',
+                                }}>
+                                    {viewingStudent.name?.charAt(0).toUpperCase()}
+                                </div>
+                                <div>
+                                    <div style={{ fontSize: 'var(--font-size-lg)', fontWeight: 700 }}>{viewingStudent.name}</div>
+                                    <div style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)' }}>Class {viewingStudent.grade}</div>
+                                </div>
+                            </div>
+
+                            {/* Info Grid */}
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)', marginBottom: 'var(--space-5)' }}>
+                                {viewingStudent.email && (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                                        <Mail size={15} style={{ color: 'var(--color-accent)', flexShrink: 0 }} />
+                                        <div>
+                                            <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>Email</div>
+                                            <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: 500 }}>{viewingStudent.email}</div>
+                                        </div>
+                                    </div>
+                                )}
+                                {viewingStudent.phone && (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                                        <Phone size={15} style={{ color: 'var(--color-accent)', flexShrink: 0 }} />
+                                        <div>
+                                            <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>Phone</div>
+                                            <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: 500 }}>{viewingStudent.phone}</div>
+                                        </div>
+                                    </div>
+                                )}
+                                {viewingStudent.school && (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                                        <School size={15} style={{ color: 'var(--color-accent)', flexShrink: 0 }} />
+                                        <div>
+                                            <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>School/College</div>
+                                            <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: 500 }}>{viewingStudent.school}</div>
+                                        </div>
+                                    </div>
+                                )}
+                                {viewingStudent.address && (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                                        <MapPin size={15} style={{ color: 'var(--color-accent)', flexShrink: 0 }} />
+                                        <div>
+                                            <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>Address</div>
+                                            <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: 500 }}>{viewingStudent.address}</div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Guardian Info */}
+                            {(viewingStudent.guardianName || viewingStudent.guardianPhone) && (
+                                <div style={{
+                                    background: 'var(--color-surface-2)', borderRadius: 'var(--radius-lg)',
+                                    padding: 'var(--space-4)', marginBottom: 'var(--space-5)',
+                                }}>
+                                    <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 'var(--space-2)' }}>Guardian</div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                        <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: 600 }}>{viewingStudent.guardianName || '—'}</div>
+                                        {viewingStudent.guardianPhone && (
+                                            <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>{viewingStudent.guardianPhone}</div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Batches */}
+                            <div style={{ marginBottom: 'var(--space-4)' }}>
+                                <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 'var(--space-2)' }}>Assigned Batches</div>
+                                <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+                                    {(viewingStudent.batchIds || []).length > 0
+                                        ? viewingStudent.batchIds.map((bid) => (
+                                            <span key={bid} className="badge badge-teal">{getBatchName(bid)}</span>
+                                        ))
+                                        : <span className="badge badge-red">Unassigned</span>
+                                    }
+                                </div>
+                            </div>
+
+                            {/* Notes */}
+                            {viewingStudent.notes && (
+                                <div>
+                                    <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 'var(--space-2)' }}>Notes</div>
+                                    <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', lineHeight: 1.6 }}>{viewingStudent.notes}</div>
+                                </div>
+                            )}
+                        </div>
+                        <div className="modal-footer">
+                            <button className="btn btn-secondary" onClick={() => { setViewingStudent(null); openEdit(viewingStudent); }}>Edit Profile</button>
+                            <button className="btn btn-primary" onClick={() => setViewingStudent(null)}>Close</button>
+                        </div>
                     </div>
                 </div>
             )}

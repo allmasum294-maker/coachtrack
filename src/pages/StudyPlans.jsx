@@ -250,7 +250,7 @@ export default function StudyPlans() {
 
                     <div style={{ padding: 'var(--space-6)' }}>
                         {/* Summary of findings */}
-                        <div style={{ marginBottom: 'var(--space-6)', background: 'var(--color-surface-1)', padding: 'var(--space-4)', borderRadius: 'var(--radius-md)' }}>
+                        <div style={{ marginBottom: 'var(--space-6)', background: 'var(--color-bg-secondary)', padding: 'var(--space-4)', borderRadius: 'var(--radius-md)' }}>
                             <p style={{ margin: 0, lineHeight: 1.6, fontSize: '15px' }}>
                                 Based on a heuristic analysis of past exam data, we've identified that immediate focus is required on <strong>{studyPlan.weakTopics.join(', ')}</strong>. 
                                 By dedicating structured review time to these areas, the student can significantly elevate their overall average.
@@ -288,10 +288,10 @@ export default function StudyPlans() {
                                             {item.description}
                                         </p>
                                         <div style={{ display: 'flex', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
-                                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12px', background: 'var(--color-surface-2)', padding: '4px 10px', borderRadius: '12px', fontWeight: 500 }}>
+                                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12px', background: 'var(--color-bg-elevated)', padding: '4px 10px', borderRadius: '12px', fontWeight: 500 }}>
                                                 <Clock size={14} style={{ color: 'var(--color-text-muted)' }} /> Required Time: {item.time}
                                             </span>
-                                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12px', background: 'var(--color-surface-2)', padding: '4px 10px', borderRadius: '12px', fontWeight: 500 }}>
+                                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12px', background: 'var(--color-bg-elevated)', padding: '4px 10px', borderRadius: '12px', fontWeight: 500 }}>
                                                 <Calendar size={14} style={{ color: 'var(--color-text-muted)' }} /> Frequency: {item.frequency}
                                             </span>
                                         </div>

@@ -164,11 +164,13 @@ export default function Dashboard() {
             }
 
             // Declining exam scores
-            const pastExams = examsData.filter(e => !upcomingExams.find(ue => ue.id === e.id)).sort((a,b) => {
-                const da = a.date.toDate ? a.date.toDate() : new Date(a.date);
-                const db2 = b.date.toDate ? b.date.toDate() : new Date(b.date);
-                return da - db2;
-            });
+            const pastExams = examsData
+                .filter(e => e.date && !upcomingExams.find(ue => ue.id === e.id))
+                .sort((a, b) => {
+                    const da = a.date.toDate ? a.date.toDate() : new Date(a.date);
+                    const db2 = b.date.toDate ? b.date.toDate() : new Date(b.date);
+                    return da - db2;
+                });
 
             const studentScores = {};
             pastExams.forEach(exam => {
@@ -211,26 +213,40 @@ export default function Dashboard() {
     }
 
     function formatClassDate(date) {
-        const d = date.toDate ? date.toDate() : new Date(date);
-        if (isToday(d)) return 'Today';
-        if (isTomorrow(d)) return 'Tomorrow';
-        return format(d, 'EEE, MMM d');
+        if (!date) return '—';
+        try {
+            const d = date.toDate ? date.toDate() : new Date(date);
+            if (isNaN(d.getTime())) return '—';
+            if (isToday(d)) return 'Today';
+            if (isTomorrow(d)) return 'Tomorrow';
+            return format(d, 'EEE, MMM d');
+        } catch (err) {
+            console.error('Error formatting date:', err);
+            return '—';
+        }
     }
 
     function formatClassTime(timeStr) {
         if (!timeStr) return 'TBD';
-        const [hoursRaw, minutesRaw] = timeStr.split(':');
-        let h = parseInt(hoursRaw, 10);
-        const m = parseInt(minutesRaw, 10);
-        
-        // Handle AM/PM if string natively has it stored
-        const lower = timeStr.toLowerCase();
-        if (lower.includes('pm') && h < 12) h += 12;
-        if (lower.includes('am') && h === 12) h = 0;
+        try {
+            const [hoursRaw, minutesRaw] = timeStr.split(':');
+            let h = parseInt(hoursRaw, 10);
+            const m = parseInt(minutesRaw, 10) || 0;
+            
+            if (isNaN(h)) return timeStr;
 
-        const d = new Date();
-        d.setHours(h, m, 0);
-        return format(d, 'h:mm a');
+            // Handle AM/PM if string natively has it stored
+            const lower = timeStr.toLowerCase();
+            if (lower.includes('pm') && h < 12) h += 12;
+            if (lower.includes('am') && h === 12) h = 0;
+
+            const d = new Date();
+            d.setHours(h, m, 0);
+            return format(d, 'h:mm a');
+        } catch (err) {
+            console.error('Error formatting time:', err);
+            return timeStr;
+        }
     }
 
     function getCountdownText(exam) {
@@ -353,18 +369,14 @@ export default function Dashboard() {
                         ) : (
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 'var(--space-4)' }}>
                                 {atRiskList.map(risk => (
-                                    <div key={risk.studentId} style={{ 
-                                        background: 'var(--color-surface-1)', 
+                                    <div key={risk.studentId} className="card-interactive" style={{ 
+                                        background: 'var(--color-bg-card)', 
                                         padding: 'var(--space-5)', 
                                         borderRadius: 'var(--radius-lg)', 
                                         border: `1px solid ${risk.score >= 2 ? 'rgba(239, 68, 68, 0.3)' : 'rgba(245, 158, 11, 0.3)'}`,
                                         borderLeft: `4px solid ${risk.score >= 2 ? 'var(--color-danger)' : 'var(--color-warning)'}`,
                                         boxShadow: 'var(--shadow-sm)',
-                                        transition: 'transform 0.2s',
-                                    }}
-                                    onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
-                                    onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
-                                    >
+                                    }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--space-4)' }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
                                                  <div style={{ width: 40, height: 40, borderRadius: 'var(--radius-full)', background: 'var(--color-bg-elevated)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '18px', color: 'var(--color-text-primary)' }}>

@@ -148,7 +148,7 @@ export default function Leaderboard() {
                     {leaderboardData.length >= 3 && (
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-4)', alignItems: 'end', marginBottom: 'var(--space-4)' }}>
                             {/* Rank 2 */}
-                            <div className="card" style={{ padding: 'var(--space-6) var(--space-4)', textAlign: 'center', background: 'linear-gradient(to bottom, var(--color-surface-1), var(--color-surface-2))', borderTop: '4px solid #94a3b8', transform: 'translateY(20px)' }}>
+                            <div className="card" style={{ padding: 'var(--space-6) var(--space-4)', textAlign: 'center', background: 'linear-gradient(to bottom, var(--color-bg-card), var(--color-bg-elevated))', borderTop: '4px solid #94a3b8', transform: 'translateY(20px)' }}>
                                 <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-2)' }}>
                                     <Medal size={32} style={{ color: '#94a3b8' }} />
                                 </div>
@@ -172,7 +172,7 @@ export default function Leaderboard() {
                             </div>
 
                             {/* Rank 3 */}
-                            <div className="card" style={{ padding: 'var(--space-6) var(--space-4)', textAlign: 'center', background: 'linear-gradient(to bottom, var(--color-surface-1), var(--color-surface-2))', borderTop: '4px solid #b45309', transform: 'translateY(30px)' }}>
+                            <div className="card" style={{ padding: 'var(--space-6) var(--space-4)', textAlign: 'center', background: 'linear-gradient(to bottom, var(--color-bg-card), var(--color-bg-elevated))', borderTop: '4px solid #b45309', transform: 'translateY(30px)' }}>
                                 <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-2)' }}>
                                     <Medal size={32} style={{ color: '#b45309' }} />
                                 </div>
@@ -227,7 +227,7 @@ export default function Leaderboard() {
                     </div>
 
                     {/* Points Legend */}
-                    <div style={{ background: 'var(--color-surface-2)', padding: 'var(--space-4)', borderRadius: 'var(--radius-md)', display: 'flex', gap: 'var(--space-6)', justifyContent: 'center', flexWrap: 'wrap' }}>
+                    <div style={{ background: 'var(--color-bg-elevated)', padding: 'var(--space-4)', borderRadius: 'var(--radius-md)', display: 'flex', gap: 'var(--space-6)', justifyContent: 'center', flexWrap: 'wrap' }}>
                         <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <Star size={14} style={{ color: 'var(--color-gold)' }} /> <strong>+10 pts</strong> per attended class
                         </div>

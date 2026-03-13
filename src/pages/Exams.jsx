@@ -395,40 +395,38 @@ export default function Exams() {
             )}
 
             {/* Score Entry Modal */}
-            {showScoreModal && selectedExam && (
-                <div className="modal-overlay" onClick={() => setShowScoreModal(false)}>
+            {showScoresModal && scoringExam && (
+                <div className="modal-overlay" onClick={() => setShowScoresModal(false)}>
                     <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 640 }}>
                         <div className="modal-header">
-                            <h2 className="modal-title">Enter Scores — {selectedExam.title}</h2>
-                            <button className="btn btn-ghost btn-icon" onClick={() => setShowScoreModal(false)}><X size={20} /></button>
+                            <h2 className="modal-title">Enter Scores — {scoringExam.title}</h2>
+                            <button className="btn btn-ghost btn-icon" onClick={() => setShowScoresModal(false)}><X size={20} /></button>
                         </div>
                         <div className="modal-body">
                             <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-3)' }}>
-                                Total Marks: <strong>{selectedExam.totalMarks}</strong>
+                                Total Marks: <strong>{scoringExam.totalMarks}</strong>
                             </p>
-                            {students
-                                .filter((s) => (s.batchIds || []).includes(selectedExam.batchId))
-                                .map((student) => (
-                                    <div key={student.id} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-3)', flexWrap: 'wrap' }}>
-                                        <div style={{ flex: '1 1 120px', fontWeight: 600, fontSize: 'var(--font-size-sm)' }}>{student.name}</div>
+                            <div style={{ maxHeight: '450px', overflowY: 'auto' }}>
+                                {studentScores.map((studentScore, idx) => (
+                                    <div key={studentScore.studentId} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-4)', padding: 'var(--space-3)', background: 'var(--color-bg-elevated)', borderRadius: 'var(--radius-md)', flexWrap: 'wrap' }}>
+                                        <div style={{ flex: '1 1 120px', fontWeight: 600, fontSize: 'var(--font-size-sm)' }}>{studentScore.name}</div>
                                         
-                                        {(selectedExam.topics?.length > 0) ? (
+                                        {(scoringExam.topics?.length > 0) ? (
                                             <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', flex: '1 1 auto' }}>
-                                                {selectedExam.topics.map(t => (
+                                                {scoringExam.topics.map(t => (
                                                     <div key={t} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                                                         <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>{t}</span>
                                                         <input
                                                             className="form-input"
                                                             type="number" min="0"
-                                                            style={{ width: 70, padding: '4px 8px' }}
+                                                            style={{ width: 75, padding: '4px 8px' }}
                                                             placeholder="Score"
-                                                            value={scores[student.id]?.topicMarks?.[t] || ''}
-                                                            onChange={(e) => setScores(prev => ({
-                                                                ...prev, [student.id]: {
-                                                                    ...prev[student.id], 
-                                                                    topicMarks: { ...prev[student.id].topicMarks, [t]: e.target.value }
-                                                                }
-                                                            }))}
+                                                            value={studentScore.topicMarks?.[t] || ''}
+                                                            onChange={(e) => {
+                                                                const newScores = [...studentScores];
+                                                                newScores[idx].topicMarks = { ...newScores[idx].topicMarks, [t]: e.target.value };
+                                                                setStudentScores(newScores);
+                                                            }}
                                                         />
                                                     </div>
                                                 ))}
@@ -438,25 +436,34 @@ export default function Exams() {
                                                 className="form-input"
                                                 type="number"
                                                 min="0"
-                                                max={selectedExam.totalMarks}
-                                                style={{ width: 80 }}
+                                                max={scoringExam.totalMarks}
+                                                style={{ width: 85 }}
                                                 placeholder="Marks"
-                                                value={scores[student.id]?.marks || ''}
-                                                onChange={(e) => setScores({ ...scores, [student.id]: { ...scores[student.id], marks: e.target.value } })}
+                                                value={studentScore.marksObtained || ''}
+                                                onChange={(e) => {
+                                                    const newScores = [...studentScores];
+                                                    newScores[idx].marksObtained = e.target.value;
+                                                    setStudentScores(newScores);
+                                                }}
                                             />
                                         )}
                                         <input
                                             className="form-input"
                                             style={{ width: 140 }}
                                             placeholder="Remarks"
-                                            value={scores[student.id]?.remarks || ''}
-                                            onChange={(e) => setScores({ ...scores, [student.id]: { ...scores[student.id], remarks: e.target.value } })}
+                                            value={studentScore.remarks || ''}
+                                            onChange={(e) => {
+                                                const newScores = [...studentScores];
+                                                newScores[idx].remarks = e.target.value;
+                                                setStudentScores(newScores);
+                                            }}
                                         />
                                     </div>
                                 ))}
+                            </div>
                         </div>
                         <div className="modal-footer">
-                            <button className="btn btn-secondary" onClick={() => setShowScoreModal(false)}>Cancel</button>
+                            <button className="btn btn-secondary" onClick={() => setShowScoresModal(false)}>Cancel</button>
                             <button className="btn btn-primary" onClick={handleSaveScores}>Save Scores</button>
                         </div>
                     </div>

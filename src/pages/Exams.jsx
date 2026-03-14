@@ -87,9 +87,67 @@ export default function Exams() {
             await updateDoc(doc(db, 'exams', scoringExam.id), {
                 attendance: attendanceRecords
             });
+
+            // Sync with main attendance collection
+            const dateVal = scoringExam.date?.toDate ? format(scoringExam.date.toDate(), 'yyyy-MM-dd') : scoringExam.date;
+            const snap = await getDocs(
+                query(
+                    collection(db, 'attendance'),
+                    where('teacherId', '==', currentUser.uid),
+                    where('batchId', '==', scoringExam.batchId),
+                )
+            );
+
+            const existing = snap.docs.find((d) => {
+                const data = d.data();
+                const dDate = data.date?.toDate ? format(data.date.toDate(), 'yyyy-MM-dd') : data.date;
+                return dDate === dateVal;
+            });
+
+            if (existing) {
+                const data = existing.data();
+                const updatedRecords = [...(data.records || [])];
+                
+                // Update or add records from exam attendance
+                Object.entries(attendanceRecords).forEach(([studentId, status]) => {
+                    const idx = updatedRecords.findIndex(r => r.studentId === studentId);
+                    if (idx > -1) {
+                        // If marked 'present' in exam, mark 'present' in attendance
+                        // If 'absent' in exam, we can choose to mark 'absent' or leave as is.
+                        // User said: "a student attending in exam is considered present"
+                        if (status === 'present') {
+                            updatedRecords[idx].status = 'present';
+                        }
+                    } else {
+                        if (status === 'present') {
+                            updatedRecords.push({ studentId, status: 'present' });
+                        }
+                    }
+                });
+
+                await updateDoc(doc(db, 'attendance', existing.id), {
+                    records: updatedRecords
+                });
+            } else {
+                // Create new attendance record
+                const batchStudents = students.filter(s => (s.batchIds || []).includes(scoringExam.batchId));
+                const recordsArray = batchStudents.map(s => ({
+                    studentId: s.id,
+                    status: attendanceRecords[s.id] || 'present' // Default to present if not in exam list, but if in exam list use their status
+                }));
+
+                await addDoc(collection(db, 'attendance'), {
+                    batchId: scoringExam.batchId,
+                    teacherId: currentUser.uid,
+                    date: scoringExam.date,
+                    records: recordsArray,
+                    createdAt: serverTimestamp()
+                });
+            }
+
             setShowAttendanceModal(false);
             loadData();
-            toast.success('Exam attendance updated');
+            toast.success('Exam attendance updated & synced');
         } catch (err) {
             console.error(err);
             toast.error('Failed to update attendance');

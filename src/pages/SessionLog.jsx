@@ -124,7 +124,7 @@ export default function SessionLog() {
                 await updateDoc(doc(db, 'sessionLogs', editingLog.id), data);
             } else {
                 data.createdAt = serverTimestamp();
-                await addDoc(collection(db, 'sessionLogs'), data);
+                const logRef = await addDoc(collection(db, 'sessionLogs'), data);
                 // Mark the schedule as completed
                 if (form.scheduleId) {
                     await updateDoc(doc(db, 'schedules', form.scheduleId), { status: 'completed' });
@@ -140,7 +140,7 @@ export default function SessionLog() {
                         teacherId: currentUser.uid,
                         completedBy: [],
                         submissions: {},
-                        sessionLogId: '', // will link after we know the ID — or link by date/batch
+                        sessionLogId: logRef.id, // properly linked!
                         createdAt: serverTimestamp(),
                     });
                 }

@@ -21,6 +21,7 @@ export default function Schedule() {
     const [batches, setBatches] = useState([]);
     const [students, setStudents] = useState([]);
     const [sessionLogs, setSessionLogs] = useState([]);
+    const [homeworks, setHomeworks] = useState([]);
     const [loading, setLoading] = useState(true);
     const [filterBatch, setFilterBatch] = useState('');
     const [showModal, setShowModal] = useState(false);
@@ -49,18 +50,20 @@ export default function Schedule() {
 
     async function loadData() {
         try {
-            const [schedSnap, batchSnap, studentSnap, examSnap, sessionLogSnap] = await Promise.all([
+            const [schedSnap, batchSnap, studentSnap, examSnap, sessionLogSnap, hwSnap] = await Promise.all([
                 getDocs(query(collection(db, 'schedules'), where('teacherId', '==', currentUser.uid))),
                 getDocs(query(collection(db, 'batches'), where('teacherId', '==', currentUser.uid))),
                 getDocs(query(collection(db, 'students'), where('teacherId', '==', currentUser.uid))),
                 getDocs(query(collection(db, 'exams'), where('teacherId', '==', currentUser.uid))),
                 getDocs(query(collection(db, 'sessionLogs'), where('teacherId', '==', currentUser.uid))),
+                getDocs(query(collection(db, 'homeworks'), where('teacherId', '==', currentUser.uid))),
             ]);
             setSchedules(schedSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
             setBatches(batchSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
             setStudents(studentSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
             setExams(examSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
             setSessionLogs(sessionLogSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
+            setHomeworks(hwSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
         } catch (err) {
             console.error('Error loading schedules:', err);
         } finally {
@@ -127,7 +130,26 @@ export default function Schedule() {
                 };
             });
 
-        return [...classEvents, ...examEvents, ...sessionLogEvents];
+        // Homework Events
+        const homeworkEvents = homeworks
+            .filter(hw => !filterBatch || hw.batchId === filterBatch)
+            .filter(hw => hw.dueDate)
+            .map((hw) => {
+                const dateStr = hw.dueDate?.toDate ? format(hw.dueDate.toDate(), 'yyyy-MM-dd') : hw.dueDate;
+                const batchMsg = batches.find(b => b.id === hw.batchId)?.name || '';
+                const color = '#ec4899'; // Pink for Homework
+                return {
+                    id: `hw-${hw.id}`,
+                    title: `HW DUE: ${hw.title}`,
+                    start: `${dateStr}T23:59:59`, // Homework typically due end of day
+                    allDay: true,
+                    backgroundColor: color,
+                    borderColor: color,
+                    extendedProps: { homework: hw, batchName: batchMsg, type: 'homework' },
+                };
+            });
+
+        return [...classEvents, ...examEvents, ...sessionLogEvents, ...homeworkEvents];
     }
 
     function openRecurringCreate() {
@@ -276,7 +298,25 @@ export default function Schedule() {
                 teacherId: currentUser.uid,
                 createdAt: serverTimestamp()
             };
-            await addDoc(collection(db, 'sessionLogs'), sessionData);
+            const logRef = await addDoc(collection(db, 'sessionLogs'), sessionData);
+
+            if (completeForm.homeworkAssigned && completeForm.homeworkAssigned.trim()) {
+                const baseDate = dateVal?.toDate ? dateVal.toDate() : new Date(dateVal);
+                const dueDate = new Date(baseDate);
+                dueDate.setDate(dueDate.getDate() + 3);
+                
+                await addDoc(collection(db, 'homeworks'), {
+                    title: completeForm.homeworkAssigned.substring(0, 80),
+                    description: completeForm.homeworkAssigned,
+                    batchId: editingSchedule.batchId,
+                    dueDate: Timestamp.fromDate(dueDate),
+                    teacherId: currentUser.uid,
+                    completedBy: [],
+                    submissions: {},
+                    sessionLogId: logRef.id,
+                    createdAt: serverTimestamp(),
+                });
+            }
 
             const recordsArray = Object.entries(attendanceRecords).map(([studentId, status]) => ({ studentId, status }));
             const attData = {
@@ -375,6 +415,7 @@ export default function Schedule() {
         { color: '#f59e0b', label: 'Rescheduled' },
         { color: '#8b5cf6', label: 'Exam' },
         { color: '#f97316', label: 'Session Log' },
+        { color: '#ec4899', label: 'HW Due' },
     ];
 
     return (
@@ -424,12 +465,20 @@ export default function Schedule() {
                     eventClick={(info) => {
                         const props = info.event.extendedProps;
                         if (props.type === 'sessionLog') {
-                            // Navigate to session logs for this log
                             navigate(`/sessions?batchId=${props.sessionLog.batchId || ''}`);
                             return;
                         }
-                        const eventData = props.type === 'exam' ? props.exam : props.schedule;
-                        setSelectedEvent({ ...eventData, displayType: props.type });
+                        
+                        let eventData;
+                        if (props.type === 'exam') eventData = props.exam;
+                        else if (props.type === 'homework') eventData = props.homework;
+                        else eventData = props.schedule;
+
+                        setSelectedEvent({ 
+                            ...eventData, 
+                            displayType: props.type,
+                            displayBatchName: props.batchName // used for homework 
+                        });
                         setShowQuickView(true);
                     }}
                     editable={true}
@@ -644,7 +693,11 @@ export default function Schedule() {
                 <div className="modal-overlay" onClick={() => setShowQuickView(false)}>
                     <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 400 }}>
                         <div className="modal-header">
-                            <h2 className="modal-title">{selectedEvent.displayType === 'exam' ? 'Exam Details' : 'Class Details'}</h2>
+                            <h2 className="modal-title">
+                                {selectedEvent.displayType === 'exam' ? 'Exam Details' : 
+                                 selectedEvent.displayType === 'homework' ? 'Homework Due' :
+                                 'Class Details'}
+                            </h2>
                             <button className="btn btn-ghost btn-icon" onClick={() => setShowQuickView(false)}>
                                 <X size={20} />
                             </button>
@@ -652,16 +705,21 @@ export default function Schedule() {
                         <div className="modal-body">
                             <div style={{ marginBottom: 'var(--space-4)' }}>
                                 <h3 style={{ fontSize: '1.25rem', fontWeight: 600 }}>{selectedEvent.title}</h3>
-                                {selectedEvent.batchName && (
+                                {(selectedEvent.batchName || selectedEvent.displayBatchName) && (
                                     <p style={{ color: 'var(--color-text-secondary)', marginTop: 'var(--space-1)' }}>
-                                        Batch: {selectedEvent.batchName}
+                                        Batch: {selectedEvent.batchName || selectedEvent.displayBatchName}
                                     </p>
                                 )}
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
                                     <CalIcon size={18} style={{ color: 'var(--color-text-secondary)' }} />
-                                    <span>{selectedEvent.date?.toDate ? format(selectedEvent.date.toDate(), 'PPP') : selectedEvent.date}</span>
+                                    <span>
+                                        {selectedEvent.displayType === 'homework' 
+                                            ? (selectedEvent.dueDate?.toDate ? format(selectedEvent.dueDate.toDate(), 'PPP') : selectedEvent.dueDate)
+                                            : (selectedEvent.date?.toDate ? format(selectedEvent.date.toDate(), 'PPP') : selectedEvent.date)
+                                        }
+                                    </span>
                                 </div>
                                 {(selectedEvent.startTime || selectedEvent.endTime) && (
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
@@ -673,6 +731,12 @@ export default function Schedule() {
                                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-2)' }}>
                                         <Info size={18} style={{ color: 'var(--color-text-secondary)', marginTop: 2 }} />
                                         <span>{selectedEvent.notes}</span>
+                                    </div>
+                                )}
+                                {selectedEvent.description && selectedEvent.displayType === 'homework' && (
+                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-2)' }}>
+                                        <Info size={18} style={{ color: 'var(--color-text-secondary)', marginTop: 2 }} />
+                                        <span>{selectedEvent.description}</span>
                                     </div>
                                 )}
                                 {selectedEvent.status && (
@@ -690,6 +754,14 @@ export default function Schedule() {
                             </div>
                         </div>
                         <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-2)' }}>
+                            {selectedEvent.displayType === 'homework' && (
+                                <button type="button" className="btn btn-primary" onClick={() => {
+                                    setShowQuickView(false);
+                                    navigate('/homework');
+                                }}>
+                                    Go to Homework
+                                </button>
+                            )}
                             {selectedEvent.displayType === 'class' && (
                                 <button type="button" className="btn btn-primary" onClick={() => {
                                     setShowQuickView(false);

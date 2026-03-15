@@ -127,6 +127,25 @@ export default function Attendance() {
                 await addDoc(collection(db, 'attendance'), data);
             }
 
+            // Sync with Class Schedule: Mark corresponding scheduled class as completed
+            const schedSnap = await getDocs(
+                query(
+                    collection(db, 'schedules'),
+                    where('teacherId', '==', currentUser.uid),
+                    where('batchId', '==', selectedBatch)
+                )
+            );
+            
+            const updatePromises = [];
+            schedSnap.docs.forEach((d) => {
+                const sData = d.data();
+                const sDateVal = sData.date?.toDate ? format(sData.date.toDate(), 'yyyy-MM-dd') : sData.date;
+                if (sDateVal === selectedDate && sData.status === 'scheduled') {
+                    updatePromises.push(updateDoc(doc(db, 'schedules', d.id), { status: 'completed' }));
+                }
+            });
+            await Promise.all(updatePromises);
+
             toast.success('Attendance saved!');
             loadAttendanceForDate();
         } catch (err) {

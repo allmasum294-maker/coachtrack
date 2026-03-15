@@ -18,8 +18,10 @@ export default function Exams() {
     const [showModal, setShowModal] = useState(false);
     const [showScoresModal, setShowScoresModal] = useState(false);
     const [showAttendanceModal, setShowAttendanceModal] = useState(false);
+    const [showLeaderboardModal, setShowLeaderboardModal] = useState(false);
     const [editingExam, setEditingExam] = useState(null);
     const [scoringExam, setScoringExam] = useState(null);
+    const [leaderboardExam, setLeaderboardExam] = useState(null);
     const [studentScores, setStudentScores] = useState([]);
     const [attendanceRecords, setAttendanceRecords] = useState({});
     const [filterBatch, setFilterBatch] = useState('');
@@ -374,6 +376,9 @@ export default function Exams() {
                                         <div className="card-subtitle">{getBatchName(exam.batchId)} · {format(dateVal, 'MMM d, yyyy')}</div>
                                     </div>
                                     <div style={{ display: 'flex', gap: 'var(--space-1)' }}>
+                                        <button className="btn btn-ghost btn-icon" onClick={() => { setLeaderboardExam(exam); setShowLeaderboardModal(true); }} title="View Leaderboard">
+                                            <Trophy size={16} style={{ color: 'var(--color-gold)' }} />
+                                        </button>
                                         <button className="btn btn-ghost btn-icon" onClick={() => openAttendance(exam)} title="Mark Attendance">
                                             <Users size={16} />
                                         </button>
@@ -654,6 +659,70 @@ export default function Exams() {
                         <div className="modal-footer">
                             <button className="btn btn-secondary" onClick={() => setShowScoresModal(false)}>Cancel</button>
                             <button className="btn btn-primary" onClick={handleSaveScores}>Save Scores</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* Leaderboard Modal */}
+            {showLeaderboardModal && leaderboardExam && (
+                <div className="modal-overlay" onClick={() => setShowLeaderboardModal(false)}>
+                    <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 600, padding: 0, overflow: 'hidden' }}>
+                        <div style={{ background: 'linear-gradient(135deg, var(--color-gold), #f59e0b)', padding: 'var(--space-6)', color: 'white', position: 'relative', textAlign: 'center' }}>
+                            <button className="btn btn-ghost btn-icon" onClick={() => setShowLeaderboardModal(false)} style={{ position: 'absolute', top: 'var(--space-4)', right: 'var(--space-4)', color: 'white' }}><X size={20} /></button>
+                            <Trophy size={48} style={{ margin: '0 auto var(--space-3)' }} />
+                            <h2 style={{ fontSize: '24px', fontWeight: 800, margin: 0, textShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>Leaderboard</h2>
+                            <div style={{ opacity: 0.9, fontSize: 'var(--font-size-md)', marginTop: '4px', fontWeight: 600 }}>{leaderboardExam.title}</div>
+                        </div>
+                        <div className="modal-body" style={{ maxHeight: '60vh', overflowY: 'auto', padding: '0', background: 'var(--color-surface-2)' }}>
+                            {(!leaderboardExam.scores || leaderboardExam.scores.length === 0) ? (
+                                <div style={{ padding: 'var(--space-8)', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                                    No scores entered yet.
+                                </div>
+                            ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                    {[...leaderboardExam.scores]
+                                        .filter(s => students.find(st => st.id === s.studentId))
+                                        .sort((a, b) => b.marksObtained - a.marksObtained)
+                                        .map((score, index) => {
+                                            const student = students.find(st => st.id === score.studentId);
+                                            const perc = leaderboardExam.totalMarks > 0 ? Math.round((score.marksObtained / leaderboardExam.totalMarks) * 100) : 0;
+                                            
+                                            let rankBadge = null;
+                                            if (index === 0) rankBadge = <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'linear-gradient(135deg, #FFD700, #FDB931)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', boxShadow: '0 2px 8px rgba(255, 215, 0, 0.4)' }}>1</div>;
+                                            else if (index === 1) rankBadge = <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'linear-gradient(135deg, #E0E0E0, #BDBDBD)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', boxShadow: '0 2px 8px rgba(224, 224, 224, 0.4)' }}>2</div>;
+                                            else if (index === 2) rankBadge = <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'linear-gradient(135deg, #CD7F32, #A0522D)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', boxShadow: '0 2px 8px rgba(205, 127, 50, 0.4)' }}>3</div>;
+                                            else rankBadge = <div style={{ width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: 'var(--color-text-muted)' }}>{index + 1}</div>;
+
+                                            return (
+                                                <div key={score.studentId} style={{ 
+                                                    display: 'flex', alignItems: 'center', padding: 'var(--space-4) var(--space-5)', 
+                                                    borderBottom: '1px solid var(--color-border)',
+                                                    background: index < 3 ? 'var(--color-bg-card)' : 'transparent',
+                                                    transition: 'all 0.2s ease',
+                                                }}>
+                                                    <div style={{ marginRight: 'var(--space-4)' }}>{rankBadge}</div>
+                                                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+                                                        <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'var(--color-bg-elevated)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                                                            {student.name.charAt(0).toUpperCase()}
+                                                        </div>
+                                                        <div>
+                                                            <div style={{ fontWeight: 600, fontSize: '16px', color: 'var(--color-text-primary)' }}>{student.name}</div>
+                                                            <div style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>Class {student.grade}</div>
+                                                        </div>
+                                                    </div>
+                                                    <div style={{ textAlign: 'right' }}>
+                                                        <div style={{ fontSize: '20px', fontWeight: 800, color: index === 0 ? '#FDB931' : index === 1 ? '#BDBDBD' : index === 2 ? '#CD7F32' : 'var(--color-accent)' }}>
+                                                            {score.marksObtained} <span style={{ fontSize: '14px', color: 'var(--color-text-muted)', fontWeight: 500 }}>/ {leaderboardExam.totalMarks}</span>
+                                                        </div>
+                                                        <div style={{ fontSize: '12px', fontWeight: 600, color: perc >= 80 ? 'var(--color-success)' : perc >= 50 ? 'var(--color-warning)' : 'var(--color-danger)' }}>
+                                                            {perc}%
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

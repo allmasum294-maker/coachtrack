@@ -31,7 +31,7 @@ export default function Students() {
     const [homeworks, setHomeworks] = useState([]);
     const [form, setForm] = useState({
         name: '', email: '', phone: '', guardianName: '', guardianPhone: '',
-        school: '', grade: '', address: '', notes: '', batchIds: [],
+        school: '', grade: '', address: '', notes: '', batchIds: [], unenrolledBatchIds: [],
     });
 
     useEffect(() => {
@@ -64,7 +64,7 @@ export default function Students() {
         setEditingStudent(null);
         setForm({
             name: '', email: '', phone: '', guardianName: '', guardianPhone: '',
-            school: '', grade: '', address: '', notes: '', batchIds: [],
+            school: '', grade: '', address: '', notes: '', batchIds: [], unenrolledBatchIds: [],
         });
         setShowModal(true);
     }
@@ -82,6 +82,7 @@ export default function Students() {
             address: student.address || '',
             notes: student.notes || '',
             batchIds: student.batchIds || [],
+            unenrolledBatchIds: student.unenrolledBatchIds || [],
         });
         setShowModal(true);
     }
@@ -113,13 +114,14 @@ export default function Students() {
         }
     }
 
-    function toggleBatch(batchId) {
-        setForm((prev) => ({
-            ...prev,
-            batchIds: prev.batchIds.includes(batchId)
-                ? prev.batchIds.filter((id) => id !== batchId)
-                : [...prev.batchIds, batchId],
-        }));
+    function setBatchStatus(batchId, status) {
+        setForm((prev) => {
+            const newBatchIds = (prev.batchIds || []).filter(id => id !== batchId);
+            const newUnenrolled = (prev.unenrolledBatchIds || []).filter(id => id !== batchId);
+            if (status === 'enrolled') newBatchIds.push(batchId);
+            if (status === 'unenrolled') newUnenrolled.push(batchId);
+            return { ...prev, batchIds: newBatchIds, unenrolledBatchIds: newUnenrolled };
+        });
     }
 
     function handleSort(key) {
@@ -314,6 +316,7 @@ export default function Students() {
                     address: row.address || '',
                     notes: row.notes || '',
                     batchIds: filterBatch ? [filterBatch] : [],
+                    unenrolledBatchIds: [],
                     teacherId: currentUser.uid,
                     createdAt: serverTimestamp(),
                 };
@@ -431,7 +434,12 @@ export default function Students() {
                                             {(student.batchIds || []).map((bid) => (
                                                 <span key={bid} className="badge badge-teal">{getBatchName(bid)}</span>
                                             ))}
-                                            {(!student.batchIds || student.batchIds.length === 0) && (
+                                            {(student.unenrolledBatchIds || []).map((bid) => (
+                                                <span key={'u'+bid} className="badge badge-red" style={{ opacity: 0.8 }} title="Unenrolled">
+                                                    {getBatchName(bid)} (Unenrolled)
+                                                </span>
+                                            ))}
+                                            {(!student.batchIds || student.batchIds.length === 0) && (!student.unenrolledBatchIds || student.unenrolledBatchIds.length === 0) && (
                                                 <span className="badge badge-red">Unassigned</span>
                                             )}
                                         </div>
@@ -570,18 +578,22 @@ export default function Students() {
                                     <textarea className="form-textarea" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2} placeholder="Any additional notes about the student..." />
                                 </div>
                                 <div className="form-group">
-                                    <label className="form-label">Assign to Batches</label>
-                                    <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
-                                        {batches.map((b) => (
-                                            <button
-                                                key={b.id}
-                                                type="button"
-                                                className={`btn btn-sm ${form.batchIds.includes(b.id) ? 'btn-primary' : 'btn-secondary'}`}
-                                                onClick={() => toggleBatch(b.id)}
-                                            >
-                                                {b.name}
-                                            </button>
-                                        ))}
+                                    <label className="form-label">Batch Configuration</label>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                                        {batches.map((b) => {
+                                            const isEnrolled = (form.batchIds || []).includes(b.id);
+                                            const isUnenrolled = (form.unenrolledBatchIds || []).includes(b.id);
+                                            return (
+                                                <div key={b.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--color-bg-secondary)', padding: 'var(--space-2) var(--space-3)', borderRadius: 'var(--radius-md)' }}>
+                                                    <span style={{ fontWeight: 600, fontSize: 'var(--font-size-sm)' }}>{b.name}</span>
+                                                    <div style={{ display: 'flex', gap: '4px' }}>
+                                                        <button type="button" onClick={() => setBatchStatus(b.id, 'none')} className={`btn btn-sm ${!isEnrolled && !isUnenrolled ? 'btn-secondary' : 'btn-ghost'}`} style={{ padding: '4px 8px', fontSize: '11px' }}>None</button>
+                                                        <button type="button" onClick={() => setBatchStatus(b.id, 'enrolled')} className={`btn btn-sm ${isEnrolled ? 'btn-primary' : 'btn-ghost'}`} style={{ padding: '4px 8px', fontSize: '11px' }}>Enrolled</button>
+                                                        <button type="button" onClick={() => setBatchStatus(b.id, 'unenrolled')} className={`btn btn-sm ${isUnenrolled ? 'btn-danger' : 'btn-ghost'}`} style={{ padding: '4px 8px', fontSize: '11px' }}>Unenrolled</button>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
                                         {batches.length === 0 && (
                                             <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)' }}>
                                                 Create batches first to assign students.

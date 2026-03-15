@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
+import toast from 'react-hot-toast';
 import {
     BarChart3, TrendingUp, Users, BookOpen, Calendar, ClipboardCheck,
 } from 'lucide-react';
@@ -24,6 +25,18 @@ export default function Analytics() {
     const [schedules, setSchedules] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedBatch, setSelectedBatch] = useState('');
+    const [startDate, setStartDate] = useState(format(subDays(new Date(), 30), 'yyyy-MM-dd'));
+    const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+    const [targetClasses, setTargetClasses] = useState('');
+
+    useEffect(() => {
+        if (selectedBatch) {
+            const b = batches.find(x => x.id === selectedBatch);
+            setTargetClasses(b?.targetClasses || '');
+        } else {
+            setTargetClasses('');
+        }
+    }, [selectedBatch, batches]);
 
     useEffect(() => {
         if (currentUser) loadAllData();
@@ -51,6 +64,44 @@ export default function Analytics() {
         } finally {
             setLoading(false);
         }
+    }
+
+    async function handleSaveTarget() {
+        if (!selectedBatch) return;
+        try {
+            const val = parseInt(targetClasses, 10) || 0;
+            await updateDoc(doc(db, 'batches', selectedBatch), { targetClasses: val });
+            setBatches(batches.map(b => b.id === selectedBatch ? { ...b, targetClasses: val } : b));
+            toast.success('Target classes updated');
+        } catch (err) {
+            console.error(err);
+            toast.error('Failed to update target');
+        }
+    }
+
+    function getFilteredSchedules() {
+        return schedules.filter(s => {
+            if (selectedBatch && s.batchId !== selectedBatch) return false;
+            const dateVal = s.date?.toDate ? s.date.toDate() : new Date(s.date);
+            const dateStr = format(dateVal, 'yyyy-MM-dd');
+            return dateStr >= startDate && dateStr <= endDate;
+        });
+    }
+
+    function getTargetFulfillmentData() {
+        const filtered = getFilteredSchedules();
+        const fulfilled = filtered.filter(s => s.status === 'completed').length;
+        const cancelled = filtered.filter(s => s.status === 'cancelled').length;
+        const scheduled = filtered.filter(s => s.status === 'scheduled').length;
+        
+        let target = 0;
+        if (selectedBatch) {
+            target = batches.find(b => b.id === selectedBatch)?.targetClasses || 0;
+        } else {
+            target = batches.reduce((sum, b) => sum + (b.targetClasses || 0), 0);
+        }
+
+        return { fulfilled, cancelled, scheduled, target };
     }
 
     // --- Computed Data ---
@@ -163,14 +214,107 @@ export default function Analytics() {
                 </div>
             </div>
 
-            <div className="analytics-filters">
-                <select className="form-select" style={{ width: 220 }} value={selectedBatch} onChange={(e) => setSelectedBatch(e.target.value)}>
+            <div className="analytics-filters" style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap', alignItems: 'center' }}>
+                <select className="form-select" style={{ width: 200 }} value={selectedBatch} onChange={(e) => setSelectedBatch(e.target.value)}>
                     <option value="">All Batches</option>
                     {batches.map((b) => (<option key={b.id} value={b.id}>{b.name}</option>))}
                 </select>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                    <input type="date" className="form-input" style={{ width: 150 }} value={startDate} onChange={e => setStartDate(e.target.value)} />
+                    <span style={{ color: 'var(--color-text-muted)' }}>to</span>
+                    <input type="date" className="form-input" style={{ width: 150 }} value={endDate} onChange={e => setEndDate(e.target.value)} />
+                </div>
+                {selectedBatch && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginLeft: 'auto', background: 'var(--color-surface-2)', padding: '4px', borderRadius: 'var(--radius-md)' }}>
+                        <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginLeft: 'var(--space-2)' }}>Target:</span>
+                        <input type="number" className="form-input" style={{ width: 80, padding: '4px 8px' }} placeholder="Classes" value={targetClasses} onChange={e => setTargetClasses(e.target.value)} />
+                        <button className="btn btn-primary btn-sm" onClick={handleSaveTarget}>Save</button>
+                    </div>
+                )}
             </div>
 
             <div className="analytics-charts">
+                {/* Target Fulfillment (Newly Added) */}
+                <div className="chart-card" style={{ gridColumn: '1 / -1' }}>
+                    <div className="chart-card-header">
+                        <div>
+                            <div className="chart-card-title">Target Fulfillment & Class Status</div>
+                            <div className="chart-card-subtitle">Completed vs Cancelled classes within {format(new Date(startDate), 'MMM d')} - {format(new Date(endDate), 'MMM d')}</div>
+                        </div>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--space-6)', padding: 'var(--space-4)' }}>
+                        {(() => {
+                            const { fulfilled, cancelled, scheduled, target } = getTargetFulfillmentData();
+                            const totalFiltered = fulfilled + cancelled + scheduled;
+                            const progress = target > 0 ? Math.min(Math.round((fulfilled / target) * 100), 100) : 0;
+                            
+                            return (
+                                <>
+                                    <div style={{ background: 'var(--color-surface-2)', padding: 'var(--space-5)', borderRadius: 'var(--radius-lg)', textAlign: 'center' }}>
+                                        <div style={{ fontSize: '36px', fontWeight: 800, color: 'var(--color-accent)' }}>{fulfilled}</div>
+                                        <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', fontWeight: 600 }}>Fulfilled Classes</div>
+                                        {target > 0 && (
+                                            <div style={{ marginTop: 'var(--space-4)' }}>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--font-size-xs)', marginBottom: '4px' }}>
+                                                    <span style={{ color: 'var(--color-text-muted)' }}>Progress to Target ({target})</span>
+                                                    <span style={{ fontWeight: 600, color: 'var(--color-accent)' }}>{progress}%</span>
+                                                </div>
+                                                <div className="progress-bar" style={{ height: 8 }}>
+                                                    <div className="progress-bar-fill" style={{ width: `${progress}%`, background: progress >= 100 ? 'var(--color-success)' : 'var(--color-accent)' }} />
+                                                </div>
+                                            </div>
+                                        )}
+                                        {target === 0 && selectedBatch && (
+                                            <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-warning)', marginTop: 'var(--space-2)' }}>Set a target to track progress</div>
+                                        )}
+                                    </div>
+                                    <div style={{ background: 'var(--color-surface-2)', padding: 'var(--space-5)', borderRadius: 'var(--radius-lg)', textAlign: 'center' }}>
+                                        <div style={{ fontSize: '36px', fontWeight: 800, color: 'var(--color-danger)' }}>{cancelled}</div>
+                                        <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', fontWeight: 600 }}>Cancelled Classes</div>
+                                        <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', marginTop: 'var(--space-2)' }}>
+                                            {totalFiltered > 0 ? Math.round((cancelled / totalFiltered) * 100) : 0}% of scheduled
+                                        </div>
+                                    </div>
+                                    <div style={{ background: 'var(--color-surface-2)', padding: 'var(--space-5)', borderRadius: 'var(--radius-lg)', textAlign: 'center' }}>
+                                        <div style={{ fontSize: '36px', fontWeight: 800, color: 'var(--color-teal)' }}>{scheduled}</div>
+                                        <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', fontWeight: 600 }}>Upcoming / Scheduled</div>
+                                        <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', marginTop: 'var(--space-2)' }}>
+                                            Pending completion
+                                        </div>
+                                    </div>
+                                    
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '150px' }}>
+                                        {totalFiltered > 0 ? (
+                                            <ResponsiveContainer width="100%" height={150}>
+                                                <PieChart>
+                                                    <Pie data={[
+                                                        { name: 'Fulfilled', value: fulfilled, color: 'var(--color-accent)' },
+                                                        { name: 'Cancelled', value: cancelled, color: 'var(--color-danger)' },
+                                                        { name: 'Scheduled', value: scheduled, color: 'var(--color-teal)' }
+                                                    ].filter(x => x.value > 0)} cx="50%" cy="50%" innerRadius={40} outerRadius={60} dataKey="value" stroke="none">
+                                                        {
+                                                            [
+                                                                { name: 'Fulfilled', value: fulfilled, color: 'var(--color-accent)' },
+                                                                { name: 'Cancelled', value: cancelled, color: 'var(--color-danger)' },
+                                                                { name: 'Scheduled', value: scheduled, color: 'var(--color-teal)' }
+                                                            ].filter(x => x.value > 0).map((entry, index) => (
+                                                                <Cell key={`cell-${index}`} fill={entry.color} />
+                                                            ))
+                                                        }
+                                                    </Pie>
+                                                    <Tooltip contentStyle={{ background: '#1a2235', border: '1px solid #2a3654', borderRadius: 8, color: '#f1f5f9' }} />
+                                                    <Legend />
+                                                </PieChart>
+                                            </ResponsiveContainer>
+                                        ) : (
+                                            <div style={{ color: 'var(--color-text-muted)' }}>No data in selected range</div>
+                                        )}
+                                    </div>
+                                </>
+                            );
+                        })()}
+                    </div>
+                </div>
                 {/* Attendance Trend */}
                 <div className="chart-card">
                     <div className="chart-card-header">

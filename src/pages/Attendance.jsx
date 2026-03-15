@@ -91,7 +91,15 @@ export default function Attendance() {
     }
 
     function getBatchStudents() {
-        return students.filter((s) => (s.batchIds || []).includes(selectedBatch));
+        const enrolled = students.filter((s) => (s.batchIds || []).includes(selectedBatch));
+        if (existingAttendance && existingAttendance.records) {
+            const historicalIds = existingAttendance.records.map((r) => r.studentId);
+            const historicalStudents = students.filter(
+                (s) => historicalIds.includes(s.id) && !enrolled.some((e) => e.id === s.id)
+            );
+            return [...enrolled, ...historicalStudents];
+        }
+        return enrolled;
     }
 
     function setStatus(studentId, status) {

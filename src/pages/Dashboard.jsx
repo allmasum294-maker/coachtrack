@@ -413,9 +413,9 @@ export default function Dashboard() {
                                 View Calendar <ArrowRight size={16} />
                             </Link>
                         </div>
-                        <div className="dashboard-upcoming" style={{ padding: 'var(--space-2) 0' }}>
+                        <div className="dashboard-upcoming" style={{ padding: 'var(--space-4)' }}>
                             {upcomingClasses.length === 0 ? (
-                                <div className="empty-state" style={{ padding: 'var(--space-6) var(--space-4)' }}>
+                                <div className="empty-state" style={{ padding: 'var(--space-6) 0' }}>
                                     <Calendar size={40} style={{ color: 'var(--color-border)', marginBottom: 'var(--space-3)' }} />
                                     <div className="empty-state-title">Your schedule is clear</div>
                                     <div className="empty-state-text">
@@ -423,28 +423,48 @@ export default function Dashboard() {
                                     </div>
                                 </div>
                             ) : (
-                                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                    {upcomingClasses.map((cls) => (
-                                        <div key={cls.id} className="upcoming-class-item" style={{ 
-                                            padding: 'var(--space-4)', 
-                                            borderBottom: '1px solid var(--color-bg-secondary)',
-                                            margin: 0,
-                                            borderRadius: 0,
-                                            background: 'transparent'
-                                        }}>
-                                            <div className="upcoming-class-time" style={{ background: 'var(--color-bg-elevated)', minWidth: '70px', padding: 'var(--space-2)', borderRadius: 'var(--radius-md)' }}>
-                                                <span className="time" style={{ color: 'var(--color-accent)', fontWeight: 700 }}>{formatClassTime(cls.startTime)}</span>
-                                                <span className="day" style={{ fontSize: 'var(--font-size-xs)', opacity: 0.8 }}>{formatClassDate(cls.date)}</span>
+                                <div style={{ position: 'relative', paddingLeft: '24px' }}>
+                                    {/* Vertical Line */}
+                                    <div style={{ position: 'absolute', top: 0, bottom: 0, left: '7px', width: '2px', background: 'var(--color-border)' }} />
+                                    {upcomingClasses.map((cls, idx) => (
+                                        <div key={cls.id} style={{ position: 'relative', marginBottom: idx === upcomingClasses.length - 1 ? 0 : 'var(--space-6)' }}>
+                                            {/* Timeline Dot */}
+                                            <div style={{ 
+                                                position: 'absolute', left: '-24px', top: '4px', width: '16px', height: '16px', 
+                                                borderRadius: '50%', background: 'var(--color-bg-primary)', 
+                                                border: '3px solid var(--color-accent)', zIndex: 1 
+                                            }} />
+                                            
+                                            <div className="timeline-content" style={{
+                                                background: 'var(--color-bg-card)',
+                                                border: '1px solid var(--color-border)',
+                                                borderRadius: 'var(--radius-lg)',
+                                                padding: 'var(--space-4)',
+                                                boxShadow: 'var(--shadow-sm)',
+                                                transition: 'all 0.2s ease',
+                                            }}>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                                    <div>
+                                                        <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-accent)', marginBottom: '4px' }}>
+                                                            {formatClassDate(cls.date)} • {formatClassTime(cls.startTime)}
+                                                        </div>
+                                                        <h4 style={{ fontWeight: 600, fontSize: '16px', marginBottom: '2px', color: 'var(--color-text-primary)' }}>
+                                                            {cls.title}
+                                                        </h4>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px', flexWrap: 'wrap' }}>
+                                                            <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)', background: 'var(--color-bg-elevated)', padding: '4px 10px', borderRadius: '12px', fontWeight: 600 }}>
+                                                                {cls.batchName || 'Unassigned Batch'}
+                                                            </span>
+                                                            <span style={{ fontSize: '12px', color: 'var(--color-primary)', background: 'var(--color-primary-soft)', padding: '4px 10px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}>
+                                                                <Clock size={12} /> Scheduled
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    <Link to={`/sessions?scheduleId=${cls.id}&batchId=${cls.batchId}`} className="btn btn-primary btn-sm btn-icon" style={{ borderRadius: '50%', padding: '10px', boxShadow: 'var(--shadow-glow)' }} title="Log Session">
+                                                        <PlayCircle size={18} />
+                                                    </Link>
+                                                </div>
                                             </div>
-                                            <div className="upcoming-class-info" style={{ flex: 1 }}>
-                                                <h4 style={{ fontWeight: 600, fontSize: 'var(--font-size-base)', marginBottom: '2px' }}>{cls.title}</h4>
-                                                <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
-                                                    Batch: {cls.batchName || 'Unassigned'}
-                                                </p>
-                                            </div>
-                                            <Link to={`/sessions?scheduleId=${cls.id}&batchId=${cls.batchId}`} className="btn btn-ghost btn-icon" title="Log Session">
-                                                <PlayCircle size={18} style={{ color: 'var(--color-text-muted)' }} />
-                                            </Link>
                                         </div>
                                     ))}
                                 </div>

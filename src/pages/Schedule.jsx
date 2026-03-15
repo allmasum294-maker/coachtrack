@@ -299,6 +299,71 @@ export default function Schedule() {
         }
     }
 
+    async function handleEventDrop(info) {
+        const { event } = info;
+        const props = event.extendedProps;
+        
+        try {
+            const newDate = event.start;
+            let updateData = {
+                date: Timestamp.fromDate(new Date(format(newDate, 'yyyy-MM-dd')))
+            };
+            
+            // Only update time if it was dropped on a time slot
+            if (!event.allDay) {
+                updateData.startTime = format(newDate, 'HH:mm');
+                if (event.end) {
+                    updateData.endTime = format(event.end, 'HH:mm');
+                }
+            }
+            
+            if (props.type === 'class') {
+                await updateDoc(doc(db, 'schedules', props.schedule.id), updateData);
+                toast.success('Schedule updated!');
+                loadData();
+            } else if (props.type === 'exam') {
+                await updateDoc(doc(db, 'exams', props.exam.id), updateData);
+                toast.success('Exam updated!');
+                loadData();
+            } else {
+                info.revert();
+            }
+        } catch (error) {
+            console.error('Error updating event:', error);
+            toast.error('Failed to update event');
+            info.revert();
+        }
+    }
+
+    async function handleEventResize(info) {
+        const { event } = info;
+        const props = event.extendedProps;
+        
+        if (!event.end) return;
+
+        try {
+            if (props.type === 'class') {
+                await updateDoc(doc(db, 'schedules', props.schedule.id), {
+                    endTime: format(event.end, 'HH:mm')
+                });
+                toast.success('Schedule duration updated!');
+                loadData();
+            } else if (props.type === 'exam') {
+                await updateDoc(doc(db, 'exams', props.exam.id), {
+                    endTime: format(event.end, 'HH:mm')
+                });
+                toast.success('Exam duration updated!');
+                loadData();
+            } else {
+                info.revert();
+            }
+        } catch (error) {
+            console.error('Error updating event:', error);
+            toast.error('Failed to update event duration');
+            info.revert();
+        }
+    }
+
     if (loading) {
         return <div className="loading-page"><div className="loading-spinner" /></div>;
     }
@@ -367,6 +432,9 @@ export default function Schedule() {
                         setSelectedEvent({ ...eventData, displayType: props.type });
                         setShowQuickView(true);
                     }}
+                    editable={true}
+                    eventDrop={handleEventDrop}
+                    eventResize={handleEventResize}
                     height="auto"
                     aspectRatio={1.8}
                 />
@@ -567,6 +635,79 @@ export default function Schedule() {
                                 <button type="submit" className="btn btn-primary">Save Session & Attendance</button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Quick View Modal */}
+            {showQuickView && selectedEvent && (
+                <div className="modal-overlay" onClick={() => setShowQuickView(false)}>
+                    <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 400 }}>
+                        <div className="modal-header">
+                            <h2 className="modal-title">{selectedEvent.displayType === 'exam' ? 'Exam Details' : 'Class Details'}</h2>
+                            <button className="btn btn-ghost btn-icon" onClick={() => setShowQuickView(false)}>
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="modal-body">
+                            <div style={{ marginBottom: 'var(--space-4)' }}>
+                                <h3 style={{ fontSize: '1.25rem', fontWeight: 600 }}>{selectedEvent.title}</h3>
+                                {selectedEvent.batchName && (
+                                    <p style={{ color: 'var(--color-text-secondary)', marginTop: 'var(--space-1)' }}>
+                                        Batch: {selectedEvent.batchName}
+                                    </p>
+                                )}
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                                    <CalIcon size={18} style={{ color: 'var(--color-text-secondary)' }} />
+                                    <span>{selectedEvent.date?.toDate ? format(selectedEvent.date.toDate(), 'PPP') : selectedEvent.date}</span>
+                                </div>
+                                {(selectedEvent.startTime || selectedEvent.endTime) && (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                                        <Clock size={18} style={{ color: 'var(--color-text-secondary)' }} />
+                                        <span>{selectedEvent.startTime ? format(new Date(`2000-01-01T${selectedEvent.startTime}`), 'h:mm a') : 'Start'} - {selectedEvent.endTime ? format(new Date(`2000-01-01T${selectedEvent.endTime}`), 'h:mm a') : 'End'}</span>
+                                    </div>
+                                )}
+                                {selectedEvent.notes && (
+                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-2)' }}>
+                                        <Info size={18} style={{ color: 'var(--color-text-secondary)', marginTop: 2 }} />
+                                        <span>{selectedEvent.notes}</span>
+                                    </div>
+                                )}
+                                {selectedEvent.status && (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                                        <AlertCircle size={18} style={{ color: 'var(--color-text-secondary)' }} />
+                                        <span style={{ textTransform: 'capitalize', fontWeight: 500, color: 
+                                            selectedEvent.status === 'completed' ? 'var(--color-success)' :
+                                            selectedEvent.status === 'cancelled' ? 'var(--color-danger)' :
+                                            selectedEvent.status === 'rescheduled' ? 'var(--color-warning)' : 'var(--color-primary)'
+                                        }}>
+                                            {selectedEvent.status}
+                                        </span>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                        <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-2)' }}>
+                            {selectedEvent.displayType === 'class' && (
+                                <button type="button" className="btn btn-primary" onClick={() => {
+                                    setShowQuickView(false);
+                                    openEdit(selectedEvent);
+                                }}>
+                                    Edit Details
+                                </button>
+                            )}
+                            {selectedEvent.displayType === 'exam' && (
+                                <button type="button" className="btn btn-primary" onClick={() => {
+                                    setShowQuickView(false);
+                                    navigate('/exams');
+                                }}>
+                                    Go to Exams
+                                </button>
+                            )}
+                            <button type="button" className="btn btn-secondary" onClick={() => setShowQuickView(false)}>Close</button>
+                        </div>
                     </div>
                 </div>
             )}

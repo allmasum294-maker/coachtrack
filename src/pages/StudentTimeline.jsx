@@ -1,230 +1,349 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useSearchParams } from 'react-router-dom';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { User, Calendar, ClipboardCheck, FileText, BookOpen, Clock } from 'lucide-react';
-import { format } from 'date-fns';
+import { Clock, User, Calendar, FileText, BookOpen, CheckSquare, Filter, XCircle, AlertTriangle } from 'lucide-react';
+import { format, startOfDay, endOfDay } from 'date-fns';
 
 export default function StudentTimeline() {
     const { currentUser } = useAuth();
-    const [searchParams] = useSearchParams();
-    const defaultStudentId = searchParams.get('studentId') || '';
-    
     const [students, setStudents] = useState([]);
-    const [selectedStudentId, setSelectedStudentId] = useState(defaultStudentId);
-    const [events, setEvents] = useState([]);
+    const [batches, setBatches] = useState([]);
+    const [attendance, setAttendance] = useState([]);
+    const [exams, setExams] = useState([]);
+    const [sessionLogs, setSessionLogs] = useState([]);
+    const [homeworks, setHomeworks] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [filter, setFilter] = useState('All');
+    const [selectedStudentId, setSelectedStudentId] = useState('');
+    const [filterBatch, setFilterBatch] = useState('');
+    const [dateFrom, setDateFrom] = useState('');
+    const [dateTo, setDateTo] = useState('');
+    const [filterType, setFilterType] = useState('all');
 
     useEffect(() => {
-        if (currentUser) loadStudents();
+        if (currentUser) loadData();
     }, [currentUser]);
 
+    async function loadData() {
+        try {
+            const uid = currentUser.uid;
+            const [studentSnap, batchSnap, attSnap, examSnap, sessionSnap, hwSnap] = await Promise.all([
+                getDocs(query(collection(db, 'students'), where('teacherId', '==', uid))),
+                getDocs(query(collection(db, 'batches'), where('teacherId', '==', uid))),
+                getDocs(query(collection(db, 'attendance'), where('teacherId', '==', uid))),
+                getDocs(query(collection(db, 'exams'), where('teacherId', '==', uid))),
+                getDocs(query(collection(db, 'sessionLogs'), where('teacherId', '==', uid))),
+                getDocs(query(collection(db, 'homeworks'), where('teacherId', '==', uid))),
+            ]);
+            setStudents(studentSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+            setBatches(batchSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+            setAttendance(attSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+            setExams(examSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+            setSessionLogs(sessionSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+            setHomeworks(hwSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+        } catch (err) {
+            console.error('Error:', err);
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    function toDate(val) {
+        if (!val) return new Date(0);
+        return val.toDate ? val.toDate() : new Date(val);
+    }
+
+    function isInDateRange(d) {
+        if (!dateFrom && !dateTo) return true;
+        if (dateFrom && d < startOfDay(new Date(dateFrom))) return false;
+        if (dateTo && d > endOfDay(new Date(dateTo))) return false;
+        return true;
+    }
+
+    // Batch-filtered students for the dropdown
+    const filteredStudents = filterBatch
+        ? students.filter(s => s.batchIds?.includes(filterBatch))
+        : students;
+
     useEffect(() => {
-        if (selectedStudentId) {
-            loadStudentEvents(selectedStudentId);
-        } else {
-            setEvents([]);
-            setLoading(false);
+        if (selectedStudentId && !filteredStudents.find(s => s.id === selectedStudentId)) {
+            setSelectedStudentId('');
         }
-    }, [selectedStudentId, students]);
+    }, [filterBatch, filteredStudents, selectedStudentId]);
 
-    async function loadStudents() {
-        try {
-            const uid = currentUser.uid;
-            const snap = await getDocs(query(collection(db, 'students'), where('teacherId', '==', uid)));
-            setStudents(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-        } catch (err) {
-            console.error(err);
-        } finally {
-            if (!selectedStudentId) setLoading(false);
-        }
-    }
+    const selectedStudent = students.find(s => s.id === selectedStudentId);
 
-    async function loadStudentEvents(studentId) {
-        if (students.length === 0) return;
-        setLoading(true);
-        try {
-            const uid = currentUser.uid;
-            const student = students.find(s => s.id === studentId);
-            const batchIds = student?.batchIds || [];
+    const events = useMemo(() => {
+        if (!selectedStudent) return [];
+        const evts = [];
 
-            const newEvents = [];
-
-            // 1. Joined
-            if (student?.createdAt) {
-                const dateVal = student.createdAt.toDate ? student.createdAt.toDate() : new Date(student.createdAt);
-                newEvents.push({
-                    id: `join-${student.id}`,
-                    type: 'System',
-                    title: 'Student Profile Created',
-                    description: `${student.name} was added to the system.`,
-                    date: dateVal,
+        // Profile creation
+        if (selectedStudent.createdAt) {
+            const d = toDate(selectedStudent.createdAt);
+            if (isInDateRange(d)) {
+                evts.push({
+                    date: d,
+                    type: 'profile',
                     icon: <User size={16} />,
-                    color: '#3b82f6' // blueprint blue
+                    color: 'var(--color-primary)',
+                    title: 'Profile Created',
+                    detail: `${selectedStudent.name} was added to the system.`,
                 });
             }
-
-            // 2. Attendance (Present/Absent)
-            if (batchIds.length > 0) {
-                const attSnap = await getDocs(query(collection(db, 'attendance'), where('teacherId', '==', uid)));
-                attSnap.docs.forEach(d => {
-                    const data = d.data();
-                    if (batchIds.includes(data.batchId)) {
-                        const record = (data.records || []).find(r => r.studentId === studentId);
-                        if (record) {
-                            const dateVal = data.date.toDate ? data.date.toDate() : new Date(data.date);
-                            const isPresent = record.status === 'present';
-                            newEvents.push({
-                                id: `att-${d.id}`,
-                                type: 'Attendance',
-                                title: isPresent ? 'Attended Class' : 'Missed Class',
-                                description: isPresent ? 'Marked present for session.' : 'Marked absent.',
-                                date: dateVal,
-                                icon: <ClipboardCheck size={16} />,
-                                color: isPresent ? '#14b8a6' : '#ef4444' // teal / red
-                            });
-                        }
-                    }
-                });
-            }
-
-            // 3. Exams
-            if (batchIds.length > 0) {
-                const examSnap = await getDocs(query(collection(db, 'exams'), where('teacherId', '==', uid)));
-                examSnap.docs.forEach(d => {
-                    const data = d.data();
-                    if (batchIds.includes(data.batchId)) {
-                        const score = (data.scores || []).find(s => s.studentId === studentId);
-                        if (score) {
-                            const dateVal = data.date.toDate ? data.date.toDate() : new Date(data.date);
-                            const perc = data.totalMarks > 0 ? Math.round((score.marksObtained / data.totalMarks) * 100) : 0;
-                            newEvents.push({
-                                id: `exam-${d.id}`,
-                                type: 'Exam',
-                                title: `Exam Taken: ${data.title}`,
-                                description: `Scored ${score.marksObtained}/${data.totalMarks} (${perc}%)`,
-                                date: dateVal,
-                                icon: <FileText size={16} />,
-                                color: '#f59e0b' // gold
-                            });
-                        }
-                    }
-                });
-            }
-
-            // 4. Homework (from SessionLogs)
-            if (batchIds.length > 0) {
-                const sessionLogsSnap = await getDocs(query(collection(db, 'sessionLogs'), where('teacherId', '==', uid)));
-                sessionLogsSnap.docs.forEach(d => {
-                    const data = d.data();
-                    if (batchIds.includes(data.batchId) && data.homeworkAssigned) {
-                        const dateVal = data.date.toDate ? data.date.toDate() : new Date(data.date);
-                        newEvents.push({
-                            id: `hw-${d.id}`,
-                            type: 'Homework',
-                            title: `Homework Assigned`,
-                            description: data.homeworkAssigned,
-                            date: dateVal,
-                            icon: <BookOpen size={16} />,
-                            color: '#a78bfa' // purple
-                        });
-                    }
-                });
-            }
-
-            // Sort descending
-            newEvents.sort((a,b) => b.date - a.date);
-            setEvents(newEvents);
-        } catch (err) {
-            console.error(err);
-        } finally {
-            setLoading(false);
         }
-    }
 
-    const filteredEvents = events.filter(e => filter === 'All' || e.type === filter);
+        // Attendance
+        attendance.forEach(a => {
+            if (!selectedStudent.batchIds?.includes(a.batchId)) return;
+            const rec = (a.records || []).find(r => r.studentId === selectedStudent.id);
+            if (!rec) return;
+            const d = toDate(a.date);
+            if (!isInDateRange(d)) return;
+            const batchName = batches.find(b => b.id === a.batchId)?.name || '';
+            evts.push({
+                date: d,
+                type: 'attendance',
+                icon: <Calendar size={16} />,
+                color: rec.status === 'present' ? 'var(--color-success)' : rec.status === 'late' ? 'var(--color-warning)' : 'var(--color-danger)',
+                title: `Attendance: ${rec.status === 'present' ? '✅ Present' : rec.status === 'late' ? '⏰ Late' : '❌ Absent'}`,
+                detail: `Class in ${batchName}`,
+            });
+        });
 
-    if (loading && students.length === 0) return <div className="loading-page"><div className="loading-spinner" /></div>;
+        // Exams
+        exams.forEach(e => {
+            if (!selectedStudent.batchIds?.includes(e.batchId)) return;
+            const d = toDate(e.date);
+            if (!isInDateRange(d)) return;
+            const s = (e.scores || []).find(sc => sc.studentId === selectedStudent.id);
+            const detail = s
+                ? `Scored ${s.marksObtained}/${e.totalMarks} (${e.totalMarks > 0 ? Math.round((s.marksObtained / e.totalMarks) * 100) : 0}%)`
+                : 'No score recorded';
+            evts.push({
+                date: d,
+                type: 'exam',
+                icon: <FileText size={16} />,
+                color: 'var(--color-accent)',
+                title: `Exam: ${e.title}`,
+                detail,
+            });
+        });
+
+        // Session Logs (homework assigned)
+        sessionLogs.forEach(l => {
+            if (!selectedStudent.batchIds?.includes(l.batchId)) return;
+            const d = toDate(l.date);
+            if (!isInDateRange(d)) return;
+            if (l.homeworkAssigned) {
+                evts.push({
+                    date: d,
+                    type: 'homework_assigned',
+                    icon: <BookOpen size={16} />,
+                    color: 'var(--color-warning)',
+                    title: 'Homework Assigned',
+                    detail: l.homeworkAssigned.substring(0, 80) + (l.homeworkAssigned.length > 80 ? '...' : ''),
+                });
+            }
+        });
+
+        // Homework completion events
+        homeworks.forEach(hw => {
+            if (!selectedStudent.batchIds?.includes(hw.batchId)) return;
+            const dueDate = hw.dueDate ? toDate(hw.dueDate) : null;
+
+            // Check student's submission
+            const sub = hw.submissions?.[selectedStudent.id];
+            const completedByOld = (hw.completedBy || []).includes(selectedStudent.id);
+
+            if (sub) {
+                const d = sub.date ? new Date(sub.date) : (dueDate || toDate(hw.createdAt));
+                if (!isInDateRange(d)) return;
+                if (sub.status === 'completed') {
+                    evts.push({
+                        date: d,
+                        type: 'homework_completed',
+                        icon: <CheckSquare size={16} />,
+                        color: 'var(--color-success)',
+                        title: `HW Completed: ${hw.title}`,
+                        detail: 'Submitted on time',
+                    });
+                } else if (sub.status === 'late') {
+                    evts.push({
+                        date: d,
+                        type: 'homework_completed',
+                        icon: <AlertTriangle size={16} />,
+                        color: 'var(--color-warning)',
+                        title: `HW Late: ${hw.title}`,
+                        detail: 'Submitted late',
+                    });
+                } else if (sub.status === 'not_submitted' && dueDate && dueDate < new Date()) {
+                    evts.push({
+                        date: dueDate,
+                        type: 'homework_missing',
+                        icon: <XCircle size={16} />,
+                        color: 'var(--color-danger)',
+                        title: `HW Missing: ${hw.title}`,
+                        detail: `Due ${format(dueDate, 'MMM d')} — not submitted`,
+                    });
+                }
+            } else if (completedByOld) {
+                const d = dueDate || toDate(hw.createdAt);
+                if (isInDateRange(d)) {
+                    evts.push({
+                        date: d,
+                        type: 'homework_completed',
+                        icon: <CheckSquare size={16} />,
+                        color: 'var(--color-success)',
+                        title: `HW Completed: ${hw.title}`,
+                        detail: 'Completed',
+                    });
+                }
+            } else if (dueDate && dueDate < new Date()) {
+                if (isInDateRange(dueDate)) {
+                    evts.push({
+                        date: dueDate,
+                        type: 'homework_missing',
+                        icon: <XCircle size={16} />,
+                        color: 'var(--color-danger)',
+                        title: `HW Not Submitted: ${hw.title}`,
+                        detail: `Due ${format(dueDate, 'MMM d')} — not submitted`,
+                    });
+                }
+            }
+        });
+
+        // Filter by type
+        const filteredEvts = filterType === 'all'
+            ? evts
+            : evts.filter(e => {
+                if (filterType === 'attendance') return e.type === 'attendance';
+                if (filterType === 'exam') return e.type === 'exam';
+                if (filterType === 'homework') return e.type === 'homework_assigned' || e.type === 'homework_completed' || e.type === 'homework_missing';
+                return true;
+            });
+
+        // Sort descending
+        filteredEvts.sort((a, b) => b.date - a.date);
+        return filteredEvts;
+    }, [selectedStudent, attendance, exams, sessionLogs, homeworks, batches, filterType, dateFrom, dateTo]);
+
+    if (loading) return <div className="loading-page"><div className="loading-spinner" /></div>;
 
     return (
         <div className="animate-fade-in">
             <div className="page-header">
                 <div>
-                    <h1 className="page-title">Activity Timeline</h1>
-                    <p className="page-subtitle">Chronological feed of student events</p>
+                    <h1 className="page-title">Student Timeline</h1>
+                    <p className="page-subtitle">Chronological view of a student's activity</p>
                 </div>
             </div>
 
-            <div className="card" style={{ marginBottom: 'var(--space-6)' }}>
-                <div style={{ padding: 'var(--space-4)', display: 'flex', gap: 'var(--space-4)', flexWrap: 'wrap', alignItems: 'flex-end' }}>
-                    <div style={{ flex: 1, minWidth: 250 }}>
+            {/* Filters */}
+            <div className="card" style={{ padding: 'var(--space-4)', marginBottom: 'var(--space-6)' }}>
+                <div style={{ display: 'flex', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
+                    <div style={{ flex: '1 1 180px' }}>
+                        <label className="form-label" style={{ marginBottom: 'var(--space-2)' }}>Filter by Batch</label>
+                        <select className="form-select" value={filterBatch} onChange={(e) => setFilterBatch(e.target.value)}>
+                            <option value="">All Batches</option>
+                            {batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                        </select>
+                    </div>
+                    <div style={{ flex: '1 1 200px' }}>
                         <label className="form-label" style={{ marginBottom: 'var(--space-2)' }}>Select Student</label>
                         <select className="form-select" value={selectedStudentId} onChange={(e) => setSelectedStudentId(e.target.value)}>
-                            <option value="">-- Choose a Student --</option>
-                            {students.map(s => <option key={s.id} value={s.id}>{s.name} (Class {s.grade})</option>)}
+                            <option value="">-- Choose Student --</option>
+                            {filteredStudents.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                         </select>
                     </div>
-                    <div>
-                        <label className="form-label" style={{ marginBottom: 'var(--space-2)' }}>Filter Events</label>
-                        <select className="form-select" value={filter} onChange={e => setFilter(e.target.value)}>
-                            <option value="All">All Events</option>
-                            <option value="Attendance">Attendance</option>
-                            <option value="Exam">Exams</option>
-                            <option value="Homework">Homework</option>
-                            <option value="System">System</option>
+                    <div style={{ flex: '1 1 140px' }}>
+                        <label className="form-label" style={{ marginBottom: 'var(--space-2)' }}>Event Type</label>
+                        <select className="form-select" value={filterType} onChange={(e) => setFilterType(e.target.value)}>
+                            <option value="all">All Events</option>
+                            <option value="attendance">Attendance</option>
+                            <option value="exam">Exams</option>
+                            <option value="homework">Homework</option>
                         </select>
+                    </div>
+                    <div style={{ flex: '1 1 130px' }}>
+                        <label className="form-label" style={{ marginBottom: 'var(--space-2)', display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
+                            <Filter size={12} /> From
+                        </label>
+                        <input type="date" className="form-input" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
+                    </div>
+                    <div style={{ flex: '1 1 130px' }}>
+                        <label className="form-label" style={{ marginBottom: 'var(--space-2)', display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
+                            <Filter size={12} /> To
+                        </label>
+                        <input type="date" className="form-input" value={dateTo} onChange={e => setDateTo(e.target.value)} />
                     </div>
                 </div>
+                {(dateFrom || dateTo) && (
+                    <div style={{ marginTop: 'var(--space-2)', display: 'flex', justifyContent: 'flex-end' }}>
+                        <button className="btn btn-ghost" style={{ fontSize: 'var(--font-size-xs)' }} onClick={() => { setDateFrom(''); setDateTo(''); }}>
+                            Clear Date Filter
+                        </button>
+                    </div>
+                )}
             </div>
 
-            {loading && selectedStudentId ? (
-                <div className="loading-spinner" style={{ margin: 'var(--space-8) auto' }} />
-            ) : selectedStudentId ? (
-                <div className="timeline-container" style={{ position: 'relative', paddingLeft: 'var(--space-4)', marginTop: 'var(--space-6)' }}>
-                    {/* Vertical Line */}
-                    <div style={{ position: 'absolute', top: 0, bottom: 0, left: '32px', width: '2px', background: 'var(--color-border)' }} />
-                    
-                    {filteredEvents.length === 0 ? (
-                        <div className="empty-state" style={{ marginLeft: 'var(--space-8)' }}>
-                            <Clock size={48} className="empty-state-icon" style={{ color: 'var(--color-text-muted)' }} />
-                            <div className="empty-state-title">No events found</div>
-                            <div className="empty-state-text">There is no historical data for this student matching your filter.</div>
-                        </div>
-                    ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-                            {filteredEvents.map(ev => (
-                                <div key={ev.id} style={{ display: 'flex', gap: 'var(--space-4)', position: 'relative' }}>
-                                    <div style={{ 
-                                        width: 40, height: 40, borderRadius: 'var(--radius-full)', 
-                                        background: ev.color, color: '#fff',
-                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                        flexShrink: 0, zIndex: 1, boxShadow: '0 0 0 4px var(--color-bg-base)'
-                                    }}>
-                                        {ev.icon}
+            {selectedStudent ? (
+                events.length > 0 ? (
+                    <div style={{ position: 'relative', paddingLeft: 'var(--space-8)' }}>
+                        {/* Vertical timeline line */}
+                        <div style={{
+                            position: 'absolute', left: '20px', top: 0, bottom: 0, width: '2px',
+                            background: 'var(--color-border)'
+                        }} />
+
+                        {events.map((evt, i) => (
+                            <div key={i} style={{
+                                position: 'relative',
+                                marginBottom: 'var(--space-4)',
+                            }}>
+                                {/* Timeline dot */}
+                                <div style={{
+                                    position: 'absolute',
+                                    left: '-22px',
+                                    top: 'var(--space-3)',
+                                    width: '14px', height: '14px',
+                                    borderRadius: 'var(--radius-full)',
+                                    background: evt.color,
+                                    border: '3px solid var(--color-bg-app)',
+                                    zIndex: 1,
+                                }} />
+
+                                <div className="card" style={{ padding: 'var(--space-3) var(--space-4)' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-1)' }}>
+                                        <span style={{ color: evt.color }}>{evt.icon}</span>
+                                        <span style={{ fontSize: 'var(--font-size-sm)', fontWeight: 600 }}>{evt.title}</span>
+                                        <span style={{ marginLeft: 'auto', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>
+                                            <Clock size={12} style={{ marginRight: '4px' }} />
+                                            {format(evt.date, 'MMM d, yyyy')}
+                                        </span>
                                     </div>
-                                    <div className="card" style={{ flex: 1, padding: 'var(--space-3)' }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 'var(--space-1)' }}>
-                                            <h4 style={{ fontWeight: 600 }}>{ev.title}</h4>
-                                            <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>
-                                                {format(ev.date, 'MMM d, yyyy')}
-                                            </span>
-                                        </div>
-                                        <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
-                                            {ev.description}
-                                        </p>
+                                    <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+                                        {evt.detail}
                                     </div>
                                 </div>
-                            ))}
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="card">
+                        <div className="empty-state">
+                            <Clock size={48} className="empty-state-icon" style={{ color: 'var(--color-text-muted)' }} />
+                            <div className="empty-state-title">No events found</div>
+                            <div className="empty-state-text">Try adjusting the filters or date range.</div>
                         </div>
-                    )}
-                </div>
+                    </div>
+                )
             ) : (
-                <div className="empty-state card">
-                    <User size={48} className="empty-state-icon" style={{ color: 'var(--color-text-muted)', marginBottom: 'var(--space-4)' }} />
-                    <div className="empty-state-title">No Student Selected</div>
-                    <div className="empty-state-text">Select a student from the dropdown to view their timeline.</div>
+                <div className="card">
+                    <div className="empty-state">
+                        <User size={48} className="empty-state-icon" style={{ color: 'var(--color-text-muted)' }} />
+                        <div className="empty-state-title">No Student Selected</div>
+                        <div className="empty-state-text">Choose a student from the filters above to view their timeline.</div>
+                    </div>
                 </div>
             )}
         </div>

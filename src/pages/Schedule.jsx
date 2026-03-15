@@ -20,7 +20,9 @@ export default function Schedule() {
     const [exams, setExams] = useState([]);
     const [batches, setBatches] = useState([]);
     const [students, setStudents] = useState([]);
+    const [sessionLogs, setSessionLogs] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [filterBatch, setFilterBatch] = useState('');
     const [showModal, setShowModal] = useState(false);
     const [showQuickView, setShowQuickView] = useState(false);
     const [selectedEvent, setSelectedEvent] = useState(null);
@@ -47,16 +49,18 @@ export default function Schedule() {
 
     async function loadData() {
         try {
-            const [schedSnap, batchSnap, studentSnap, examSnap] = await Promise.all([
+            const [schedSnap, batchSnap, studentSnap, examSnap, sessionLogSnap] = await Promise.all([
                 getDocs(query(collection(db, 'schedules'), where('teacherId', '==', currentUser.uid))),
                 getDocs(query(collection(db, 'batches'), where('teacherId', '==', currentUser.uid))),
                 getDocs(query(collection(db, 'students'), where('teacherId', '==', currentUser.uid))),
                 getDocs(query(collection(db, 'exams'), where('teacherId', '==', currentUser.uid))),
+                getDocs(query(collection(db, 'sessionLogs'), where('teacherId', '==', currentUser.uid))),
             ]);
             setSchedules(schedSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
             setBatches(batchSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
             setStudents(studentSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
             setExams(examSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
+            setSessionLogs(sessionLogSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
         } catch (err) {
             console.error('Error loading schedules:', err);
         } finally {
@@ -65,40 +69,65 @@ export default function Schedule() {
     }
 
     function getCalendarEvents() {
-        const classEvents = schedules.map((s) => {
-            const dateStr = s.date?.toDate ? format(s.date.toDate(), 'yyyy-MM-dd') : s.date;
-            let color = '#3b82f6'; // Blue for scheduled
-            if (s.status === 'completed') color = '#10b981'; // Green
-            if (s.status === 'cancelled') color = '#ef4444'; // Red
-            if (s.status === 'rescheduled') color = '#f59e0b'; // Amber
+        // Build a set of schedule IDs that have session logs
+        const loggedScheduleIds = new Set(sessionLogs.filter(l => l.scheduleId).map(l => l.scheduleId));
 
-            return {
-                id: s.id,
-                title: `${s.batchName || ''}: ${s.title}`,
-                start: `${dateStr}T${s.startTime || '00:00:00'}`,
-                end: `${dateStr}T${s.endTime || '23:59:59'}`,
-                backgroundColor: color,
-                borderColor: color,
-                extendedProps: { schedule: s, type: 'class' },
-            };
-        });
+        const classEvents = schedules
+            .filter(s => !filterBatch || s.batchId === filterBatch)
+            .map((s) => {
+                const dateStr = s.date?.toDate ? format(s.date.toDate(), 'yyyy-MM-dd') : s.date;
+                let color = '#3b82f6'; // Blue for scheduled
+                if (s.status === 'completed') color = '#10b981'; // Green
+                if (s.status === 'cancelled') color = '#ef4444'; // Red
+                if (s.status === 'rescheduled') color = '#f59e0b'; // Amber
 
-        const examEvents = exams.map((e) => {
-            const dateStr = e.date?.toDate ? format(e.date.toDate(), 'yyyy-MM-dd') : e.date;
-            const color = '#8b5cf6'; // Violet/Purple for Exams
+                return {
+                    id: s.id,
+                    title: `${s.batchName || ''}: ${s.title}`,
+                    start: `${dateStr}T${s.startTime || '00:00:00'}`,
+                    end: `${dateStr}T${s.endTime || '23:59:59'}`,
+                    backgroundColor: color,
+                    borderColor: color,
+                    extendedProps: { schedule: s, type: 'class' },
+                };
+            });
 
-            return {
-                id: e.id,
-                title: `EXAM: ${e.title}`,
-                start: `${dateStr}T${e.startTime || '00:00:00'}`,
-                end: `${dateStr}T${e.endTime || '23:59:59'}`,
-                backgroundColor: color,
-                borderColor: color,
-                extendedProps: { exam: e, type: 'exam' },
-            };
-        });
+        const examEvents = exams
+            .filter(e => !filterBatch || e.batchId === filterBatch)
+            .map((e) => {
+                const dateStr = e.date?.toDate ? format(e.date.toDate(), 'yyyy-MM-dd') : e.date;
+                const color = '#8b5cf6'; // Violet/Purple for Exams
 
-        return [...classEvents, ...examEvents];
+                return {
+                    id: `exam-${e.id}`,
+                    title: `EXAM: ${e.title}`,
+                    start: `${dateStr}T${e.startTime || '00:00:00'}`,
+                    end: `${dateStr}T${e.endTime || '23:59:59'}`,
+                    backgroundColor: color,
+                    borderColor: color,
+                    extendedProps: { exam: e, type: 'exam' },
+                };
+            });
+
+        // Session log events (only for logs NOT already linked to a schedule that is shown)
+        const sessionLogEvents = sessionLogs
+            .filter(l => !filterBatch || l.batchId === filterBatch)
+            .filter(l => !l.scheduleId || !loggedScheduleIds.has(l.scheduleId))
+            .map((l) => {
+                const dateStr = l.date?.toDate ? format(l.date.toDate(), 'yyyy-MM-dd') : l.date;
+                const color = '#f97316'; // Orange for session logs
+                return {
+                    id: `log-${l.id}`,
+                    title: `LOG: ${l.batchName || ''} — ${l.topicsCovered || 'Session'}`,
+                    start: `${dateStr}T00:00:00`,
+                    end: `${dateStr}T23:59:59`,
+                    backgroundColor: color,
+                    borderColor: color,
+                    extendedProps: { sessionLog: l, type: 'sessionLog' },
+                };
+            });
+
+        return [...classEvents, ...examEvents, ...sessionLogEvents];
     }
 
     function openRecurringCreate() {
@@ -274,6 +303,15 @@ export default function Schedule() {
         return <div className="loading-page"><div className="loading-spinner" /></div>;
     }
 
+    const calendarLegend = [
+        { color: '#3b82f6', label: 'Scheduled' },
+        { color: '#10b981', label: 'Completed' },
+        { color: '#ef4444', label: 'Cancelled' },
+        { color: '#f59e0b', label: 'Rescheduled' },
+        { color: '#8b5cf6', label: 'Exam' },
+        { color: '#f97316', label: 'Session Log' },
+    ];
+
     return (
         <div className="animate-fade-in">
             <div className="page-header">
@@ -291,6 +329,22 @@ export default function Schedule() {
                 </div>
             </div>
 
+            {/* Batch Filter + Color Legend */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--space-4)', marginBottom: 'var(--space-4)', flexWrap: 'wrap' }}>
+                <select className="form-select" style={{ width: 240 }} value={filterBatch} onChange={(e) => setFilterBatch(e.target.value)}>
+                    <option value="">All Batches</option>
+                    {batches.map((b) => (<option key={b.id} value={b.id}>{b.name}</option>))}
+                </select>
+                <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap', alignItems: 'center' }}>
+                    {calendarLegend.map(item => (
+                        <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
+                            <div style={{ width: 10, height: 10, borderRadius: 'var(--radius-full)', background: item.color }} />
+                            {item.label}
+                        </div>
+                    ))}
+                </div>
+            </div>
+
             <div className="card" style={{ padding: 'var(--space-4)' }}>
                 <FullCalendar
                     plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
@@ -304,6 +358,11 @@ export default function Schedule() {
                     dateClick={(info) => openCreate(info.dateStr)}
                     eventClick={(info) => {
                         const props = info.event.extendedProps;
+                        if (props.type === 'sessionLog') {
+                            // Navigate to session logs for this log
+                            navigate(`/sessions?batchId=${props.sessionLog.batchId || ''}`);
+                            return;
+                        }
                         const eventData = props.type === 'exam' ? props.exam : props.schedule;
                         setSelectedEvent({ ...eventData, displayType: props.type });
                         setShowQuickView(true);

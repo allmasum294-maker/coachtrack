@@ -69,10 +69,6 @@ export default function StudentAnalytics() {
         return true;
     }
 
-    function toDate(val) {
-        if (!val) return new Date(0);
-        return val.toDate ? val.toDate() : new Date(val);
-    }
 
     const filteredStudents = useMemo(() => {
         return selectedBatchId
@@ -96,7 +92,8 @@ export default function StudentAnalytics() {
 
         attendance.forEach((a) => {
             if (!selectedStudent.batchIds?.includes(a.batchId)) return;
-            if (!isInDateRange(toDate(a.date))) return;
+            const d = safeToDate(a.date);
+            if (!d || !isInDateRange(d)) return;
             const record = (a.records || []).find(r => r.studentId === selectedStudent.id);
             if (record) {
                 totalClasses++;
@@ -112,7 +109,8 @@ export default function StudentAnalytics() {
 
         exams.forEach(e => {
             if (!selectedStudent.batchIds?.includes(e.batchId)) return;
-            if (!isInDateRange(toDate(e.date))) return;
+            const ed = safeToDate(e.date);
+            if (!ed || !isInDateRange(ed)) return;
             const sScore = (e.scores || []).find(sc => sc.studentId === selectedStudent.id);
             if (sScore) {
                 examsTaken++;
@@ -127,7 +125,7 @@ export default function StudentAnalytics() {
 
         homeworks.forEach(hw => {
             if (!selectedStudent.batchIds?.includes(hw.batchId)) return;
-            const hwDate = hw.dueDate ? toDate(hw.dueDate) : (hw.createdAt ? toDate(hw.createdAt) : null);
+            const hwDate = safeToDate(hw.dueDate) || safeToDate(hw.createdAt);
             if (hwDate && !isInDateRange(hwDate)) return;
 
             totalHomeworks++;
@@ -159,13 +157,17 @@ export default function StudentAnalytics() {
         const history = [];
         attendance
             .filter(a => selectedStudent.batchIds?.includes(a.batchId))
-            .filter(a => isInDateRange(toDate(a.date)))
-            .sort((a, b) => toDate(a.date) - toDate(b.date))
+            .filter(a => {
+                const d = safeToDate(a.date);
+                return d && isInDateRange(d);
+            })
+            .sort((a, b) => (safeToDate(a.date) || 0) - (safeToDate(b.date) || 0))
             .forEach(a => {
                 const record = (a.records || []).find(r => r.studentId === selectedStudent.id);
                 if (record) {
+                    const d = safeToDate(a.date);
                     history.push({
-                        date: format(toDate(a.date), 'MMM d'),
+                        date: d ? format(d, 'MMM d') : 'N/A',
                         status: record.status === 'present' ? 100 : 0,
                     });
                 }
@@ -178,8 +180,11 @@ export default function StudentAnalytics() {
         const history = [];
         exams
             .filter(e => selectedStudent.batchIds?.includes(e.batchId))
-            .filter(e => isInDateRange(toDate(e.date)))
-            .sort((a, b) => toDate(a.date) - toDate(b.date))
+            .filter(e => {
+                const d = safeToDate(e.date);
+                return d && isInDateRange(d);
+            })
+            .sort((a, b) => (safeToDate(a.date) || 0) - (safeToDate(b.date) || 0))
             .forEach(e => {
                 const sScore = (e.scores || []).find(sc => sc.studentId === selectedStudent.id);
                 if (sScore) {
@@ -201,10 +206,10 @@ export default function StudentAnalytics() {
         return homeworks
             .filter(hw => selectedStudent.batchIds?.includes(hw.batchId))
             .filter(hw => {
-                const d = hw.dueDate ? toDate(hw.dueDate) : (hw.createdAt ? toDate(hw.createdAt) : null);
+                const d = safeToDate(hw.dueDate) || safeToDate(hw.createdAt);
                 return d ? isInDateRange(d) : true;
             })
-            .sort((a, b) => toDate(a.dueDate || a.createdAt) - toDate(b.dueDate || b.createdAt))
+            .sort((a, b) => (safeToDate(a.dueDate || a.createdAt) || 0) - (safeToDate(b.dueDate || b.createdAt) || 0))
             .slice(-10)
             .map(hw => {
                 const sub = hw.submissions?.[selectedStudent.id];
@@ -221,15 +226,19 @@ export default function StudentAnalytics() {
         if (!selectedStudent) return [];
         return exams
             .filter(e => selectedStudent.batchIds?.includes(e.batchId))
-            .filter(e => isInDateRange(toDate(e.date)))
-            .sort((a, b) => toDate(b.date) - toDate(a.date))
+            .filter(e => {
+                const d = safeToDate(e.date);
+                return d && isInDateRange(d);
+            })
+            .sort((a, b) => (safeToDate(b.date) || 0) - (safeToDate(a.date) || 0))
             .map(e => {
                 const sScore = (e.scores || []).find(sc => sc.studentId === selectedStudent.id);
                 if (!sScore) return null;
                 const topics = e.topicConfig || (e.topics || []).map(t => ({ name: t, maxMarks: null }));
+                const d = safeToDate(e.date);
                 return {
                     title: e.title,
-                    date: format(toDate(e.date), 'MMM d, yyyy'),
+                    date: d ? format(d, 'MMM d, yyyy') : 'N/A',
                     totalMarks: e.totalMarks,
                     marksObtained: sScore.marksObtained,
                     percentage: e.totalMarks > 0 ? Math.round((sScore.marksObtained / e.totalMarks) * 100) : 0,
@@ -245,7 +254,8 @@ export default function StudentAnalytics() {
         const topicsPerformance = {};
         exams.forEach(e => {
             if (!selectedStudent.batchIds?.includes(e.batchId)) return;
-            if (!isInDateRange(toDate(e.date))) return;
+            const ed = safeToDate(e.date);
+            if (!ed || !isInDateRange(ed)) return;
             const sScore = (e.scores || []).find(sc => sc.studentId === selectedStudent.id);
             if (sScore && sScore.topicMarks) {
                 const batchTopicSums = {};

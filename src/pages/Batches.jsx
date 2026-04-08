@@ -13,7 +13,8 @@ export default function Batches() {
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [editingBatch, setEditingBatch] = useState(null);
-    const [form, setForm] = useState({ name: '', grade: '', subject: 'English' });
+    const [form, setForm] = useState({ name: '', grade: '', subject: 'English', isClosed: false });
+    const [viewMode, setViewMode] = useState('active'); // 'active' or 'closed'
     const [studentCounts, setStudentCounts] = useState({});
 
     useEffect(() => {
@@ -49,13 +50,13 @@ export default function Batches() {
 
     function openCreate() {
         setEditingBatch(null);
-        setForm({ name: '', grade: '', subject: 'English' });
+        setForm({ name: '', grade: '', subject: 'English', isClosed: false });
         setShowModal(true);
     }
 
     function openEdit(batch) {
         setEditingBatch(batch);
-        setForm({ name: batch.name, grade: String(batch.grade), subject: batch.subject });
+        setForm({ name: batch.name, grade: String(batch.grade), subject: batch.subject, isClosed: !!batch.isClosed });
         setShowModal(true);
     }
 
@@ -66,6 +67,8 @@ export default function Batches() {
                 name: form.name,
                 grade: parseInt(form.grade),
                 subject: form.subject,
+                isClosed: form.isClosed,
+                closedAt: form.isClosed ? (editingBatch?.closedAt || serverTimestamp()) : null,
                 teacherId: currentUser.uid,
             };
 
@@ -74,6 +77,7 @@ export default function Batches() {
             } else {
                 data.createdAt = serverTimestamp();
                 data.studentIds = [];
+                data.isClosed = false;
                 await addDoc(collection(db, 'batches'), data);
             }
             setShowModal(false);
@@ -132,24 +136,47 @@ export default function Batches() {
                 </div>
             ) : (
                 <div className="grid-3">
-                    {batches.map((batch) => (
-                        <div key={batch.id} className="card card-interactive">
+                    {batches
+                        .filter(b => viewMode === 'closed' ? !!b.isClosed : !b.isClosed)
+                        .map((batch) => (
+                        <div key={batch.id} className="card card-interactive" style={{ opacity: batch.isClosed ? 0.8 : 1 }}>
                             <div className="card-header">
-                                <div
-                                    style={{
-                                        width: 42,
-                                        height: 42,
-                                        background: 'var(--color-accent-soft)',
-                                        borderRadius: 'var(--radius-md)',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        color: 'var(--color-accent)',
-                                    }}
-                                >
-                                    <GraduationCap size={22} />
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                                    <div
+                                        style={{
+                                            width: 38,
+                                            height: 38,
+                                            background: batch.isClosed ? 'var(--color-bg-elevated)' : 'var(--color-accent-soft)',
+                                            borderRadius: 'var(--radius-md)',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            color: batch.isClosed ? 'var(--color-text-muted)' : 'var(--color-accent)',
+                                        }}
+                                    >
+                                        <GraduationCap size={20} />
+                                    </div>
+                                    {batch.isClosed && (
+                                        <span className="badge badge-red" style={{ fontSize: '10px' }}>COMPLETED</span>
+                                    )}
                                 </div>
                                 <div style={{ display: 'flex', gap: 'var(--space-1)' }}>
+                                    <button 
+                                        className="btn btn-ghost btn-icon" 
+                                        onClick={async () => {
+                                            const newStatus = !batch.isClosed;
+                                            if (confirm(`Are you sure you want to ${newStatus ? 'complete' : 'reactivate'} this batch?`)) {
+                                                await updateDoc(doc(db, 'batches', batch.id), { 
+                                                    isClosed: newStatus,
+                                                    closedAt: newStatus ? serverTimestamp() : null
+                                                });
+                                                loadBatches();
+                                            }
+                                        }}
+                                        title={batch.isClosed ? "Reactivate Batch" : "Complete Batch"}
+                                    >
+                                        <CheckCircle size={16} style={{ color: batch.isClosed ? 'var(--color-success)' : 'var(--color-text-muted)' }} />
+                                    </button>
                                     <button className="btn btn-ghost btn-icon" onClick={() => openEdit(batch)}>
                                         <Edit2 size={16} />
                                     </button>

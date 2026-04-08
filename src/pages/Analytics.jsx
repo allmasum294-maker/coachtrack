@@ -180,7 +180,7 @@ export default function Analytics() {
                 examPerf = Math.round(avgs.reduce((a, b) => a + b, 0) / avgs.length);
             }
 
-            const studentCount = students.filter((s) => (s.batchIds || []).includes(batch.id)).length;
+            const studentCount = students.filter((s) => (s.batchIds || []).includes(batch.id) && (s.status || 'enrolled') === 'enrolled').length;
 
             return { subject: batch.name, Attendance: attRate, Syllabus: sylRate, Performance: examPerf };
         });

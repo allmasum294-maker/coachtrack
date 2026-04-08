@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import Papa from 'papaparse';
 import toast from 'react-hot-toast';
+import { setStudentStatus } from '../services/studentService';
 
 export default function Students() {
     const { currentUser } = useAuth();
@@ -29,6 +30,9 @@ export default function Students() {
     const [attendance, setAttendance] = useState([]);
     const [exams, setExams] = useState([]);
     const [homeworks, setHomeworks] = useState([]);
+    const [viewMode, setViewMode] = useState('enrolled');
+    const [filterSchool, setFilterSchool] = useState('');
+    const [schoolList, setSchoolList] = useState([]);
     const [form, setForm] = useState({
         name: '', email: '', phone: '', guardianName: '', guardianPhone: '',
         school: '', grade: '', address: '', notes: '', batchIds: [], unenrolledBatchIds: [],
@@ -48,7 +52,13 @@ export default function Students() {
                 getDocs(query(collection(db, 'exams'), where('teacherId', '==', uid))),
                 getDocs(query(collection(db, 'homeworks'), where('teacherId', '==', uid))),
             ]);
-            setStudents(studentSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
+            const studentData = studentSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+            setStudents(studentData);
+
+            // Extract unique school names from students
+            const schools = [...new Set(studentData.map(s => s.school).filter(Boolean))];
+            setSchoolList(schools);
+
             setBatches(batchSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
             setAttendance(attSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
             setExams(examSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
@@ -90,11 +100,17 @@ export default function Students() {
     async function handleSave(e) {
         e.preventDefault();
         try {
-            const data = { ...form, grade: parseInt(form.grade) || 0, teacherId: currentUser.uid };
+            const data = {
+                ...form,
+                grade: parseInt(form.grade) || 0,
+                teacherId: currentUser.uid,
+                status: form.status || 'enrolled'
+            };
             if (editingStudent) {
                 await updateDoc(doc(db, 'students', editingStudent.id), data);
             } else {
                 data.createdAt = serverTimestamp();
+                data.status = 'enrolled';
                 await addDoc(collection(db, 'students'), data);
             }
             setShowModal(false);
@@ -137,11 +153,13 @@ export default function Students() {
 
     const filteredStudents = useMemo(() => {
         return students.filter((s) => {
-            const matchesSearch = s.name.toLowerCase().includes(search.toLowerCase());
+            const matchesSearch = (s.name || '').toLowerCase().includes(search.toLowerCase());
             const matchesBatch = !filterBatch || (s.batchIds || []).includes(filterBatch);
-            return matchesSearch && matchesBatch;
+            const matchesStatus = (s.status || 'enrolled') === viewMode;
+            const matchesSchool = !filterSchool || s.school === filterSchool;
+            return matchesSearch && matchesBatch && matchesStatus && matchesSchool;
         });
-    }, [students, search, filterBatch]);
+    }, [students, search, filterBatch, viewMode, filterSchool]);
 
     const sortedStudents = useMemo(() => {
         let sortable = [...filteredStudents];
@@ -356,28 +374,55 @@ export default function Students() {
                 </div>
             </div>
 
-            {/* Filters */}
-            <div style={{ display: 'flex', gap: 'var(--space-3)', marginBottom: 'var(--space-6)', flexWrap: 'wrap' }}>
-                <div className="search-bar" style={{ flex: 1, minWidth: 200 }}>
-                    <Search className="search-icon" />
-                    <input
-                        className="form-input"
-                        placeholder="Search students..."
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                    />
+            {/* Tabs and School Filter */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-4)', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
+                <div className="tabs" style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                    <button
+                        className={`btn ${viewMode === 'enrolled' ? 'btn-primary' : 'btn-ghost'}`}
+                        onClick={() => { setViewMode('enrolled'); setCurrentPage(1); }}
+                    >
+                        Enrolled
+                    </button>
+                    <button
+                        className={`btn ${viewMode === 'unenrolled' ? 'btn-primary' : 'btn-ghost'}`}
+                        onClick={() => { setViewMode('unenrolled'); setCurrentPage(1); }}
+                    >
+                        Unenrolled
+                    </button>
                 </div>
-                <select
-                    className="form-select"
-                    style={{ width: 200 }}
-                    value={filterBatch}
-                    onChange={(e) => setFilterBatch(e.target.value)}
-                >
-                    <option value="">All Batches</option>
-                    {batches.map((b) => (
-                        <option key={b.id} value={b.id}>{b.name}</option>
-                    ))}
-                </select>
+                <div style={{ display: 'flex', gap: 'var(--space-3)', flex: 1, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                    <div className="search-bar" style={{ minWidth: 200, flex: 1 }}>
+                        <Search className="search-icon" />
+                        <input
+                            className="form-input"
+                            placeholder="Search students..."
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                        />
+                    </div>
+                    <select
+                        className="form-select"
+                        style={{ width: 180 }}
+                        value={filterBatch}
+                        onChange={(e) => setFilterBatch(e.target.value)}
+                    >
+                        <option value="">All Batches</option>
+                        {batches.map((b) => (
+                            <option key={b.id} value={b.id}>{b.name}</option>
+                        ))}
+                    </select>
+                    <select
+                        className="form-select"
+                        style={{ width: 180 }}
+                        value={filterSchool}
+                        onChange={(e) => setFilterSchool(e.target.value)}
+                    >
+                        <option value="">All Schools</option>
+                        {schoolList.map((s) => (
+                            <option key={s} value={s}>{s}</option>
+                        ))}
+                    </select>
+                </div>
             </div>
 
             {filteredStudents.length === 0 ? (
@@ -461,10 +506,28 @@ export default function Students() {
                                             <button className="btn btn-ghost btn-icon" onClick={() => setViewingStudent(student)} title="View details">
                                                 <Eye size={16} />
                                             </button>
-                                            <button className="btn btn-ghost btn-icon" onClick={() => openEdit(student)}>
+                                            <button className="btn btn-ghost btn-icon" onClick={() => openEdit(student)} title="Edit">
                                                 <Edit2 size={16} />
                                             </button>
-                                            <button className="btn btn-ghost btn-icon" onClick={() => handleDelete(student.id)}>
+                                            <button 
+                                                className={`btn btn-ghost btn-icon ${student.status === 'unenrolled' ? 'text-success' : 'text-warning'}`}
+                                                onClick={async () => {
+                                                    const newStatus = (student.status || 'enrolled') === 'enrolled' ? 'unenrolled' : 'enrolled';
+                                                    if (confirm(`Are you sure you want to ${newStatus === 'unenrolled' ? 'unenroll' : 're-enroll'} ${student.name}?`)) {
+                                                        try {
+                                                            await setStudentStatus(student.id, newStatus);
+                                                            toast.success(`Student ${newStatus === 'unenrolled' ? 'unenrolled' : 're-enrolled'} successfully`);
+                                                            loadData();
+                                                        } catch (err) {
+                                                            toast.error('Failed to update status');
+                                                        }
+                                                    }
+                                                }}
+                                                title={student.status === 'unenrolled' ? 'Enroll' : 'Unenroll'}
+                                            >
+                                                {student.status === 'unenrolled' ? <CheckCircle size={16} /> : <CheckCircle size={16} style={{ color: 'var(--color-text-muted)', opacity: 0.3 }} />}
+                                            </button>
+                                            <button className="btn btn-ghost btn-icon" onClick={() => handleDelete(student.id)} title="Delete">
                                                 <Trash2 size={16} style={{ color: 'var(--color-danger)' }} />
                                             </button>
                                         </div>

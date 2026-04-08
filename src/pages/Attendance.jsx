@@ -38,7 +38,8 @@ export default function Attendance() {
                 getDocs(query(collection(db, 'students'), where('teacherId', '==', currentUser.uid))),
             ]);
             setBatches(batchSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
-            setStudents(studentSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
+            const allStudents = studentSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+            setStudents(allStudents);
         } catch (err) {
             console.error('Error loading:', err);
         } finally {
@@ -71,7 +72,7 @@ export default function Attendance() {
             } else {
                 setExistingAttendance(null);
                 const batchStudents = students.filter((s) =>
-                    (s.batchIds || []).includes(selectedBatch)
+                    (s.batchIds || []).includes(selectedBatch) && (s.status || 'enrolled') === 'enrolled'
                 );
                 const recs = {};
                 batchStudents.forEach((s) => { recs[s.id] = 'present'; });
@@ -91,7 +92,7 @@ export default function Attendance() {
     }
 
     function getBatchStudents() {
-        const enrolled = students.filter((s) => (s.batchIds || []).includes(selectedBatch));
+        const enrolled = students.filter((s) => (s.batchIds || []).includes(selectedBatch) && (s.status || 'enrolled') === 'enrolled');
         if (existingAttendance && existingAttendance.records) {
             const historicalIds = existingAttendance.records.map((r) => r.studentId);
             const historicalStudents = students.filter(

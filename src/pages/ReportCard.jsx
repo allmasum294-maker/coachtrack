@@ -43,7 +43,10 @@ export default function ReportCard() {
         }
     }
 
-    const filteredStudents = selectedBatchId ? students.filter(s => s.batchIds?.includes(selectedBatchId)) : students;
+    const filteredStudents = (selectedBatchId 
+        ? students.filter(s => s.batchIds?.includes(selectedBatchId)) 
+        : students
+    ).filter(s => (s.status || 'enrolled') === 'enrolled');
 
     useEffect(() => {
         if (selectedStudentId && !filteredStudents.find(s => s.id === selectedStudentId)) {

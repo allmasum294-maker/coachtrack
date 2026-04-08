@@ -40,3 +40,11 @@ export async function reactivateBatch(batchId) {
     closedAt: null
   });
 }
+
+export const batchService = {
+  getBatches,
+  closeBatch,
+  reactivateBatch
+};
+
+export default batchService;

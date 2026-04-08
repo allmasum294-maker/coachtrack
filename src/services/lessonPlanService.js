@@ -23,3 +23,10 @@ export async function logSession(data) {
   });
   return res.id;
 }
+
+export const lessonPlanService = {
+  getBatchLessons,
+  logSession
+};
+
+export default lessonPlanService;

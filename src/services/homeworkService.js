@@ -32,3 +32,10 @@ export async function toggleHomeworkCompletion(homeworkId, studentId, isComplete
   
   await updateDoc(hwRef, { completedBy });
 }
+
+export const homeworkService = {
+  getBatchHomeworks,
+  toggleHomeworkCompletion
+};
+
+export default homeworkService;

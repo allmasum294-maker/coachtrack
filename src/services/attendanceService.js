@@ -49,3 +49,10 @@ export async function saveAttendance(teacherId, batchId, dateStr, records) {
     return res.id;
   }
 }
+
+export const attendanceService = {
+  getBatchAttendance,
+  saveAttendance
+};
+
+export default attendanceService;

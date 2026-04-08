@@ -53,3 +53,12 @@ export async function getStudentsBySchool(batchId, schoolName) {
   const snap = await getDocs(q);
   return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 }
+
+export const studentService = {
+  getEnrolledStudents,
+  getUnenrolledStudents,
+  setStudentStatus,
+  getStudentsBySchool
+};
+
+export default studentService;

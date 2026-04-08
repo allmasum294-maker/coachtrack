@@ -684,3 +684,97 @@
 .tooltip-wrapper:hover .tooltip {
     opacity: 1;
 }
+
+/* --- FullCalendar Overrides --- */
+.calendar-styles-override .fc {
+    --fc-border-color: rgba(255, 255, 255, 0.08);
+    --fc-button-bg-color: rgba(255, 255, 255, 0.05);
+    --fc-button-border-color: rgba(255, 255, 255, 0.1);
+    --fc-button-hover-bg-color: rgba(255, 255, 255, 0.1);
+    --fc-button-active-bg-color: var(--color-accent);
+    --fc-event-bg-color: var(--color-accent);
+    --fc-event-border-color: transparent;
+    --fc-page-bg-color: transparent;
+    --fc-neutral-bg-color: rgba(255, 255, 255, 0.02);
+    --fc-today-bg-color: rgba(20, 184, 166, 0.08);
+    font-family: var(--font-family);
+}
+
+.calendar-styles-override .fc-theme-standard td, 
+.calendar-styles-override .fc-theme-standard th {
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.calendar-styles-override .fc-col-header-cell {
+    padding: 12px 0;
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.calendar-styles-override .fc-col-header-cell-cushion {
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.1rem;
+    color: var(--color-accent);
+}
+
+.calendar-styles-override .fc-daygrid-day-number {
+    font-size: 13px;
+    font-weight: 700;
+    padding: 8px 12px;
+    color: var(--color-text-muted);
+}
+
+.calendar-styles-override .fc-daygrid-day.fc-day-today .fc-daygrid-day-number {
+    color: var(--color-accent);
+    font-weight: 900;
+}
+
+.calendar-styles-override .fc-event {
+    border-radius: 6px;
+    padding: 2px 6px;
+    font-size: 11px;
+    font-weight: 700;
+    border: none;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.calendar-styles-override .fc-event:hover {
+    transform: scale(1.03);
+    z-index: 5;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+}
+
+.calendar-styles-override .fc-toolbar-title {
+    font-size: 22px !important;
+    font-weight: 900 !important;
+    letter-spacing: -0.02em;
+    color: var(--color-text-primary);
+}
+
+.calendar-styles-override .fc-button {
+    font-weight: 800 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
+    padding: 10px 20px !important;
+    border-radius: 12px !important;
+    font-size: 12px !important;
+    transition: all 0.3s ease !important;
+}
+
+.calendar-styles-override .fc-button-primary:not(:disabled).fc-button-active,
+.calendar-styles-override .fc-button-primary:not(:disabled):active {
+    background-color: var(--color-accent) !important;
+    border-color: var(--color-accent) !important;
+    box-shadow: 0 0 20px rgba(20, 184, 166, 0.4) !important;
+}
+
+.calendar-styles-override .fc-daygrid-event-dot {
+    border-color: var(--color-accent) !important;
+}
+
+.calendar-styles-override .fc-h-event .fc-event-main {
+    color: #fff;
+}

@@ -2,18 +2,19 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { Download, FileSpreadsheet, FileText, Calendar, ClipboardCheck, BookOpen, BarChart3 } from 'lucide-react';
-import { format, isWithinInterval, parseISO } from 'date-fns';
+import { batchService } from '../services/batchService';
+import { Download, FileSpreadsheet, FileText, ClipboardCheck, BookOpen, BarChart3, UserCheck, Filter, ArrowRight } from 'lucide-react';
+import { format, isWithinInterval } from 'date-fns';
 import Papa from 'papaparse';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import toast from 'react-hot-toast';
 
 const EXPORT_TYPES = [
-    { id: 'attendance', icon: ClipboardCheck, title: 'Attendance Records', desc: 'Export student attendance data with present/absent/late status' },
-    { id: 'lessons', icon: BookOpen, title: 'Lessons Covered', desc: 'Export syllabus coverage and topic completion data' },
-    { id: 'exams', icon: BarChart3, title: 'Exam Results', desc: 'Export exam scores, averages, and performance data' },
-    { id: 'students', icon: FileText, title: 'Student Data', desc: 'Export student profiles and batch assignments' },
+    { id: 'attendance', icon: ClipboardCheck, title: 'Attendance Logs', desc: 'Present/Absent/Late records for students across sessions' },
+    { id: 'lessons', icon: BookOpen, title: 'Syllabus Tracker', desc: 'Curriculum coverage, lesson dates, and completion status' },
+    { id: 'exams', icon: BarChart3, title: 'Exam Scores', desc: 'Student marks, percentages, and performance metrics' },
+    { id: 'students', icon: UserCheck, title: 'Student Directory', desc: 'Enrolled student profiles and batch assignments' },
 ];
 
 export default function Export() {
@@ -33,10 +34,14 @@ export default function Export() {
 
     async function loadBatches() {
         try {
-            const snap = await getDocs(query(collection(db, 'batches'), where('teacherId', '==', currentUser.uid)));
-            setBatches(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-        } catch (err) { console.error(err); }
-        finally { setLoading(false); }
+            // Only export data for active batches by default
+            const activeBatches = await batchService.getBatches(currentUser.uid, true);
+            setBatches(activeBatches);
+        } catch (err) { 
+            console.error('Error loading batches:', err); 
+        } finally { 
+            setLoading(false); 
+        }
     }
 
     function isInDateRange(dateVal) {
@@ -44,33 +49,47 @@ export default function Export() {
         const d = dateVal instanceof Date ? dateVal : new Date(dateVal);
         if (dateFrom && !dateTo) return d >= new Date(dateFrom);
         if (!dateFrom && dateTo) return d <= new Date(dateTo);
-        return isWithinInterval(d, { start: new Date(dateFrom), end: new Date(dateTo) });
+        try {
+            return isWithinInterval(d, { start: new Date(dateFrom), end: new Date(dateTo) });
+        } catch (e) { return true; }
     }
 
     async function handleExport() {
         setExporting(true);
+        const toastId = toast.loading('Preparing export...');
         try {
             const uid = currentUser.uid;
             let rows = [];
             let title = '';
 
+            // Strictly filter for enrolled students for all clinical data exports
+            const [enrolledSnap] = await Promise.all([
+                getDocs(query(collection(db, 'students'), where('teacherId', '==', uid), where('status', '==', 'enrolled')))
+            ]);
+            const studentMap = {};
+            const enrolledStudentIds = new Set();
+            enrolledSnap.docs.forEach((d) => { 
+                studentMap[d.id] = d.data().name; 
+                enrolledStudentIds.add(d.id);
+            });
+
+            const batchMap = {};
+            batches.forEach((b) => { batchMap[b.id] = b.name; });
+
             if (selectedType === 'attendance') {
                 title = 'Attendance Records';
-                const [attSnap, studentSnap] = await Promise.all([
-                    getDocs(query(collection(db, 'attendance'), where('teacherId', '==', uid))),
-                    getDocs(query(collection(db, 'students'), where('teacherId', '==', uid))),
-                ]);
-                const studentMap = {};
-                studentSnap.docs.forEach((d) => { studentMap[d.id] = d.data().name; });
-                const batchMap = {};
-                batches.forEach((b) => { batchMap[b.id] = b.name; });
-
+                const attSnap = await getDocs(query(collection(db, 'attendance'), where('teacherId', '==', uid)));
+                
                 attSnap.docs.forEach((d) => {
                     const data = d.data();
                     if (selectedBatch && data.batchId !== selectedBatch) return;
                     const dateVal = data.date?.toDate ? data.date.toDate() : new Date(data.date);
                     if (!isInDateRange(dateVal)) return;
+
                     (data.records || []).forEach((r) => {
+                        // Only export records for currently enrolled students
+                        if (!enrolledStudentIds.has(r.studentId)) return;
+                        
                         rows.push({
                             Date: format(dateVal, 'yyyy-MM-dd'),
                             Batch: batchMap[data.batchId] || data.batchId,
@@ -80,10 +99,8 @@ export default function Export() {
                     });
                 });
             } else if (selectedType === 'lessons') {
-                title = 'Lessons Covered';
+                title = 'Syllabus Coverage';
                 const lessonSnap = await getDocs(query(collection(db, 'lessons'), where('teacherId', '==', uid)));
-                const batchMap = {};
-                batches.forEach((b) => { batchMap[b.id] = b.name; });
 
                 lessonSnap.docs.forEach((d) => {
                     const data = d.data();
@@ -98,22 +115,19 @@ export default function Export() {
                     });
                 });
             } else if (selectedType === 'exams') {
-                title = 'Exam Results';
-                const [examSnap, studentSnap] = await Promise.all([
-                    getDocs(query(collection(db, 'exams'), where('teacherId', '==', uid))),
-                    getDocs(query(collection(db, 'students'), where('teacherId', '==', uid))),
-                ]);
-                const studentMap = {};
-                studentSnap.docs.forEach((d) => { studentMap[d.id] = d.data().name; });
-                const batchMap = {};
-                batches.forEach((b) => { batchMap[b.id] = b.name; });
+                title = 'Exam Performance';
+                const examSnap = await getDocs(query(collection(db, 'exams'), where('teacherId', '==', uid)));
 
                 examSnap.docs.forEach((d) => {
                     const data = d.data();
                     if (selectedBatch && data.batchId !== selectedBatch) return;
                     const dateVal = data.date?.toDate ? data.date.toDate() : new Date(data.date);
                     if (!isInDateRange(dateVal)) return;
+
                     (data.scores || []).forEach((s) => {
+                        // Only include enrolled students in the export
+                        if (!enrolledStudentIds.has(s.studentId)) return;
+
                         rows.push({
                             Exam: data.title,
                             Date: format(dateVal, 'yyyy-MM-dd'),
@@ -127,31 +141,27 @@ export default function Export() {
                     });
                 });
             } else if (selectedType === 'students') {
-                title = 'Student Data';
-                const studentSnap = await getDocs(query(collection(db, 'students'), where('teacherId', '==', uid)));
-                const batchMap = {};
-                batches.forEach((b) => { batchMap[b.id] = b.name; });
-
-                studentSnap.docs.forEach((d) => {
+                title = 'Enrolled Students';
+                // students data comes from enrolledSnap directly
+                enrolledSnap.docs.forEach((d) => {
                     const data = d.data();
                     if (selectedBatch && !(data.batchIds || []).includes(selectedBatch)) return;
                     rows.push({
+                        'Student ID': data.studentId || '',
                         Name: data.name,
-                        Email: data.email || '',
-                        Phone: data.phone || '',
                         Grade: data.grade || '',
                         School: data.school || '',
+                        Email: data.email || '',
+                        Phone: data.phone || '',
                         Guardian: data.guardianName || '',
                         'Guardian Phone': data.guardianPhone || '',
                         Batches: (data.batchIds || []).map((id) => batchMap[id] || id).join(', '),
-                        Address: data.address || '',
-                        Notes: data.notes || '',
                     });
                 });
             }
 
             if (rows.length === 0) {
-                toast.error('No data to export with the current filters.');
+                toast.error('No matching records found for export.', { id: toastId });
                 setExporting(false);
                 return;
             }
@@ -161,30 +171,36 @@ export default function Export() {
                 downloadFile(csv, `${title.replace(/\s+/g, '_')}_${format(new Date(), 'yyyyMMdd')}.csv`, 'text/csv');
             } else {
                 const pdfDoc = new jsPDF();
-                pdfDoc.setFontSize(16);
-                pdfDoc.text(title, 14, 20);
+                pdfDoc.setFontSize(22);
+                pdfDoc.setTextColor(20, 184, 166);
+                pdfDoc.text(title, 14, 22);
+                
                 pdfDoc.setFontSize(10);
-                pdfDoc.text(`Generated: ${format(new Date(), 'MMM d, yyyy h:mm a')}`, 14, 28);
+                pdfDoc.setTextColor(100, 116, 139);
+                pdfDoc.text(`Generated on ${format(new Date(), 'PPP p')}`, 14, 30);
+                
                 if (selectedBatch) {
                     const batchName = batches.find((b) => b.id === selectedBatch)?.name || '';
-                    pdfDoc.text(`Batch: ${batchName}`, 14, 34);
+                    pdfDoc.text(`Filtering for Batch: ${batchName}`, 14, 36);
                 }
+
                 const cols = Object.keys(rows[0]);
-                const tableRows = rows.map((r) => cols.map((c) => String(r[c])));
+                const tableRows = rows.map((r) => cols.map((c) => String(r[c] || '')));
                 autoTable(pdfDoc, {
                     head: [cols],
                     body: tableRows,
-                    startY: selectedBatch ? 40 : 34,
-                    styles: { fontSize: 8, cellPadding: 2 },
-                    headStyles: { fillColor: [20, 184, 166] },
+                    startY: 42,
+                    styles: { fontSize: 8, cellPadding: 3, font: 'helvetica' },
+                    headStyles: { fillColor: [20, 184, 166], textColor: 255, fontStyle: 'bold' },
+                    alternateRowStyles: { fillColor: [248, 250, 252] },
                 });
                 pdfDoc.save(`${title.replace(/\s+/g, '_')}_${format(new Date(), 'yyyyMMdd')}.pdf`);
             }
 
-            toast.success(`Exported ${rows.length} records as ${exportFormat.toUpperCase()}!`);
+            toast.success(`${title} exported successfully!`, { id: toastId });
         } catch (err) {
             console.error('Export error:', err);
-            toast.error('Export failed.');
+            toast.error('Failed to generate export.', { id: toastId });
         } finally {
             setExporting(false);
         }
@@ -206,65 +222,123 @@ export default function Export() {
         <div className="animate-fade-in">
             <div className="page-header">
                 <div>
-                    <h1 className="page-title">Export Data</h1>
-                    <p className="page-subtitle">Download your coaching data as CSV or PDF</p>
+                    <h1 className="page-title">Digital Export</h1>
+                    <p className="page-subtitle">Generate comprehensive PDF or CSV reports for offline use</p>
                 </div>
             </div>
 
-            {/* Export Type Selection */}
-            <div className="export-options">
-                {EXPORT_TYPES.map((type) => (
-                    <div key={type.id} className={`export-option-card ${selectedType === type.id ? 'selected' : ''}`} onClick={() => setSelectedType(type.id)}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>
-                            <type.icon size={20} style={{ color: selectedType === type.id ? 'var(--color-accent)' : 'var(--color-text-muted)' }} />
-                            <h3>{type.title}</h3>
-                        </div>
-                        <p>{type.desc}</p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 'var(--space-8)', alignItems: 'start' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--space-4)' }}>
+                        {EXPORT_TYPES.map((type) => (
+                            <div 
+                                key={type.id} 
+                                className={`glass-card ${selectedType === type.id ? 'selected' : ''}`} 
+                                onClick={() => setSelectedType(type.id)}
+                                style={{ 
+                                    cursor: 'pointer',
+                                    padding: 'var(--space-5)',
+                                    transition: 'all 0.3s ease',
+                                    border: selectedType === type.id ? '2px solid var(--color-primary)' : '1px solid rgba(255,255,255,0.05)',
+                                    background: selectedType === type.id ? 'rgba(59, 130, 246, 0.05)' : 'rgba(255,255,255,0.05)',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '12px'
+                                }}
+                            >
+                                <div style={{ 
+                                    width: '48px', 
+                                    height: '48px', 
+                                    borderRadius: '12px', 
+                                    background: selectedType === type.id ? 'var(--color-primary)' : 'rgba(255,255,255,0.1)',
+                                    color: selectedType === type.id ? 'white' : 'var(--color-text-muted)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                }}>
+                                    <type.icon size={24} />
+                                </div>
+                                <div>
+                                    <h3 style={{ fontSize: '18px', fontWeight: 800, marginBottom: '4px' }}>{type.title}</h3>
+                                    <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', lineHeight: 1.5 }}>{type.desc}</p>
+                                </div>
+                                {selectedType === type.id && (
+                                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 'auto' }}>
+                                        <ArrowRight size={18} style={{ color: 'var(--color-primary)' }} />
+                                    </div>
+                                )}
+                            </div>
+                        ))}
                     </div>
-                ))}
-            </div>
+                </div>
 
-            {/* Filters */}
-            <div className="card" style={{ marginBottom: 'var(--space-6)' }}>
-                <h3 style={{ fontSize: 'var(--font-size-base)', fontWeight: 700, marginBottom: 'var(--space-4)' }}>Filters</h3>
-                <div style={{ display: 'flex', gap: 'var(--space-4)', flexWrap: 'wrap', alignItems: 'flex-end' }}>
-                    <div className="form-group" style={{ minWidth: 200 }}>
-                        <label className="form-label">Batch</label>
-                        <select className="form-select" value={selectedBatch} onChange={(e) => setSelectedBatch(e.target.value)}>
-                            <option value="">All Batches</option>
-                            {batches.map((b) => (<option key={b.id} value={b.id}>{b.name}</option>))}
-                        </select>
+                <div className="glass-panel" style={{ padding: 'var(--space-6)', position: 'sticky', top: 'var(--space-8)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: 'var(--space-6)', color: 'var(--color-primary)' }}>
+                        <Filter size={18} />
+                        <h3 style={{ fontSize: '15px', fontWeight: 800, margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Export Filters</h3>
                     </div>
-                    {(selectedType === 'attendance' || selectedType === 'exams') && (
-                        <>
-                            <div className="form-group" style={{ minWidth: 160 }}>
-                                <label className="form-label">From Date</label>
-                                <input className="form-input" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
-                            </div>
-                            <div className="form-group" style={{ minWidth: 160 }}>
-                                <label className="form-label">To Date</label>
-                                <input className="form-input" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
-                            </div>
-                        </>
-                    )}
-                    <div className="form-group">
-                        <label className="form-label">Format</label>
-                        <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-                            <button className={`btn btn-sm ${exportFormat === 'csv' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setExportFormat('csv')}>
-                                <FileSpreadsheet size={14} /> CSV
-                            </button>
-                            <button className={`btn btn-sm ${exportFormat === 'pdf' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setExportFormat('pdf')}>
-                                <FileText size={14} /> PDF
-                            </button>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+                        <div className="form-group">
+                            <label className="form-label" style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase' }}>Target Batch</label>
+                            <select className="form-select" value={selectedBatch} onChange={(e) => setSelectedBatch(e.target.value)}>
+                                <option value="">All Batches</option>
+                                {batches.map((b) => (<option key={b.id} value={b.id}>{b.name}</option>))}
+                            </select>
                         </div>
+
+                        {(selectedType === 'attendance' || selectedType === 'exams') && (
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
+                                <div className="form-group">
+                                    <label className="form-label" style={{ fontSize: '11px', fontWeight: 800 }}>From Date</label>
+                                    <input className="form-input" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label" style={{ fontSize: '11px', fontWeight: 800 }}>To Date</label>
+                                    <input className="form-input" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="form-group" style={{ marginTop: 'var(--space-2)' }}>
+                            <label className="form-label" style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase' }}>Output Format</label>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-2)' }}>
+                                <button 
+                                    className={`btn btn-sm ${exportFormat === 'csv' ? 'btn-primary' : 'btn-secondary'}`} 
+                                    onClick={() => setExportFormat('csv')}
+                                    style={{ borderRadius: '10px', height: '42px', border: 'none' }}
+                                >
+                                    <FileSpreadsheet size={16} /> CSV
+                                </button>
+                                <button 
+                                    className={`btn btn-sm ${exportFormat === 'pdf' ? 'btn-primary' : 'btn-secondary'}`} 
+                                    onClick={() => setExportFormat('pdf')}
+                                    style={{ borderRadius: '10px', height: '42px', border: 'none' }}
+                                >
+                                    <FileText size={16} /> PDF
+                                </button>
+                            </div>
+                        </div>
+
+                        <div style={{ height: '1px', background: 'rgba(255,255,255,0.05)', margin: 'var(--space-4) 0' }} />
+
+                        <button 
+                            className="btn btn-primary" 
+                            onClick={handleExport} 
+                            disabled={exporting} 
+                            style={{ 
+                                width: '100%', 
+                                height: '52px', 
+                                fontSize: '15px', 
+                                fontWeight: 800,
+                                boxShadow: '0 8px 16px -4px rgba(59, 130, 246, 0.25)'
+                            }}
+                        >
+                            <Download size={18} /> {exporting ? 'Generating...' : 'Export Now'}
+                        </button>
                     </div>
                 </div>
             </div>
-
-            {/* Export Button */}
-            <button className="btn btn-gold btn-lg" onClick={handleExport} disabled={exporting} style={{ width: '100%', maxWidth: 400 }}>
-                <Download size={20} /> {exporting ? 'Exporting...' : `Export ${EXPORT_TYPES.find((t) => t.id === selectedType)?.title} as ${exportFormat.toUpperCase()}`}
-            </button>
         </div>
     );
 }

@@ -1,9 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { User, FileSignature, Printer } from 'lucide-react';
+import { 
+    User, FileSignature, Printer, Search, 
+    Award, TrendingUp, BarChart3, BookOpen,
+    GraduationCap, Calendar, CheckCircle2, AlertCircle
+} from 'lucide-react';
 import { format } from 'date-fns';
+import { batchService } from '../services/batchService';
 
 export default function ReportCard() {
     const { currentUser, userProfile } = useAuth();
@@ -24,29 +29,36 @@ export default function ReportCard() {
     async function loadData() {
         try {
             const uid = currentUser.uid;
-            const [studentSnap, batchSnap, attSnap, examSnap, hwSnap] = await Promise.all([
-                getDocs(query(collection(db, 'students'), where('teacherId', '==', uid))),
-                getDocs(query(collection(db, 'batches'), where('teacherId', '==', uid))),
+            const [studentSnap, activeBatches, attSnap, examSnap, hwSnap] = await Promise.all([
+                getDocs(query(
+                    collection(db, 'students'), 
+                    where('teacherId', '==', uid),
+                    where('status', '==', 'enrolled')
+                )),
+                batchService.getBatches(uid, true),
                 getDocs(query(collection(db, 'attendance'), where('teacherId', '==', uid))),
                 getDocs(query(collection(db, 'exams'), where('teacherId', '==', uid))),
                 getDocs(query(collection(db, 'homeworks'), where('teacherId', '==', uid))),
             ]);
             setStudents(studentSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
-            setBatches(batchSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
+            setBatches(activeBatches);
             setAttendance(attSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
             setExams(examSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
             setHomework(hwSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
         } catch (err) {
-            console.error(err);
+            console.error('Error loading report credentials:', err);
         } finally {
             setLoading(false);
         }
     }
 
-    const filteredStudents = (selectedBatchId 
-        ? students.filter(s => s.batchIds?.includes(selectedBatchId)) 
-        : students
-    ).filter(s => (s.status || 'enrolled') === 'enrolled');
+    const filteredStudents = useMemo(() => {
+        let list = students.filter(s => s.status === 'enrolled');
+        if (selectedBatchId) {
+            list = list.filter(s => s.batchIds?.includes(selectedBatchId));
+        }
+        return list;
+    }, [students, selectedBatchId]);
 
     useEffect(() => {
         if (selectedStudentId && !filteredStudents.find(s => s.id === selectedStudentId)) {
@@ -54,9 +66,9 @@ export default function ReportCard() {
         }
     }, [selectedBatchId, filteredStudents, selectedStudentId]);
 
-    const selectedStudent = students.find((s) => s.id === selectedStudentId);
+    const selectedStudent = useMemo(() => students.find((s) => s.id === selectedStudentId), [students, selectedStudentId]);
 
-    function getStudentStats() {
+    const stats = useMemo(() => {
         if (!selectedStudent) return null;
 
         let totalClasses = 0;
@@ -114,13 +126,9 @@ export default function ReportCard() {
         const hwCompletionRate = totalHomework > 0 ? Math.round((completedHomework / totalHomework) * 100) : 0;
 
         return { totalClasses, presentClasses, attRate, studentExams, avgScore, totalHomework, completedHomework, hwCompletionRate };
-    }
+    }, [selectedStudent, attendance, exams, homework]);
 
-    const handlePrint = () => {
-        window.print();
-    };
-
-    const stats = getStudentStats();
+    const handlePrint = () => window.print();
 
     if (loading) return <div className="loading-page"><div className="loading-spinner" /></div>;
 
@@ -129,131 +137,216 @@ export default function ReportCard() {
             <style>
                 {`
                 @media print {
-                    @page { margin: 0; }
-                    body { margin: 1cm; background: white; }
-                    .app-layout { grid-template-columns: 1fr; }
-                    .sidebar, .topbar, .page-header, .no-print { display: none !important; }
-                    .main-content { padding: 0 !important; margin: 0 !important; width: 100% !important; max-width: 100% !important; overflow: visible !important; }
+                    @page { size: A4; margin: 0; }
+                    body { margin: 0; background: white !important; font-family: 'Inter', sans-serif !important; }
+                    .app-layout { grid-template-columns: 1fr; display: block !important; }
+                    .sidebar, .topbar, .page-header, .no-print, .btn, .tabs, .glass-card:not(.print-section), .glass-panel:not(.print-section) { display: none !important; }
+                    .main-content { padding: 0 !important; margin: 0 !important; width: 100% !important; max-width: 100% !important; }
                     .print-section {
-                        margin: 0;
-                        padding: 0;
-                        width: 100%;
-                        max-width: 100%;
+                        margin: 0 !important;
+                        padding: 40px !important;
+                        width: 100% !important;
+                        height: 100vh;
+                        box-sizing: border-box;
                         background: white !important;
                         color: black !important;
                         box-shadow: none !important;
                         border: none !important;
+                        backdrop-filter: none !important;
+                        display: flex !important;
+                        flex-direction: column !important;
                     }
-                    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+                    .report-card-inner {
+                        border: 3px double #000 !important;
+                        padding: 2.5rem !important;
+                        background: transparent !important;
+                        height: 100% !important;
+                        display: flex !important;
+                        flex-direction: column !important;
+                    }
+                    .badge { border: 1px solid #ddd !important; background: transparent !important; color: black !important; }
                 }
                 `}
             </style>
+            
             <div className="page-header no-print">
                 <div>
-                    <h1 className="page-title">Report Card Generator</h1>
-                    <p className="page-subtitle">Create downloadable PDF performance summaries</p>
+                    <h1 className="page-title">Performance Credentials</h1>
+                    <p className="page-subtitle">Generate official achievement summaries for student records</p>
                 </div>
             </div>
 
-            <div className="card no-print" style={{ marginBottom: 'var(--space-6)' }}>
-                <div style={{ padding: 'var(--space-4)', display: 'flex', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
-                    <div className="form-group" style={{ flex: '1 1 300px' }}>
-                        <label className="form-label">Filter by Batch</label>
-                        <select className="form-select" value={selectedBatchId} onChange={(e) => setSelectedBatchId(e.target.value)}>
-                            <option value="">-- All Batches --</option>
+            {/* Premium Selector */}
+            <div className="glass-card no-print" style={{ padding: 'var(--space-6)', marginBottom: 'var(--space-8)' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 'var(--space-6)' }}>
+                    <div className="form-group">
+                        <label className="form-label" style={{ color: 'var(--color-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <BookOpen size={14} /> BATCH CLASSIFICATION
+                        </label>
+                        <select className="form-select" value={selectedBatchId} onChange={(e) => setSelectedBatchId(e.target.value)} style={{ height: '52px', fontWeight: 700 }}>
+                            <option value="">Search Across All Batches</option>
                             {batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                         </select>
                     </div>
-                    <div className="form-group" style={{ flex: '1 1 300px' }}>
-                        <label className="form-label">Select Student</label>
-                        <select className="form-select" value={selectedStudentId} onChange={(e) => setSelectedStudentId(e.target.value)}>
-                            <option value="">-- Choose a Student --</option>
-                            {filteredStudents.map(s => <option key={s.id} value={s.id}>{s.name} (Class {s.grade})</option>)}
+                    <div className="form-group">
+                        <label className="form-label" style={{ color: 'var(--color-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <GraduationCap size={16} /> TARGET STUDENT
+                        </label>
+                        <select className="form-select" value={selectedStudentId} onChange={(e) => setSelectedStudentId(e.target.value)} style={{ height: '52px', fontWeight: 700 }}>
+                            <option value="">Locate Student Profile...</option>
+                            {filteredStudents.map(s => <option key={s.id} value={s.id}>{s.name} (Grade {s.grade})</option>)}
                         </select>
                     </div>
                 </div>
             </div>
 
             {selectedStudent && stats ? (
-                <div className="dashboard-grid">
-                    <div className="card print-section" style={{ gridColumn: '1 / -1' }}>
-                        <div className="card-header no-print">
-                            <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <FileSignature size={18} style={{ color: 'var(--color-primary)' }} />
-                                Report Card Preview
+                <div className="animate-fade-in" style={{ maxWidth: '1000px', margin: '0 auto' }}>
+                    <div className="glass-panel print-section" style={{ padding: 'var(--space-8)', position: 'relative', overflow: 'hidden' }}>
+                        {/* Decorative background for UI */}
+                        <div className="no-print" style={{ position: 'absolute', top: -100, right: -100, width: 300, height: 300, background: 'var(--color-primary)', filter: 'blur(150px)', opacity: 0.1, pointerEvents: 'none' }} />
+                        
+                        <div className="report-card-inner" style={{ background: 'rgba(255,255,255,0.02)', padding: 'var(--space-10)', borderRadius: '32px', border: '1px solid rgba(255,255,255,0.1)', position: 'relative' }}>
+                            
+                            {/* Certificate Header */}
+                            <div style={{ textAlign: 'center', marginBottom: 'var(--space-12)' }}>
+                                <div style={{ display: 'inline-block', marginBottom: 'var(--space-6)', position: 'relative' }}>
+                                    <div style={{ padding: '16px', background: 'var(--color-primary)', borderRadius: '24px', color: 'white', boxShadow: '0 10px 30px -5px rgba(59, 130, 246, 0.5)' }}>
+                                        <Award size={40} />
+                                    </div>
+                                    <div style={{ position: 'absolute', top: -10, right: -10, color: '#fbbf24' }}>
+                                        <Sparkles size={24} className="animate-pulse" />
+                                    </div>
+                                </div>
+                                <h2 style={{ fontSize: '38px', fontWeight: 900, color: 'var(--color-text-primary)', marginBottom: '8px', letterSpacing: '-0.02em' }}>Progress Verification</h2>
+                                <div style={{ height: '3px', width: '80px', background: 'var(--color-primary)', margin: '0 auto var(--space-4)', borderRadius: '2px' }} />
+                                <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', letterSpacing: '0.2em', textTransform: 'uppercase', fontWeight: 900 }}>Academic Performance Certificate</p>
+                            </div>
+
+                            {/* Academic Identity */}
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-8)', marginBottom: 'var(--space-12)', padding: 'var(--space-8)', background: 'rgba(255,255,255,0.03)', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                <div>
+                                    <h4 style={{ fontSize: '11px', color: 'var(--color-primary)', textTransform: 'uppercase', fontWeight: 900, marginBottom: '6px', letterSpacing: '0.05em' }}>SCHOLAR NAME</h4>
+                                    <p style={{ fontSize: '20px', fontWeight: 900 }}>{selectedStudent.name}</p>
+                                </div>
+                                <div>
+                                    <h4 style={{ fontSize: '11px', color: 'var(--color-primary)', textTransform: 'uppercase', fontWeight: 900, marginBottom: '6px', letterSpacing: '0.05em' }}>GRADE LEVEL</h4>
+                                    <p style={{ fontSize: '20px', fontWeight: 900 }}>Standard {selectedStudent.grade}</p>
+                                </div>
+                                <div>
+                                    <h4 style={{ fontSize: '11px', color: 'var(--color-primary)', textTransform: 'uppercase', fontWeight: 900, marginBottom: '6px', letterSpacing: '0.05em' }}>ACADEMIC YEAR</h4>
+                                    <p style={{ fontSize: '20px', fontWeight: 900 }}>{format(new Date(), 'yyyy')}</p>
+                                </div>
+                            </div>
+
+                            {/* Performance Radar Stats */}
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-6)', marginBottom: 'var(--space-12)' }}>
+                                <div className="glass-card" style={{ padding: 'var(--space-6)', textAlign: 'center', borderBottom: '4px solid var(--color-teal)' }}>
+                                    <div style={{ color: 'var(--color-teal)', marginBottom: 'var(--space-3)', display: 'flex', justifyContent: 'center' }}><CheckCircle2 size={24} /></div>
+                                    <h4 style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 900, marginBottom: '4px' }}>ATTENDANCE</h4>
+                                    <div style={{ fontSize: '32px', fontWeight: 900 }}>{stats.attRate}<span style={{ fontSize: '14px', opacity: 0.5 }}>%</span></div>
+                                </div>
+                                <div className="glass-card" style={{ padding: 'var(--space-6)', textAlign: 'center', borderBottom: '4px solid var(--color-primary)', background: 'rgba(59, 130, 246, 0.05)' }}>
+                                    <div style={{ color: 'var(--color-primary)', marginBottom: 'var(--space-3)', display: 'flex', justifyContent: 'center' }}><TrendingUp size={24} /></div>
+                                    <h4 style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 900, marginBottom: '4px' }}>EXAM MASTERY</h4>
+                                    <div style={{ fontSize: '32px', fontWeight: 900 }}>{stats.avgScore}<span style={{ fontSize: '14px', opacity: 0.5 }}>%</span></div>
+                                </div>
+                                <div className="glass-card" style={{ padding: 'var(--space-6)', textAlign: 'center', borderBottom: '4px solid var(--color-warning)' }}>
+                                    <div style={{ color: 'var(--color-warning)', marginBottom: 'var(--space-3)', display: 'flex', justifyContent: 'center' }}><Star size={24} /></div>
+                                    <h4 style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 900, marginBottom: '4px' }}>HW ENGAGEMENT</h4>
+                                    <div style={{ fontSize: '32px', fontWeight: 900 }}>{stats.hwCompletionRate}<span style={{ fontSize: '14px', opacity: 0.5 }}>%</span></div>
+                                </div>
+                            </div>
+
+                            {/* Evaluation Ledger */}
+                            <div style={{ marginBottom: 'var(--space-12)' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: 'var(--space-6)' }}>
+                                    <BarChart3 size={24} color="var(--color-primary)" />
+                                    <h3 style={{ fontSize: '20px', fontWeight: 900 }}>Assessment Ledger</h3>
+                                    <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.05)' }} />
+                                </div>
+                                <div className="table-container" style={{ border: '1px solid rgba(255,255,255,0.05)', borderRadius: '24px', overflow: 'hidden' }}>
+                                    <table className="table">
+                                        <thead>
+                                            <tr>
+                                                <th style={{ padding: '18px 24px', background: 'rgba(255,255,255,0.02)' }}>CURRICULUM UNIT</th>
+                                                <th style={{ background: 'rgba(255,255,255,0.02)' }}>SESSION DATE</th>
+                                                <th style={{ background: 'rgba(255,255,255,0.02)' }}>POINTS SECURED</th>
+                                                <th style={{ background: 'rgba(255,255,255,0.02)', textAlign: 'right', paddingRight: '24px' }}>PERFORMANCE</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {stats.studentExams.length === 0 ? (
+                                                <tr><td colSpan="4" style={{ textAlign: 'center', padding: '48px', color: 'var(--color-text-muted)', fontSize: '15px', fontStyle: 'italic' }}>Historical data remains synchronized. No evaluations recorded for this profile yet.</td></tr>
+                                            ) : (
+                                                stats.studentExams.map((e, i) => (
+                                                    <tr key={i}>
+                                                        <td style={{ padding: '20px 24px', fontWeight: 800 }}>{e.title}</td>
+                                                        <td style={{ color: 'var(--color-text-muted)', fontWeight: 600 }}>{e.date}</td>
+                                                        <td><span style={{ fontWeight: 900 }}>{e.marks}</span> <span style={{ opacity: 0.5 }}>/ {e.total}</span></td>
+                                                        <td style={{ textAlign: 'right', paddingRight: '24px' }}>
+                                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '10px' }}>
+                                                                <div style={{ width: '60px', height: '6px', background: 'rgba(255,255,255,0.05)', borderRadius: '3px', overflow: 'hidden' }}>
+                                                                    <div style={{ width: `${e.percent}%`, height: '100%', background: e.percent >= 80 ? 'var(--color-teal)' : e.percent >= 60 ? 'var(--color-primary)' : 'var(--color-warning)' }} />
+                                                                </div>
+                                                                <span style={{ fontWeight: 900, minWidth: '40px' }}>{e.percent}%</span>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                ))
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            {/* Mentorship Insight */}
+                            <div className="no-print" style={{ marginBottom: 'var(--space-8)' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                                    <TrendingUp size={18} color="var(--color-primary)" />
+                                    <h3 style={{ fontSize: '16px', fontWeight: 900 }}>Educator Remarks</h3>
+                                </div>
+                                <textarea 
+                                    className="form-textarea" 
+                                    rows={4} 
+                                    placeholder="Annotate student progress, specific milestones achieved, and strategic areas for academic optimization..."
+                                    style={{ borderRadius: '20px', padding: '20px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', fontSize: '15px', fontWeight: 600, lineHeight: '1.6' }}
+                                    value={remarks}
+                                    onChange={(e) => setRemarks(e.target.value)}
+                                />
+                            </div>
+
+                            {/* Official Signature Section */}
+                            <div style={{ marginTop: 'var(--space-12)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                                <div>
+                                    <div style={{ width: '180px', height: '1px', background: 'black', marginBottom: '10px', display: 'none' }} className="only-print"></div>
+                                    <div style={{ fontWeight: 900, fontSize: '15px' }}>{userProfile?.displayName || 'LEAD EDUCATOR'}</div>
+                                    <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em' }}>FACULTY SIGNATURE</div>
+                                </div>
+                                <div style={{ textAlign: 'right' }}>
+                                    <div style={{ fontWeight: 900, fontSize: '15px' }}>{format(new Date(), 'MMMM d, yyyy')}</div>
+                                    <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em' }}>ISSUE DATE</div>
+                                </div>
                             </div>
                         </div>
-                        <div style={{ padding: 'var(--space-4)' }} className="print-section">
-                            <div style={{ background: 'var(--color-bg-base)', padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border)' }}>
-                                <div style={{ textAlign: 'center', marginBottom: 'var(--space-6)', borderBottom: '2px solid var(--color-primary)', paddingBottom: 'var(--space-4)' }}>
-                                    <h2 style={{ fontSize: '24px', fontWeight: 700, color: 'var(--color-primary)', marginBottom: 'var(--space-2)' }}>Student Performance Report</h2>
-                                    <p style={{ color: 'var(--color-text-secondary)' }}>Instructor: {userProfile?.displayName || 'Teacher'}</p>
-                                </div>
-                                
-                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 'var(--space-6)' }}>
-                                    <div>
-                                        <p><strong>Name:</strong> {selectedStudent.name}</p>
-                                        <p><strong>Grade:</strong> {selectedStudent.grade}</p>
-                                        <p><strong>School:</strong> {selectedStudent.school || 'N/A'}</p>
-                                    </div>
-                                    <div style={{ textAlign: 'right' }}>
-                                        <p><strong>Overall Attendance:</strong> {stats.attRate}%</p>
-                                        <p><strong>Average Exam Score:</strong> {stats.avgScore}%</p>
-                                        <p><strong>Homework Completion:</strong> {stats.hwCompletionRate}%</p>
-                                    </div>
-                                </div>
 
-                                <h3 style={{ fontSize: '18px', fontWeight: 600, marginBottom: 'var(--space-3)' }}>Academic Breakdown</h3>
-                                <table className="table" style={{ marginBottom: 'var(--space-6)' }}>
-                                    <thead>
-                                        <tr>
-                                            <th>Exam</th>
-                                            <th>Date</th>
-                                            <th>Marks</th>
-                                            <th>Percentage</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {stats.studentExams.length === 0 ? (
-                                            <tr><td colSpan="4" style={{ textAlign: 'center', color: 'var(--color-text-muted)' }}>No exams taken</td></tr>
-                                        ) : (
-                                            stats.studentExams.map((e, i) => (
-                                                <tr key={i}>
-                                                    <td>{e.title}</td>
-                                                    <td>{e.date}</td>
-                                                    <td>{e.marks} / {e.total}</td>
-                                                    <td>{e.percent}%</td>
-                                                </tr>
-                                            ))
-                                        )}
-                                    </tbody>
-                                </table>
-
-                                <div className="form-group">
-                                    <label className="form-label" style={{ fontSize: '16px', fontWeight: 600, marginBottom: 'var(--space-2)' }}>Instructor Remarks (Added to PDF)</label>
-                                    <textarea 
-                                        className="form-textarea" 
-                                        rows={4} 
-                                        placeholder="Add any specific comments or feedback about the student's performance here..."
-                                        value={remarks}
-                                        onChange={(e) => setRemarks(e.target.value)}
-                                    />
-                                </div>
-
-                                <div className="no-print" style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 'var(--space-6)' }}>
-                                    <button className="btn btn-primary" onClick={handlePrint} style={{ padding: 'var(--space-3) var(--space-6)' }}>
-                                        <Printer size={18} /> Print PDF Report
-                                    </button>
-                                </div>
-                            </div>
+                        {/* Export Trigger */}
+                        <div className="no-print" style={{ marginTop: 'var(--space-8)', display: 'flex', justifyContent: 'flex-end' }}>
+                            <button className="btn btn-primary btn-lg" onClick={handlePrint} style={{ height: '60px', padding: '0 40px', borderRadius: '18px', fontSize: '16px', fontWeight: 900, boxShadow: '0 15px 30px -10px rgba(59, 130, 246, 0.4)', gap: '12px' }}>
+                                <Printer size={20} /> AUTHORIZE & PRINT
+                            </button>
                         </div>
                     </div>
                 </div>
             ) : (
-                <div className="empty-state card">
-                    <User size={48} className="empty-state-icon" style={{ color: 'var(--color-text-muted)' }} />
-                    <div className="empty-state-title">Select a Student</div>
-                    <div className="empty-state-text">Choose a student above to preview and generate their report card.</div>
+                <div className="animate-fade-in no-print">
+                    <div className="glass-panel" style={{ padding: 'var(--space-12)', textAlign: 'center' }}>
+                        <div style={{ width: '100px', height: '100px', borderRadius: '30px', background: 'rgba(255,255,255,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto var(--space-8)' }}>
+                            <GraduationCap size={44} style={{ color: 'var(--color-border)', opacity: 0.5 }} />
+                        </div>
+                        <h2 style={{ fontSize: '26px', fontWeight: 900, marginBottom: '12px' }}>Academic Inventory</h2>
+                        <p style={{ color: 'var(--color-text-muted)', maxWidth: '440px', margin: '0 auto' }}>Synchronize student data by selecting a profile to generate a detailed academic audit and achievement certificate.</p>
+                    </div>
                 </div>
             )}
         </div>

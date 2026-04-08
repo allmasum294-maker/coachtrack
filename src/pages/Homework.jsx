@@ -2,9 +2,11 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { BookOpen, Plus, Edit2, Trash2, X, CheckSquare, Square, Calendar, Clock, AlertTriangle, FileEdit } from 'lucide-react';
+import { BookOpen, Plus, Edit2, Trash2, X, CheckSquare, Square, Calendar, Clock, AlertTriangle, FileEdit, Filter, ChevronRight, Info } from 'lucide-react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
+import { batchService } from '../services/batchService';
+import Modal from '../components/Modal';
 
 const STATUSES = [
     { value: 'completed', label: '✅ Completed', color: 'var(--color-success)' },
@@ -41,14 +43,14 @@ export default function Homework() {
     async function loadData() {
         try {
             const uid = currentUser.uid;
-            const [hwSnap, batchSnap, studentSnap, sessionSnap] = await Promise.all([
+            const [hwSnap, activeBatches, studentSnap, sessionSnap] = await Promise.all([
                 getDocs(query(collection(db, 'homeworks'), where('teacherId', '==', uid))),
-                getDocs(query(collection(db, 'batches'), where('teacherId', '==', uid))),
-                getDocs(query(collection(db, 'students'), where('teacherId', '==', uid))),
+                batchService.getBatches(uid, true),
+                getDocs(query(collection(db, 'students'), where('teacherId', '==', uid), where('status', '==', 'enrolled'))),
                 getDocs(query(collection(db, 'sessionLogs'), where('teacherId', '==', uid))),
             ]);
             setAssignments(hwSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-            setBatches(batchSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+            setBatches(activeBatches);
             setStudents(studentSnap.docs.map(d => ({ id: d.id, ...d.data() })));
             setSessionLogs(sessionSnap.docs.map(d => ({ id: d.id, ...d.data() })));
         } catch (err) {
@@ -214,33 +216,39 @@ export default function Homework() {
 
     return (
         <div className="animate-fade-in">
-            <div className="page-header">
+            <div className="page-header" style={{ marginBottom: 'var(--space-8)' }}>
                 <div>
                     <h1 className="page-title">Homework Tracker</h1>
-                    <p className="page-subtitle">Assign and track student homework</p>
+                    <p className="page-subtitle">Assign, track and grade student assignments</p>
                 </div>
-                <button className="btn btn-primary" onClick={openCreate}>
-                    <Plus size={18} /> Add Assignment
+                <button className="btn btn-primary" onClick={openCreate} style={{ boxShadow: 'var(--shadow-primary)' }}>
+                    <Plus size={18} /> New Assignment
                 </button>
             </div>
 
-            <div style={{ display: 'flex', gap: 'var(--space-3)', marginBottom: 'var(--space-6)' }}>
-                <select className="form-select" style={{ width: 220 }} value={filterBatch} onChange={(e) => setFilterBatch(e.target.value)}>
-                    <option value="">All Batches</option>
-                    {batches.map((b) => (<option key={b.id} value={b.id}>{b.name}</option>))}
-                </select>
+            <div className="glass-card" style={{ padding: 'var(--space-5)', marginBottom: 'var(--space-8)', display: 'flex', gap: 'var(--space-3)', alignItems: 'center' }}>
+                <div style={{ padding: '8px', background: 'var(--color-primary-light)', borderRadius: '10px', color: 'var(--color-primary)' }}>
+                    <Filter size={18} />
+                </div>
+                <div style={{ flex: 1, maxWidth: '300px' }}>
+                    <label style={{ display: 'block', fontSize: '10px', fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '2px' }}>Filter by Batch</label>
+                    <select className="form-select" value={filterBatch} onChange={(e) => setFilterBatch(e.target.value)}>
+                        <option value="">All Active Batches</option>
+                        {batches.map((b) => (<option key={b.id} value={b.id}>{b.name}</option>))}
+                    </select>
+                </div>
             </div>
 
             {filteredAssignments.length === 0 ? (
-                <div className="card">
-                    <div className="empty-state">
-                        <BookOpen size={48} className="empty-state-icon" style={{ color: 'var(--color-text-muted)' }} />
-                        <div className="empty-state-title">No assignments found</div>
-                        <div className="empty-state-text">Click "Add Assignment" to create some homework.</div>
+                <div className="glass-card" style={{ padding: 'var(--space-12)', textAlign: 'center' }}>
+                    <div style={{ width: '80px', height: '80px', background: 'rgba(255,255,255,0.05)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto var(--space-6)' }}>
+                        <BookOpen size={40} style={{ color: 'var(--color-text-muted)', opacity: 0.3 }} />
                     </div>
+                    <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '8px' }}>No Assignments Found</h2>
+                    <p style={{ color: 'var(--color-text-muted)', maxWidth: '400px', margin: '0 auto' }}>Create an assignment for your active batches to start tracking progress.</p>
                 </div>
             ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 'var(--space-4)' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 'var(--space-6)' }}>
                     {filteredAssignments.map(hw => {
                         const status = getDueDateStatus(hw.dueDate);
                         const stats = getSubmissionStats(hw);
@@ -248,65 +256,73 @@ export default function Homework() {
                         const linkedLog = getSessionLogInfo(hw.sessionLogId);
 
                         return (
-                            <div key={hw.id} className="card" style={{ padding: 'var(--space-4)', display: 'flex', flexDirection: 'column' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--space-2)' }}>
-                                    <span className="badge" style={{ backgroundColor: `${status.color}20`, color: status.color, border: `1px solid ${status.color}40` }}>
-                                        {status.label}
-                                    </span>
-                                    <div style={{ display: 'flex', gap: 'var(--space-1)' }}>
-                                        <button className="btn btn-ghost btn-icon" onClick={() => openEdit(hw)}><Edit2 size={14} /></button>
-                                        <button className="btn btn-ghost btn-icon" onClick={() => handleDelete(hw.id)}><Trash2 size={14} style={{ color: 'var(--color-danger)' }} /></button>
+                            <div key={hw.id} className="glass-card" style={{ padding: 'var(--space-6)', display: 'flex', flexDirection: 'column' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--space-4)' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 12px', background: `${status.color}15`, borderRadius: '20px', border: `1px solid ${status.color}30` }}>
+                                        <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: status.color }} />
+                                        <span style={{ fontSize: '11px', fontWeight: 700, color: status.color }}>{status.label}</span>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '4px' }}>
+                                        <button className="btn btn-ghost btn-icon" onClick={() => openEdit(hw)} title="Edit Assignment"><Edit2 size={16} /></button>
+                                        <button className="btn btn-ghost btn-icon" onClick={() => handleDelete(hw.id)} title="Delete Assignment" style={{ color: 'var(--color-danger)' }}><Trash2 size={16} /></button>
                                     </div>
                                 </div>
-                                <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 600, marginBottom: 'var(--space-1)' }}>{hw.title}</h3>
-                                <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-2)' }}>
-                                    Batch: {getBatchName(hw.batchId)}
+
+                                <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '4px', color: 'var(--color-text)' }}>{hw.title}</h3>
+                                <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-4)', fontWeight: 500 }}>
+                                    {getBatchName(hw.batchId)}
                                 </div>
 
-                                {/* Session Log Link */}
                                 {linkedLog && (
-                                    <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', background: 'var(--color-bg-elevated)', padding: 'var(--space-2)', borderRadius: 'var(--radius-sm)', marginBottom: 'var(--space-2)', display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
-                                        <FileEdit size={12} />
-                                        From Session: {linkedLog.topicsCovered || 'N/A'} ({linkedLog.date?.toDate ? format(linkedLog.date.toDate(), 'MMM d') : ''})
+                                    <div style={{ fontSize: '12px', color: 'var(--color-primary)', background: 'var(--color-primary-light)', padding: '8px 12px', borderRadius: '8px', marginBottom: 'var(--space-4)', display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                                        <FileEdit size={14} style={{ marginTop: '1px' }} />
+                                        <span>
+                                            Linked to session: <strong>{linkedLog.topicsCovered}</strong>
+                                        </span>
                                     </div>
                                 )}
 
                                 {hw.description && (
-                                    <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)', marginBottom: 'var(--space-3)', flex: 1 }}>
+                                    <p style={{ color: 'var(--color-text-muted)', fontSize: '14px', marginBottom: 'var(--space-6)', flex: 1, lineHeight: 1.5 }}>
                                         {hw.description}
                                     </p>
                                 )}
 
-                                {/* Detailed Stats */}
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-2)', marginBottom: 'var(--space-3)', textAlign: 'center' }}>
-                                    <div>
-                                        <div style={{ fontSize: 'var(--font-size-md)', fontWeight: 700, color: 'var(--color-success)' }}>{stats.completed}</div>
-                                        <div style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>Done</div>
-                                    </div>
-                                    <div>
-                                        <div style={{ fontSize: 'var(--font-size-md)', fontWeight: 700, color: 'var(--color-warning)' }}>{stats.late}</div>
-                                        <div style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>Late</div>
-                                    </div>
-                                    <div>
-                                        <div style={{ fontSize: 'var(--font-size-md)', fontWeight: 700, color: 'var(--color-primary)' }}>{stats.partial}</div>
-                                        <div style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>Partial</div>
-                                    </div>
-                                    <div>
-                                        <div style={{ fontSize: 'var(--font-size-md)', fontWeight: 700, color: 'var(--color-danger)' }}>{stats.notSubmitted}</div>
-                                        <div style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>Missing</div>
+                                <div style={{ background: 'rgba(255,255,255,0.03)', padding: 'var(--space-4)', borderRadius: '12px', marginBottom: 'var(--space-6)' }}>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', textAlign: 'center' }}>
+                                        <div>
+                                            <div style={{ fontSize: '16px', fontWeight: 800, color: 'var(--color-success)' }}>{stats.completed}</div>
+                                            <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Done</div>
+                                        </div>
+                                        <div>
+                                            <div style={{ fontSize: '16px', fontWeight: 800, color: 'var(--color-warning)' }}>{stats.late}</div>
+                                            <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Late</div>
+                                        </div>
+                                        <div>
+                                            <div style={{ fontSize: '16px', fontWeight: 800, color: 'var(--color-primary)' }}>{stats.partial}</div>
+                                            <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Part</div>
+                                        </div>
+                                        <div>
+                                            <div style={{ fontSize: '16px', fontWeight: 800, color: 'var(--color-danger)' }}>{stats.notSubmitted}</div>
+                                            <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Miss</div>
+                                        </div>
                                     </div>
                                 </div>
 
                                 <div>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--font-size-sm)', marginBottom: 'var(--space-1)' }}>
-                                        <span>Completion</span>
-                                        <span style={{ fontWeight: 600 }}>{stats.completed}/{stats.total} ({progPerc}%)</span>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: 600, marginBottom: '8px' }}>
+                                        <span style={{ color: 'var(--color-text-secondary)' }}>Overall Completion</span>
+                                        <span style={{ color: 'var(--color-text)' }}>{stats.completed}/{stats.total} students</span>
                                     </div>
-                                    <div className="progress-bar" style={{ height: 8, marginBottom: 'var(--space-4)' }}>
-                                        <div className="progress-bar-fill" style={{ width: `${progPerc}%`, background: progPerc === 100 ? 'var(--color-teal)' : 'var(--color-primary)' }} />
+                                    <div className="progress-bar" style={{ height: 10, background: 'rgba(255,255,255,0.05)', marginBottom: 'var(--space-6)' }}>
+                                        <div className="progress-bar-fill" style={{ 
+                                            width: `${progPerc}%`, 
+                                            background: progPerc === 100 ? 'var(--color-success)' : 'var(--color-primary)',
+                                            boxShadow: progPerc > 0 ? '0 0 10px rgba(20, 184, 166, 0.3)' : 'none'
+                                        }} />
                                     </div>
-                                    <button className="btn btn-secondary" style={{ width: '100%', justifyContent: 'center' }} onClick={() => setTrackingAssignment(hw)}>
-                                        Check / Grade Submissions
+                                    <button className="btn btn-secondary" style={{ width: '100%', borderRadius: '12px', fontWeight: 700 }} onClick={() => setTrackingAssignment(hw)}>
+                                        Check Submissions
                                     </button>
                                 </div>
                             </div>
@@ -315,146 +331,153 @@ export default function Homework() {
                 </div>
             )}
 
-            {/* Create/Edit Modal */}
-            {showModal && (
-                <div className="modal-overlay" onClick={() => setShowModal(false)}>
-                    <div className="modal" onClick={(e) => e.stopPropagation()}>
-                        <div className="modal-header">
-                            <h2 className="modal-title">{editingAssignment ? 'Edit Assignment' : 'New Assignment'}</h2>
-                            <button className="btn btn-ghost btn-icon" onClick={() => setShowModal(false)}><X size={20} /></button>
-                        </div>
-                        <form onSubmit={handleSave}>
-                            <div className="modal-body">
-                                <div className="form-group">
-                                    <label className="form-label">Assignment Title *</label>
-                                    <input className="form-input" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} required placeholder="e.g. Chapter 4 Exercises" />
-                                </div>
-                                <div className="form-row">
-                                    <div className="form-group">
-                                        <label className="form-label">Batch *</label>
-                                        <select className="form-select" value={form.batchId} onChange={e => setForm({ ...form, batchId: e.target.value, sessionLogId: '' })} required>
-                                            <option value="">Select Batch</option>
-                                            {batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                                        </select>
-                                    </div>
-                                    <div className="form-group">
-                                        <label className="form-label">Due Date *</label>
-                                        <input type="date" className="form-input" value={form.dueDate} onChange={e => setForm({ ...form, dueDate: e.target.value })} required />
-                                    </div>
-                                </div>
-                                {/* Link to Session Log */}
-                                {form.batchId && (
-                                    <div className="form-group">
-                                        <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
-                                            <FileEdit size={14} /> Link to Session Log (Optional)
-                                        </label>
-                                        <select className="form-select" value={form.sessionLogId} onChange={e => setForm({ ...form, sessionLogId: e.target.value })}>
-                                            <option value="">— No link —</option>
-                                            {sessionLogs
-                                                .filter(l => l.batchId === form.batchId)
-                                                .sort((a, b) => {
-                                                    const da = a.date?.toDate ? a.date.toDate() : new Date(a.date);
-                                                    const db2 = b.date?.toDate ? b.date.toDate() : new Date(b.date);
-                                                    return db2 - da;
-                                                })
-                                                .map(l => {
-                                                    const dateVal = l.date?.toDate ? format(l.date.toDate(), 'MMM d') : l.date;
-                                                    return (
-                                                        <option key={l.id} value={l.id}>
-                                                            {dateVal} — {l.topicsCovered || 'Session'}
-                                                        </option>
-                                                    );
-                                                })}
-                                        </select>
-                                    </div>
-                                )}
-                                <div className="form-group">
-                                    <label className="form-label">Description / Instructions</label>
-                                    <textarea className="form-textarea" rows={3} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Any specific instructions..." />
-                                </div>
-                            </div>
-                            <div className="modal-footer">
-                                <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
-                                <button type="submit" className="btn btn-primary">{editingAssignment ? 'Save Changes' : 'Create Assignment'}</button>
-                            </div>
-                        </form>
+            {/* Redesigned Modal */}
+            <Modal
+                isOpen={showModal}
+                onClose={() => setShowModal(false)}
+                title={editingAssignment ? 'Edit Assignment' : 'New Assignment'}
+                maxWidth="600px"
+            >
+                <form onSubmit={handleSave} style={{ padding: '4px' }}>
+                    <div className="form-group" style={{ marginBottom: 'var(--space-4)' }}>
+                        <label className="form-label">Assignment Title <span style={{ color: 'var(--color-danger)' }}>*</span></label>
+                        <input className="form-input" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} required placeholder="e.g. Chapter 4 Exercises" />
                     </div>
-                </div>
-            )}
-
-            {/* Tracking Modal — 4-State Submission Statuses */}
-            {trackingAssignment && (
-                <div className="modal-overlay" onClick={() => setTrackingAssignment(null)}>
-                    <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 560 }}>
-                        <div className="modal-header">
-                            <div>
-                                <h2 className="modal-title">{trackingAssignment.title}</h2>
-                                <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
-                                    Batch: {getBatchName(trackingAssignment.batchId)}
-                                </p>
-                            </div>
-                            <button className="btn btn-ghost btn-icon" onClick={() => setTrackingAssignment(null)}><X size={20} /></button>
+                    
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)', marginBottom: 'var(--space-4)' }}>
+                        <div className="form-group">
+                            <label className="form-label">Batch <span style={{ color: 'var(--color-danger)' }}>*</span></label>
+                            <select className="form-select" value={form.batchId} onChange={e => setForm({ ...form, batchId: e.target.value, sessionLogId: '' })} required>
+                                <option value="">Select Batch</option>
+                                {batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                            </select>
                         </div>
-                        <div className="modal-body" style={{ maxHeight: '60vh', overflowY: 'auto', padding: 0 }}>
+                        <div className="form-group">
+                            <label className="form-label">Due Date <span style={{ color: 'var(--color-danger)' }}>*</span></label>
+                            <input type="date" className="form-input" value={form.dueDate} onChange={e => setForm({ ...form, dueDate: e.target.value })} required />
+                        </div>
+                    </div>
+
+                    {form.batchId && (
+                        <div className="form-group" style={{ marginBottom: 'var(--space-4)' }}>
+                            <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <FileEdit size={14} className="text-primary" /> 
+                                Link to Session Log
+                                <span style={{ fontSize: '10px', fontWeight: 500, color: 'var(--color-text-muted)', marginLeft: 'auto' }}>Optional</span>
+                            </label>
+                            <select className="form-select" value={form.sessionLogId} onChange={e => setForm({ ...form, sessionLogId: e.target.value })} style={{ borderStyle: 'dashed' }}>
+                                <option value="">— No session link —</option>
+                                {sessionLogs
+                                    .filter(l => l.batchId === form.batchId)
+                                    .sort((a, b) => {
+                                        const da = a.date?.toDate ? a.date.toDate() : new Date(a.date);
+                                        const db2 = b.date?.toDate ? b.date.toDate() : new Date(b.date);
+                                        return db2 - da;
+                                    })
+                                    .map(l => {
+                                        const dateVal = l.date?.toDate ? format(l.date.toDate(), 'MMM d') : l.date;
+                                        return (
+                                            <option key={l.id} value={l.id}>
+                                                {dateVal} — {l.topicsCovered || 'Session'}
+                                            </option>
+                                        );
+                                    })}
+                            </select>
+                        </div>
+                    )}
+
+                    <div className="form-group" style={{ marginBottom: 'var(--space-6)' }}>
+                        <label className="form-label">Description / Instructions</label>
+                        <textarea className="form-textarea" rows={3} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Write down what exactly needs to be done..." />
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '12px' }}>
+                        <button type="button" className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setShowModal(false)}>Cancel</button>
+                        <button type="submit" className="btn btn-primary" style={{ flex: 2, boxShadow: 'var(--shadow-primary)' }}>
+                            {editingAssignment ? 'Update Assignment' : 'Create Assignment'}
+                        </button>
+                    </div>
+                </form>
+            </Modal>
+
+            {/* Tracking Modal */}
+            <Modal
+                isOpen={!!trackingAssignment}
+                onClose={() => setTrackingAssignment(null)}
+                title={trackingAssignment?.title || 'Check Submissions'}
+                maxWidth="650px"
+            >
+                {trackingAssignment && (
+                    <div style={{ padding: '4px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: 'var(--space-6)', padding: '12px', background: 'var(--color-bg-elevated)', borderRadius: '12px' }}>
+                            <div style={{ width: '40px', height: '40px', background: 'var(--color-primary-light)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-primary)' }}>
+                                <Users size={20} />
+                            </div>
+                            <div>
+                                <div style={{ fontSize: '14px', fontWeight: 700 }}>{getBatchName(trackingAssignment.batchId)}</div>
+                                <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>Status Tracking for {students.filter(s => s.batchIds?.includes(trackingAssignment.batchId)).length} Enrolled Students</div>
+                            </div>
+                        </div>
+
+                        <div style={{ maxHeight: '450px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', paddingRight: '4px' }}>
                             {(() => {
                                 const assignedStudents = students.filter(s => s.batchIds?.includes(trackingAssignment.batchId));
                                 const subs = getSubmissions(trackingAssignment);
+                                
                                 if (assignedStudents.length === 0) {
-                                    return <div style={{ padding: 'var(--space-6)', textAlign: 'center', color: 'var(--color-text-muted)' }}>No students in this batch.</div>;
+                                    return (
+                                        <div style={{ padding: 'var(--space-10)', textAlign: 'center' }}>
+                                            <Info size={32} style={{ color: 'var(--color-text-muted)', marginBottom: '8px', opacity: 0.3 }} />
+                                            <p style={{ color: 'var(--color-text-muted)' }}>No enrolled students in this batch.</p>
+                                        </div>
+                                    );
                                 }
-                                return (
-                                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                        {assignedStudents.map(student => {
-                                            const sub = subs[student.id];
-                                            const currentStatus = sub?.status || 'not_submitted';
-                                            return (
-                                                <div
-                                                    key={student.id}
-                                                    style={{
-                                                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                                                        padding: 'var(--space-3) var(--space-4)',
-                                                        borderBottom: '1px solid var(--color-border)',
-                                                    }}
-                                                >
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-                                                        <div style={{ width: 32, height: 32, borderRadius: 'var(--radius-full)', background: 'var(--color-bg-elevated)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600 }}>
-                                                            {student.name.charAt(0).toUpperCase()}
-                                                        </div>
-                                                        <div style={{ fontWeight: 500 }}>{student.name}</div>
-                                                    </div>
-                                                    <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                                                        {STATUSES.map(st => (
-                                                            <button
-                                                                key={st.value}
-                                                                type="button"
-                                                                onClick={() => setStudentSubmissionStatus(student.id, st.value)}
-                                                                className="btn btn-sm"
-                                                                style={{
-                                                                    padding: '3px 8px',
-                                                                    fontSize: '11px',
-                                                                    background: currentStatus === st.value ? `${st.color}20` : 'transparent',
-                                                                    color: currentStatus === st.value ? st.color : 'var(--color-text-muted)',
-                                                                    border: `1px solid ${currentStatus === st.value ? st.color : 'var(--color-border)'}`,
-                                                                    fontWeight: currentStatus === st.value ? 700 : 400,
-                                                                }}
-                                                            >
-                                                                {st.label}
-                                                            </button>
-                                                        ))}
-                                                    </div>
+
+                                return assignedStudents.map(student => {
+                                    const sub = subs[student.id];
+                                    const currentStatus = sub?.status || 'not_submitted';
+                                    return (
+                                        <div key={student.id} className="glass-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'linear-gradient(135deg, var(--color-bg-elevated), var(--color-bg-secondary))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, border: '1px solid rgba(255,255,255,0.05)', color: 'var(--color-accent)' }}>
+                                                    {student.name.charAt(0).toUpperCase()}
                                                 </div>
-                                            );
-                                        })}
-                                    </div>
-                                );
+                                                <div style={{ fontWeight: 600, fontSize: '14px' }}>{student.name}</div>
+                                            </div>
+                                            <div style={{ display: 'flex', gap: '4px' }}>
+                                                {STATUSES.map(st => (
+                                                    <button
+                                                        key={st.value}
+                                                        type="button"
+                                                        onClick={() => setStudentSubmissionStatus(student.id, st.value)}
+                                                        style={{
+                                                            padding: '6px 10px',
+                                                            fontSize: '11px',
+                                                            borderRadius: '8px',
+                                                            background: currentStatus === st.value ? `${st.color}20` : 'rgba(255,255,255,0.03)',
+                                                            color: currentStatus === st.value ? st.color : 'var(--color-text-muted)',
+                                                            border: `1px solid ${currentStatus === st.value ? `${st.color}40` : 'rgba(255,255,255,0.05)'}`,
+                                                            fontWeight: currentStatus === st.value ? 700 : 500,
+                                                            cursor: 'pointer',
+                                                            transition: 'all 0.2s ease'
+                                                        }}
+                                                    >
+                                                        {st.label.split(' ')[1] || st.label}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    );
+                                });
                             })()}
                         </div>
-                        <div className="modal-footer" style={{ borderTop: '1px solid var(--color-border)' }}>
-                            <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }} onClick={() => setTrackingAssignment(null)}>Done</button>
-                        </div>
+
+                        <button className="btn btn-primary" style={{ width: '100%', marginTop: 'var(--space-6)', borderRadius: '12px', boxShadow: 'var(--shadow-primary)' }} onClick={() => setTrackingAssignment(null)}>
+                            Finish Grading
+                        </button>
                     </div>
-                </div>
-            )}
+                )}
+            </Modal>
         </div>
     );
 }

@@ -1,13 +1,18 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import {
     collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, Timestamp,
 } from 'firebase/firestore';
 import React from 'react';
 import { db } from '../services/firebase';
-import { ClipboardCheck, Check, X as XIcon, Clock, Save, Eye, Trash2, Edit2, ChevronDown, ChevronUp } from 'lucide-react';
+import { 
+    ClipboardCheck, Check, X as XIcon, Clock, Save, 
+    Trash2, Edit2, ChevronDown, ChevronUp, UserCheck, 
+    CalendarDays, History, LayoutGrid, Info, Activity
+} from 'lucide-react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
+import { batchService } from '../services/batchService';
 
 export default function Attendance() {
     const { currentUser } = useAuth();
@@ -33,15 +38,20 @@ export default function Attendance() {
 
     async function loadData() {
         try {
-            const [batchSnap, studentSnap] = await Promise.all([
-                getDocs(query(collection(db, 'batches'), where('teacherId', '==', currentUser.uid))),
-                getDocs(query(collection(db, 'students'), where('teacherId', '==', currentUser.uid))),
+            const uid = currentUser.uid;
+            const [activeBatches, studentSnap] = await Promise.all([
+                batchService.getBatches(uid, true),
+                getDocs(query(
+                    collection(db, 'students'), 
+                    where('teacherId', '==', uid),
+                    where('status', '==', 'enrolled')
+                )),
             ]);
-            setBatches(batchSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
-            const allStudents = studentSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
-            setStudents(allStudents);
+            setBatches(activeBatches);
+            setStudents(studentSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
         } catch (err) {
-            console.error('Error loading:', err);
+            console.error('Error loading foundation data:', err);
+            toast.error('Failed to load students');
         } finally {
             setLoading(false);
         }
@@ -71,29 +81,25 @@ export default function Attendance() {
                 setRecords(recs);
             } else {
                 setExistingAttendance(null);
-                const batchStudents = students.filter((s) =>
-                    (s.batchIds || []).includes(selectedBatch) && (s.status || 'enrolled') === 'enrolled'
-                );
+                const batchStudents = students.filter((s) => (s.batchIds || []).includes(selectedBatch));
                 const recs = {};
                 batchStudents.forEach((s) => { recs[s.id] = 'present'; });
                 setRecords(recs);
             }
 
-            // Load history
-            const allAttendance = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-            setHistory(allAttendance.sort((a, b) => {
+            setHistory(snap.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => {
                 const da = a.date?.toDate ? a.date.toDate() : new Date(a.date);
                 const db2 = b.date?.toDate ? b.date.toDate() : new Date(b.date);
                 return db2 - da;
             }));
         } catch (err) {
-            console.error('Error loading attendance:', err);
+            console.error('Error loading attendance logs:', err);
         }
     }
 
-    function getBatchStudents() {
-        const enrolled = students.filter((s) => (s.batchIds || []).includes(selectedBatch) && (s.status || 'enrolled') === 'enrolled');
-        if (existingAttendance && existingAttendance.records) {
+    const batchStudents = useMemo(() => {
+        const enrolled = students.filter((s) => (s.batchIds || []).includes(selectedBatch));
+        if (existingAttendance?.records) {
             const historicalIds = existingAttendance.records.map((r) => r.studentId);
             const historicalStudents = students.filter(
                 (s) => historicalIds.includes(s.id) && !enrolled.some((e) => e.id === s.id)
@@ -101,14 +107,16 @@ export default function Attendance() {
             return [...enrolled, ...historicalStudents];
         }
         return enrolled;
-    }
+    }, [students, selectedBatch, existingAttendance]);
 
     function setStatus(studentId, status) {
         setRecords((prev) => ({ ...prev, [studentId]: status }));
     }
 
     async function handleSave() {
+        if (!selectedBatch) return toast.error('Please select a batch first');
         setSaving(true);
+        const toastId = toast.loading('Saving attendance...');
         try {
             const recordsArray = Object.entries(records).map(([studentId, status]) => ({
                 studentId, status,
@@ -128,14 +136,12 @@ export default function Attendance() {
                 await addDoc(collection(db, 'attendance'), data);
             }
 
-            // Sync with Class Schedule: Mark corresponding scheduled class as completed
-            const schedSnap = await getDocs(
-                query(
-                    collection(db, 'schedules'),
-                    where('teacherId', '==', currentUser.uid),
-                    where('batchId', '==', selectedBatch)
-                )
-            );
+            // Sync with Schedule
+            const schedSnap = await getDocs(query(
+                collection(db, 'schedules'),
+                where('teacherId', '==', currentUser.uid),
+                where('batchId', '==', selectedBatch)
+            ));
             
             const updatePromises = [];
             schedSnap.docs.forEach((d) => {
@@ -147,286 +153,396 @@ export default function Attendance() {
             });
             await Promise.all(updatePromises);
 
-            toast.success('Attendance saved!');
+            toast.success('Attendance records secured!', { id: toastId });
             loadAttendanceForDate();
         } catch (err) {
-            console.error('Error saving attendance:', err);
-            toast.error('Failed to save attendance.');
+            console.error('Save error:', err);
+            toast.error('Failed to sync attendance.', { id: toastId });
         } finally {
             setSaving(false);
         }
     }
+
     async function handleDelete(id) {
-        if (!confirm('Are you sure you want to delete this attendance record?')) return;
+        if (!confirm('This will permanently delete this daily record. Proceed?')) return;
         try {
             await deleteDoc(doc(db, 'attendance', id));
-            toast.success('Record deleted');
+            toast.success('Record purged');
             loadAttendanceForDate();
         } catch (err) {
-            console.error('Error deleting:', err);
-            toast.error('Failed to delete record');
+            console.error('Delete error:', err);
+            toast.error('Operation failed');
         }
     }
 
     function handleEdit(att) {
         setSelectedBatch(att.batchId);
-        const dateVal = att.date?.toDate ? format(att.date.toDate(), 'yyyy-MM-dd') : att.date;
-        setSelectedDate(dateVal);
+        setSelectedDate(att.date?.toDate ? format(att.date.toDate(), 'yyyy-MM-dd') : att.date);
         setTab('mark');
-        toast.info('Loaded record for editing');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     function getStudentName(id) {
-        return students.find(s => s.id === id)?.name || 'Unknown Student';
+        return students.find(s => s.id === id)?.name || 'Former Student';
     }
 
-    const batchStudents = getBatchStudents();
     const presentCount = Object.values(records).filter((s) => s === 'present').length;
     const absentCount = Object.values(records).filter((s) => s === 'absent').length;
     const lateCount = Object.values(records).filter((s) => s === 'late').length;
 
-    if (loading) {
-        return <div className="loading-page"><div className="loading-spinner" /></div>;
-    }
+    if (loading) return <div className="loading-page"><div className="loading-spinner" /></div>;
 
     return (
-        <div className="animate-fade-in">
-            <div className="page-header">
+        <div className="animate-fade-in" style={{ paddingBottom: 'var(--space-12)' }}>
+            <div className="page-header" style={{ marginBottom: 'var(--space-8)' }}>
                 <div>
-                    <h1 className="page-title">Attendance</h1>
-                    <p className="page-subtitle">Mark and review batch attendance</p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                        <div style={{ padding: '8px', background: 'rgba(59, 130, 246, 0.1)', color: 'var(--color-primary)', borderRadius: '12px' }}>
+                            <Activity size={24} />
+                        </div>
+                        <h1 className="page-title" style={{ margin: 0 }}>Attendance Registry</h1>
+                    </div>
+                    <p className="page-subtitle">Precision tracking for student engagement and batch presence</p>
                 </div>
             </div>
 
-            {/* Tabs */}
-            <div className="tabs">
-                <button className={`tab ${tab === 'mark' ? 'active' : ''}`} onClick={() => setTab('mark')}>Mark Attendance</button>
-                <button className={`tab ${tab === 'history' ? 'active' : ''}`} onClick={() => setTab('history')}>History</button>
+            {/* Premium Tab Navigation */}
+            <div style={{ 
+                display: 'flex', 
+                gap: 'var(--space-2)', 
+                background: 'rgba(255, 255, 255, 0.03)', 
+                padding: '6px', 
+                borderRadius: '16px', 
+                width: 'fit-content', 
+                marginBottom: 'var(--space-10)', 
+                border: '1px solid rgba(255, 255, 255, 0.05)',
+                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.2)'
+            }}>
+                <button 
+                    className={`nav-tab ${tab === 'mark' ? 'active' : ''}`} 
+                    onClick={() => setTab('mark')}
+                    style={{ 
+                        padding: '12px 28px', 
+                        borderRadius: '12px', 
+                        fontSize: '14px', 
+                        fontWeight: 800, 
+                        background: tab === 'mark' ? 'var(--color-primary)' : 'transparent',
+                        color: tab === 'mark' ? 'white' : 'var(--color-text-muted)',
+                        border: 'none', 
+                        cursor: 'pointer', 
+                        transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '10px',
+                        boxShadow: tab === 'mark' ? '0 8px 15px -3px rgba(59, 130, 246, 0.4)' : 'none'
+                    }}
+                >
+                    <LayoutGrid size={18} /> Roll Call
+                </button>
+                <button 
+                    className={`nav-tab ${tab === 'history' ? 'active' : ''}`} 
+                    onClick={() => setTab('history')}
+                    style={{ 
+                        padding: '12px 28px', 
+                        borderRadius: '12px', 
+                        fontSize: '14px', 
+                        fontWeight: 800, 
+                        background: tab === 'history' ? 'var(--color-primary)' : 'transparent',
+                        color: tab === 'history' ? 'white' : 'var(--color-text-muted)',
+                        border: 'none', 
+                        cursor: 'pointer', 
+                        transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '10px',
+                        boxShadow: tab === 'history' ? '0 8px 15px -3px rgba(59, 130, 246, 0.4)' : 'none'
+                    }}
+                >
+                    <History size={18} /> Timeline Archive
+                </button>
             </div>
 
-            {/* Filters */}
-            <div style={{ display: 'flex', gap: 'var(--space-3)', marginBottom: 'var(--space-6)', flexWrap: 'wrap' }}>
-                <select className="form-select" style={{ width: 220 }} value={selectedBatch}
-                    onChange={(e) => setSelectedBatch(e.target.value)}>
-                    <option value="">Select Batch</option>
-                    {batches.map((b) => (
-                        <option key={b.id} value={b.id}>{b.name}</option>
-                    ))}
-                </select>
-                <input className="form-input" type="date" style={{ width: 180 }} value={selectedDate}
-                    onChange={(e) => setSelectedDate(e.target.value)} />
+            {/* Focus Controls */}
+            <div className="glass-panel" style={{ 
+                padding: 'var(--space-8)', 
+                marginBottom: 'var(--space-8)', 
+                display: 'grid', 
+                gridTemplateColumns: '1fr 1fr', 
+                gap: 'var(--space-8)',
+                background: 'rgba(255, 255, 255, 0.02)',
+                border: '1px solid rgba(255, 255, 255, 0.05)'
+            }}>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', fontWeight: 900, color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                        <UserCheck size={16} /> Select Operational Batch
+                    </label>
+                    <select className="form-select" value={selectedBatch} onChange={(e) => setSelectedBatch(e.target.value)} style={{ height: '56px', fontSize: '16px', fontWeight: 700, borderRadius: '14px', background: 'rgba(255, 255, 255, 0.04)' }}>
+                        <option value="">Choose Target...</option>
+                        {batches.map((b) => (
+                            <option key={b.id} value={b.id}>{b.name}</option>
+                        ))}
+                    </select>
+                </div>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', fontWeight: 900, color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                        <CalendarDays size={16} /> Registry Date
+                    </label>
+                    <input className="form-input" type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} style={{ height: '56px', fontSize: '16px', fontWeight: 700, borderRadius: '14px', background: 'rgba(255, 255, 255, 0.04)' }} />
+                </div>
             </div>
 
             {tab === 'mark' && (
-                <>
+                <div className="animate-fade-in">
                     {!selectedBatch ? (
-                        <div className="card"><div className="empty-state">
-                            <ClipboardCheck size={48} className="empty-state-icon" />
-                            <div className="empty-state-title">Select a batch</div>
-                            <div className="empty-state-text">Choose a batch and date to mark attendance.</div>
-                        </div></div>
+                        <div className="glass-panel" style={{ padding: 'var(--space-20)', textAlign: 'center', background: 'rgba(255, 255, 255, 0.01)' }}>
+                            <div style={{ 
+                                width: '100px', height: '100px', borderRadius: '30px', 
+                                background: 'rgba(59, 130, 246, 0.05)', display: 'flex', 
+                                alignItems: 'center', justifyContent: 'center', 
+                                margin: '0 auto var(--space-8)', color: 'var(--color-primary)',
+                                border: '1px solid rgba(59, 130, 246, 0.1)'
+                            }}>
+                                <Info size={48} />
+                            </div>
+                            <h2 style={{ fontSize: '28px', fontWeight: 900, marginBottom: '12px', letterSpacing: '-0.02em' }}>Batch Required</h2>
+                            <p style={{ color: 'var(--color-text-muted)', maxWidth: '450px', margin: '0 auto', fontSize: '16px', lineHeight: 1.6 }}>Select a target batch from the system console above to begin student roll call and attendance tracking.</p>
+                        </div>
                     ) : batchStudents.length === 0 ? (
-                        <div className="card"><div className="empty-state">
-                            <ClipboardCheck size={48} className="empty-state-icon" />
-                            <div className="empty-state-title">No students in this batch</div>
-                            <div className="empty-state-text">Add students to this batch first.</div>
-                        </div></div>
+                        <div className="glass-panel" style={{ padding: 'var(--space-20)', textAlign: 'center' }}>
+                            <ClipboardCheck size={80} style={{ color: 'rgba(255, 255, 255, 0.05)', marginBottom: 'var(--space-8)' }} />
+                            <h2 style={{ fontSize: '28px', fontWeight: 900, marginBottom: '12px', letterSpacing: '-0.02em' }}>No Enrolled Students</h2>
+                            <p style={{ color: 'var(--color-text-muted)', fontSize: '16px' }}>There are no active students matched to this operational batch.</p>
+                        </div>
                     ) : (
                         <>
-                            {/* Summary */}
-                            <div style={{ display: 'flex', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
-                                <span className="badge badge-green">Present: {presentCount}</span>
-                                <span className="badge badge-red">Absent: {absentCount}</span>
-                                <span className="badge badge-gold">Late: {lateCount}</span>
-                                {existingAttendance && <span className="badge badge-blue">Previously saved</span>}
+                            {/* Summary Stat Bar */}
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-6)', marginBottom: 'var(--space-8)' }}>
+                                <div className="glass-card" style={{ padding: 'var(--space-6)', display: 'flex', alignItems: 'center', gap: 'var(--space-4)', border: '1px solid rgba(20, 184, 166, 0.1)' }}>
+                                    <div style={{ padding: '12px', background: 'rgba(20, 184, 166, 0.1)', color: 'var(--color-teal)', borderRadius: '14px', boxShadow: '0 0 15px rgba(20, 184, 166, 0.2)' }}><Check size={24} /></div>
+                                    <div><div style={{ fontSize: '12px', fontWeight: 900, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>PRESENT</div><div style={{ fontSize: '24px', fontWeight: 900 }}>{presentCount}</div></div>
+                                </div>
+                                <div className="glass-card" style={{ padding: 'var(--space-6)', display: 'flex', alignItems: 'center', gap: 'var(--space-4)', border: '1px solid rgba(239, 68, 68, 0.1)' }}>
+                                    <div style={{ padding: '12px', background: 'rgba(239, 68, 68, 0.1)', color: 'var(--color-danger)', borderRadius: '14px', boxShadow: '0 0 15px rgba(239, 68, 68, 0.2)' }}><XIcon size={24} /></div>
+                                    <div><div style={{ fontSize: '12px', fontWeight: 900, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>ABSENT</div><div style={{ fontSize: '24px', fontWeight: 900 }}>{absentCount}</div></div>
+                                </div>
+                                <div className="glass-card" style={{ padding: 'var(--space-6)', display: 'flex', alignItems: 'center', gap: 'var(--space-4)', border: '1px solid rgba(245, 158, 11, 0.1)' }}>
+                                    <div style={{ padding: '12px', background: 'rgba(245, 158, 11, 0.1)', color: 'var(--color-warning)', borderRadius: '14px', boxShadow: '0 0 15px rgba(245, 158, 11, 0.2)' }}><Clock size={24} /></div>
+                                    <div><div style={{ fontSize: '12px', fontWeight: 900, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>LATE</div><div style={{ fontSize: '24px', fontWeight: 900 }}>{lateCount}</div></div>
+                                </div>
+                                {existingAttendance && (
+                                    <div className="glass-card" style={{ padding: 'var(--space-6)', display: 'flex', alignItems: 'center', gap: 'var(--space-4)', border: '1px solid var(--color-primary)', background: 'rgba(59, 130, 246, 0.05)' }}>
+                                        <div style={{ padding: '12px', background: 'rgba(59, 130, 246, 0.2)', color: 'var(--color-primary)', borderRadius: '14px', boxShadow: '0 0 20px rgba(59, 130, 246, 0.3)' }}><Save size={24} /></div>
+                                        <div><div style={{ fontSize: '12px', fontWeight: 900, color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>STATUS</div><div style={{ fontSize: '20px', fontWeight: 900, color: 'white' }}>ARCHIVED</div></div>
+                                    </div>
+                                )}
                             </div>
 
-                            <div className="attendance-grid">
-                                {batchStudents.map((student) => (
-                                    <div key={student.id} className="attendance-student-row">
-                                        <div className="attendance-student-info">
-                                            <div className="attendance-student-avatar">
-                                                {student.name?.charAt(0).toUpperCase()}
-                                            </div>
-                                            <div>
-                                                <div style={{ fontWeight: 600, fontSize: 'var(--font-size-sm)' }}>{student.name}</div>
-                                                <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>
-                                                    Class {student.grade}
+                            <div className="glass-panel" style={{ padding: 0, overflow: 'hidden', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                    {batchStudents.map((student, idx) => (
+                                        <div key={student.id} 
+                                            style={{ 
+                                                padding: '24px 40px', 
+                                                borderBottom: idx === batchStudents.length - 1 ? 'none' : '1px solid rgba(255, 255, 255, 0.04)',
+                                                display: 'flex',
+                                                justifyContent: 'space-between',
+                                                alignItems: 'center',
+                                                background: records[student.id] === 'absent' ? 'rgba(239, 68, 68, 0.03)' : 'transparent',
+                                                transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
+                                            }}
+                                        >
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+                                                <div style={{ 
+                                                    width: '60px', height: '60px', borderRadius: '20px', 
+                                                    background: 'rgba(255, 255, 255, 0.03)', display: 'flex', 
+                                                    alignItems: 'center', justifyContent: 'center',
+                                                    fontSize: '22px', fontWeight: 900, color: 'var(--color-primary)',
+                                                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                                                    textShadow: '0 0 10px rgba(59, 130, 246, 0.3)'
+                                                }}>
+                                                    {student.name?.charAt(0).toUpperCase()}
+                                                </div>
+                                                <div>
+                                                    <div style={{ fontWeight: 800, fontSize: '20px', letterSpacing: '-0.01em' }}>{student.name}</div>
+                                                    <div style={{ fontSize: '13px', color: 'var(--color-text-muted)', display: 'flex', gap: '10px', marginTop: '4px', alignItems: 'center' }}>
+                                                        <span style={{ 
+                                                            background: 'rgba(255, 255, 255, 0.08)', 
+                                                            padding: '2px 10px', 
+                                                            borderRadius: '6px', 
+                                                            fontWeight: 700,
+                                                            fontSize: '11px',
+                                                            color: 'white'
+                                                        }}>GRADE: {student.grade}</span>
+                                                        <span style={{ opacity: 0.3 }}>•</span>
+                                                        <span style={{ fontWeight: 600 }}>{student.studentId || 'NO_UID'}</span>
+                                                    </div>
                                                 </div>
                                             </div>
+
+                                            <div style={{ display: 'flex', gap: 'var(--space-4)' }}>
+                                                {[
+                                                    { id: 'present', label: 'Present', icon: Check, color: 'var(--color-teal)' },
+                                                    { id: 'absent', label: 'Absent', icon: XIcon, color: 'var(--color-danger)' },
+                                                    { id: 'late', label: 'Late', icon: Clock, color: 'var(--color-warning)' }
+                                                ].map((btn) => (
+                                                    <button
+                                                        key={btn.id}
+                                                        onClick={() => setStatus(student.id, btn.id)}
+                                                        style={{ 
+                                                            display: 'flex', alignItems: 'center', gap: '10px', 
+                                                            padding: '12px 24px', borderRadius: '14px', 
+                                                            fontSize: '14px', fontWeight: 800, 
+                                                            cursor: 'pointer', transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                                            border: records[student.id] === btn.id ? `2px solid ${btn.color}` : '1px solid rgba(255, 255, 255, 0.04)',
+                                                            background: records[student.id] === btn.id ? `${btn.color}15` : 'rgba(255, 255, 255, 0.02)',
+                                                            color: records[student.id] === btn.id ? btn.color : 'var(--color-text-muted)',
+                                                            boxShadow: records[student.id] === btn.id ? `0 0 20px ${btn.color}20` : 'none',
+                                                            transform: records[student.id] === btn.id ? 'translateY(-2px)' : 'none'
+                                                        }}
+                                                    >
+                                                        <btn.icon size={18} /> {btn.label}
+                                                    </button>
+                                                ))}
+                                            </div>
                                         </div>
-                                        <div className="attendance-status-buttons">
-                                            <button
-                                                className={`attendance-status-btn ${records[student.id] === 'present' ? 'present' : ''}`}
-                                                onClick={() => setStatus(student.id, 'present')}
-                                            >
-                                                <Check size={14} /> Present
-                                            </button>
-                                            <button
-                                                className={`attendance-status-btn ${records[student.id] === 'absent' ? 'absent' : ''}`}
-                                                onClick={() => setStatus(student.id, 'absent')}
-                                            >
-                                                <XIcon size={14} /> Absent
-                                            </button>
-                                            <button
-                                                className={`attendance-status-btn ${records[student.id] === 'late' ? 'late' : ''}`}
-                                                onClick={() => setStatus(student.id, 'late')}
-                                            >
-                                                <Clock size={14} /> Late
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))}
+                                    ))}
+                                </div>
                             </div>
 
-                            <div style={{ marginTop: 'var(--space-6)', display: 'flex', justifyContent: 'flex-end' }}>
-                                <button className="btn btn-primary btn-lg" onClick={handleSave} disabled={saving}>
-                                    <Save size={18} /> {saving ? 'Saving...' : 'Save Attendance'}
+                            <div style={{ marginTop: 'var(--space-10)', display: 'flex', justifyContent: 'flex-end' }}>
+                                <button className="btn btn-primary" onClick={handleSave} disabled={saving} style={{ 
+                                    padding: '0 56px', height: '64px', borderRadius: '20px', 
+                                    fontSize: '18px', fontWeight: 900, 
+                                    boxShadow: '0 20px 40px -10px rgba(59, 130, 246, 0.4)',
+                                    display: 'flex', alignItems: 'center', gap: '12px'
+                                }}>
+                                    {saving ? (
+                                        <>Syncing Registry...</>
+                                    ) : (
+                                        <>
+                                            <Save size={22} />
+                                            Confirm Roll Call
+                                        </>
+                                    )}
                                 </button>
                             </div>
                         </>
                     )}
-                </>
+                </div>
             )}
 
             {tab === 'history' && (
-                <div>
+                <div className="animate-fade-in">
                     {history.length === 0 ? (
-                        <div className="card"><div className="empty-state">
-                            <ClipboardCheck size={48} className="empty-state-icon" />
-                            <div className="empty-state-title">No attendance records</div>
-                            <div className="empty-state-text">Attendance records will appear here once you start marking.</div>
-                        </div></div>
+                        <div className="glass-panel" style={{ padding: 'var(--space-20)', textAlign: 'center' }}>
+                            <History size={80} style={{ color: 'rgba(255, 255, 255, 0.05)', marginBottom: 'var(--space-8)' }} />
+                            <h2 style={{ fontSize: '28px', fontWeight: 900, marginBottom: '12px', letterSpacing: '-0.02em' }}>Logbook Empty</h2>
+                            <p style={{ color: 'var(--color-text-muted)', fontSize: '16px' }}>Historical records for this operational batch will be archived here.</p>
+                        </div>
                     ) : (
-                        <div className="table-container">
-                            <table className="table">
-                                <thead>
-                                    <tr>
-                                        <th>Date</th>
-                                        <th>Present</th>
-                                        <th>Absent</th>
-                                        <th>Late</th>
-                                        <th>Rate</th>
-                                        <th style={{ textAlign: 'right' }}>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {history.map((att) => {
-                                        const isExpanded = expandedId === att.id;
-                                        const dateVal = att.date?.toDate ? att.date.toDate() : new Date(att.date);
-                                        const attRecords = att.records || [];
-                                        const p = attRecords.filter((r) => r.status === 'present').length;
-                                        const a = attRecords.filter((r) => r.status === 'absent').length;
-                                        const l = attRecords.filter((r) => r.status === 'late').length;
-                                        const total = attRecords.length;
-                                        const rate = total > 0 ? Math.round((p / total) * 100) : 0;
-                                        
-                                        return (
-                                            <React.Fragment key={att.id}>
-                                                <tr>
-                                                    <td>
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                            {format(dateVal, 'MMM d, yyyy')}
-                                                            {att.batchId !== selectedBatch && (
-                                                                <span className="badge" style={{ fontSize: '10px', padding: '2px 6px' }}>
-                                                                    {batches.find(b => b.id === att.batchId)?.name || 'Other'}
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                    <td><span className="badge badge-green">{p}</span></td>
-                                                    <td><span className="badge badge-red">{a}</span></td>
-                                                    <td><span className="badge badge-gold">{l}</span></td>
-                                                    <td>
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                                                            <div className="progress-bar" style={{ width: 60 }}>
-                                                                <div className="progress-bar-fill" style={{ width: `${rate}%` }} />
+                        <div className="glass-panel" style={{ padding: 0, overflow: 'hidden', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                            <div className="table-container">
+                                <table className="table">
+                                    <thead>
+                                        <tr style={{ background: 'rgba(255, 255, 255, 0.03)' }}>
+                                            <th style={{ padding: '24px 40px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--color-primary)' }}>Session Date</th>
+                                            <th style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--color-primary)' }}>Presence Breakdown</th>
+                                            <th style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--color-primary)' }}>Reliability Rate</th>
+                                            <th style={{ textAlign: 'right', paddingRight: '40px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--color-primary)' }}>Operational Control</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {history.map((att) => {
+                                            const isExpanded = expandedId === att.id;
+                                            const dateVal = att.date?.toDate ? att.date.toDate() : new Date(att.date);
+                                            const attRecords = att.records || [];
+                                            const p = attRecords.filter((r) => r.status === 'present').length;
+                                            const a = attRecords.filter((r) => r.status === 'absent').length;
+                                            const l = attRecords.filter((r) => r.status === 'late').length;
+                                            const total = attRecords.length;
+                                            const rate = total > 0 ? Math.round((p / total) * 100) : 0;
+                                            
+                                            return (
+                                                <React.Fragment key={att.id}>
+                                                    <tr style={{ cursor: 'pointer', transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)', background: isExpanded ? 'rgba(255, 255, 255, 0.02)' : 'transparent' }} onClick={() => setExpandedId(isExpanded ? null : att.id)}>
+                                                        <td style={{ padding: '28px 40px', fontWeight: 800, fontSize: '16px', letterSpacing: '-0.01em' }}>{format(dateVal, 'MMMM d, yyyy')}</td>
+                                                        <td>
+                                                            <div style={{ display: 'flex', gap: '10px' }}>
+                                                                <span style={{ fontSize: '11px', fontWeight: 900, padding: '4px 12px', borderRadius: '8px', background: 'rgba(20, 184, 166, 0.1)', color: 'var(--color-teal)', border: '1px solid rgba(20, 184, 166, 0.2)' }}>{p} PRESENT</span>
+                                                                <span style={{ fontSize: '11px', fontWeight: 900, padding: '4px 12px', borderRadius: '8px', background: 'rgba(239, 68, 68, 0.1)', color: 'var(--color-danger)', border: '1px solid rgba(239, 68, 68, 0.2)' }}>{a} ABSENT</span>
+                                                                <span style={{ fontSize: '11px', fontWeight: 900, padding: '4px 12px', borderRadius: '8px', background: 'rgba(245, 158, 11, 0.1)', color: 'var(--color-warning)', border: '1px solid rgba(245, 158, 11, 0.2)' }}>{l} LATE</span>
                                                             </div>
-                                                            <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 600 }}>{rate}%</span>
-                                                        </div>
-                                                    </td>
-                                                    <td style={{ textAlign: 'right' }}>
-                                                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-1)' }}>
-                                                            <button 
-                                                                className="btn btn-ghost btn-icon" 
-                                                                title="View Details"
-                                                                onClick={() => setExpandedId(isExpanded ? null : att.id)}
-                                                            >
-                                                                {isExpanded ? <ChevronUp size={16} /> : <Eye size={16} />}
-                                                            </button>
-                                                            <button 
-                                                                className="btn btn-ghost btn-icon" 
-                                                                title="Edit"
-                                                                onClick={() => handleEdit(att)}
-                                                            >
-                                                                <Edit2 size={16} />
-                                                            </button>
-                                                            <button 
-                                                                className="btn btn-ghost btn-icon" 
-                                                                title="Delete"
-                                                                onClick={() => handleDelete(att.id)}
-                                                            >
-                                                                <Trash2 size={16} style={{ color: 'var(--color-danger)' }} />
-                                                            </button>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                                {isExpanded && (
-                                                    <tr className="expanded-row">
-                                                        <td colSpan="6" style={{ padding: '0' }}>
-                                                            <div style={{ 
-                                                                padding: 'var(--space-4)', 
-                                                                background: 'var(--color-bg-elevated)',
-                                                                borderBottom: '1px solid var(--color-border)',
-                                                                animation: 'slideDown 0.2s ease-out'
-                                                            }}>
-                                                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-6)' }}>
-                                                                    <div>
-                                                                        <div style={{ color: 'var(--color-teal)', fontWeight: 600, fontSize: '12px', textTransform: 'uppercase', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                                            <Check size={12} /> Present ({p})
-                                                                        </div>
-                                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                                                            {attRecords.filter(r => r.status === 'present').length === 0 ? <span style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>None</span> : 
-                                                                                attRecords.filter(r => r.status === 'present').map(r => (
-                                                                                    <span key={r.studentId} style={{ fontSize: '13px' }}>{getStudentName(r.studentId)}</span>
-                                                                                ))
-                                                                            }
-                                                                        </div>
-                                                                    </div>
-                                                                    <div>
-                                                                        <div style={{ color: 'var(--color-danger)', fontWeight: 600, fontSize: '12px', textTransform: 'uppercase', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                                            <XIcon size={12} /> Absent ({a})
-                                                                        </div>
-                                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                                                            {attRecords.filter(r => r.status === 'absent').length === 0 ? <span style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>None</span> : 
-                                                                                attRecords.filter(r => r.status === 'absent').map(r => (
-                                                                                    <span key={r.studentId} style={{ fontSize: '13px' }}>{getStudentName(r.studentId)}</span>
-                                                                                ))
-                                                                            }
-                                                                        </div>
-                                                                    </div>
-                                                                    <div>
-                                                                        <div style={{ color: 'var(--color-warning)', fontWeight: 600, fontSize: '12px', textTransform: 'uppercase', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                                            <Clock size={12} /> Late ({l})
-                                                                        </div>
-                                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                                                            {attRecords.filter(r => r.status === 'late').length === 0 ? <span style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>None</span> : 
-                                                                                attRecords.filter(r => r.status === 'late').map(r => (
-                                                                                    <span key={r.studentId} style={{ fontSize: '13px' }}>{getStudentName(r.studentId)}</span>
-                                                                                ))
-                                                                            }
-                                                                        </div>
-                                                                    </div>
+                                                        </td>
+                                                        <td>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                                                                <div style={{ width: '120px', height: '10px', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '6px', overflow: 'hidden', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                                                                    <div style={{ width: `${rate}%`, height: '100%', background: 'var(--color-primary)', boxShadow: '0 0 15px rgba(59, 130, 246, 0.4)' }} />
+                                                                </div>
+                                                                <span style={{ fontSize: '16px', fontWeight: 900, color: 'white' }}>{rate}%</span>
+                                                            </div>
+                                                        </td>
+                                                        <td style={{ textAlign: 'right', paddingRight: '40px' }}>
+                                                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                                                                <button className="btn btn-ghost btn-sm btn-icon" style={{ width: '36px', height: '36px', borderRadius: '10px' }} onClick={(e) => { e.stopPropagation(); handleEdit(att); }}>
+                                                                    <Edit2 size={18} />
+                                                                </button>
+                                                                <button className="btn btn-ghost btn-sm btn-icon" style={{ width: '36px', height: '36px', borderRadius: '10px' }} onClick={(e) => { e.stopPropagation(); handleDelete(att.id); }}>
+                                                                    <Trash2 size={18} style={{ color: 'var(--color-danger)' }} />
+                                                                </button>
+                                                                <div style={{ marginLeft: '12px', opacity: 0.5 }}>
+                                                                    {isExpanded ? <ChevronUp size={24} /> : <ChevronDown size={24} />}
                                                                 </div>
                                                             </div>
                                                         </td>
                                                     </tr>
-                                                )}
-                                            </React.Fragment>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
+                                                    {isExpanded && (
+                                                        <tr>
+                                                            <td colSpan="4" style={{ padding: '0', background: 'rgba(255, 255, 255, 0.01)' }}>
+                                                                <div className="animate-slide-down" style={{ padding: '40px' }}>
+                                                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '48px' }}>
+                                                                        {[
+                                                                            { title: 'Confirmed Present', status: 'present', color: 'var(--color-teal)', icon: Check },
+                                                                            { title: 'Recorded Absent', status: 'absent', color: 'var(--color-danger)', icon: XIcon },
+                                                                            { title: 'Marked Late', status: 'late', color: 'var(--color-warning)', icon: Clock }
+                                                                        ].map((group) => (
+                                                                            <div key={group.status}>
+                                                                                <h4 style={{ fontSize: '13px', fontWeight: 950, color: group.color, textTransform: 'uppercase', marginBottom: '20px', letterSpacing: '0.15em', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                                                    <group.icon size={16} /> {group.title}
+                                                                                </h4>
+                                                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                                                                    {attRecords.filter(r => r.status === group.status).length === 0 ? (
+                                                                                        <span style={{ color: 'var(--color-text-muted)', fontSize: '14px', fontStyle: 'italic', opacity: 0.6 }}>No students recorded</span>
+                                                                                    ) : (
+                                                                                        attRecords.filter(r => r.status === group.status).map(r => (
+                                                                                            <div key={r.studentId} className="glass-card" style={{ 
+                                                                                                padding: '12px 20px', 
+                                                                                                fontSize: '14px', 
+                                                                                                fontWeight: 700, 
+                                                                                                background: 'rgba(255, 255, 255, 0.03)',
+                                                                                                border: '1px solid rgba(255, 255, 255, 0.04)',
+                                                                                                display: 'flex',
+                                                                                                justifyContent: 'space-between',
+                                                                                                alignItems: 'center'
+                                                                                            }}>
+                                                                                                {getStudentName(r.studentId)}
+                                                                                                <span style={{ opacity: 0.3, fontSize: '11px' }}>#{r.studentId.substring(0, 6)}</span>
+                                                                                            </div>
+                                                                                        ))
+                                                                                    )}
+                                                                                </div>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    )}
+                                                </React.Fragment>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     )}
                 </div>

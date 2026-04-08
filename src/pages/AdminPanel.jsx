@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { collection, query, where, getDocs, updateDoc, doc, deleteDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { ShieldCheck, Check, X, Trash2, Users } from 'lucide-react';
+import { ShieldCheck, Check, X, Trash2, Users, Database, ShieldAlert, Zap, Lock, Unlock } from 'lucide-react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 
@@ -12,6 +12,7 @@ export default function AdminPanel() {
     const [approvedUsers, setApprovedUsers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [tab, setTab] = useState('pending');
+    const [isMigrating, setIsMigrating] = useState(false);
 
     useEffect(() => {
         loadUsers();
@@ -24,7 +25,7 @@ export default function AdminPanel() {
             setPendingUsers(users.filter((u) => !u.isApproved && u.role !== 'admin'));
             setApprovedUsers(users.filter((u) => u.isApproved && u.role !== 'admin'));
         } catch (err) {
-            console.error('Error:', err);
+            console.error('Core Registry Failure:', err);
         } finally {
             setLoading(false);
         }
@@ -34,42 +35,80 @@ export default function AdminPanel() {
         try {
             await updateDoc(doc(db, 'users', userId), { isApproved: true });
             loadUsers();
-            toast.success('User approved!');
+            toast.success('Access Granted');
         } catch (err) {
-            console.error('Error:', err);
-            toast.error('Failed to approve.');
+            console.error('Auth Error:', err);
+            toast.error('Approval Failed');
         }
     }
 
     async function rejectUser(userId) {
-        if (!confirm('Reject and remove this user?')) return;
+        if (!confirm('Permanently purge this registration request?')) return;
         try {
             await deleteDoc(doc(db, 'users', userId));
             loadUsers();
-            toast.success('User rejected.');
+            toast.success('Request Purged');
         } catch (err) {
-            console.error('Error:', err);
+            console.error('Purge Error:', err);
         }
     }
 
     async function revokeAccess(userId) {
-        if (!confirm('Revoke this user\'s access?')) return;
+        if (!confirm('Revoke security clearance for this user?')) return;
         try {
             await updateDoc(doc(db, 'users', userId), { isApproved: false });
             loadUsers();
-            toast.success('Access revoked.');
+            toast.success('Access Revoked');
         } catch (err) {
-            console.error('Error:', err);
+            console.error('Revocation Error:', err);
+        }
+    }
+
+    async function runInitialSync() {
+        if (!confirm('Initialize platform-wide data consistency? (This updates all legacy student and batch records)')) return;
+        setIsMigrating(true);
+        const toastId = toast.loading('Synchronizing Data Matrix...');
+        try {
+            let batchCount = 0;
+            let studentCount = 0;
+
+            const batchSnap = await getDocs(collection(db, 'batches'));
+            const batchPromises = batchSnap.docs.map(async (d) => {
+                const data = d.data();
+                if (data.isClosed === undefined) {
+                    await updateDoc(doc(db, 'batches', d.id), { isClosed: false });
+                    batchCount++;
+                }
+            });
+
+            const studentSnap = await getDocs(collection(db, 'students'));
+            const studentPromises = studentSnap.docs.map(async (d) => {
+                const data = d.data();
+                if (data.status === undefined) {
+                    await updateDoc(doc(db, 'students', d.id), { status: 'enrolled' });
+                    studentCount++;
+                }
+            });
+
+            await Promise.all([...batchPromises, ...studentPromises]);
+            toast.success(`Matrix Synced: ${batchCount} Batches, ${studentCount} Students`, { id: toastId });
+        } catch (err) {
+            console.error('Sync Error:', err);
+            toast.error('Synchronization Aborted', { id: toastId });
+        } finally {
+            setIsMigrating(false);
         }
     }
 
     if (!isAdmin) {
         return (
-            <div className="card" style={{ marginTop: 'var(--space-8)' }}>
-                <div className="empty-state">
-                    <ShieldCheck size={48} className="empty-state-icon" />
-                    <div className="empty-state-title">Admin Access Required</div>
-                    <div className="empty-state-text">You don't have permission to access this page.</div>
+            <div className="animate-fade-in" style={{ padding: 'var(--space-12) 0', textAlign: 'center' }}>
+                <div className="glass-panel" style={{ maxWidth: '500px', margin: 'auto', padding: '40px' }}>
+                    <div style={{ background: 'rgba(239, 68, 68, 0.1)', color: 'var(--color-danger)', width: '80px', height: '80px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
+                        <Lock size={40} />
+                    </div>
+                    <h1 style={{ fontSize: '24px', fontWeight: 900, marginBottom: '12px' }}>Clearance Required</h1>
+                    <p style={{ color: 'var(--color-text-muted)', fontSize: '15px', lineHeight: 1.6 }}>Your current authentication token does not have Level 0 Administrative privileges.</p>
                 </div>
             </div>
         );
@@ -79,93 +118,163 @@ export default function AdminPanel() {
 
     return (
         <div className="animate-fade-in">
-            <div className="page-header">
+            <div className="page-header" style={{ marginBottom: 'var(--space-8)' }}>
                 <div>
-                    <h1 className="page-title">Admin Panel</h1>
-                    <p className="page-subtitle">Manage tutor registrations and access</p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                        <div style={{ padding: '4px 10px', background: 'rgba(59, 130, 246, 0.1)', color: 'var(--color-primary)', borderRadius: '8px', fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em' }}>System Oversight</div>
+                    </div>
+                    <h1 className="page-title" style={{ fontSize: '32px', fontWeight: 900 }}>Security Console</h1>
+                    <p className="page-subtitle">Manage educator credentials and platform data integrity</p>
                 </div>
             </div>
 
-            <div className="tabs">
-                <button className={`tab ${tab === 'pending' ? 'active' : ''}`} onClick={() => setTab('pending')}>
-                    Pending ({pendingUsers.length})
-                </button>
-                <button className={`tab ${tab === 'approved' ? 'active' : ''}`} onClick={() => setTab('approved')}>
-                    Approved ({approvedUsers.length})
-                </button>
+            <div className="glass-panel" style={{ padding: '8px', marginBottom: 'var(--space-8)', display: 'inline-flex', gap: '8px', background: 'rgba(255, 255, 255, 0.03)' }}>
+                {[
+                    { id: 'pending', label: 'Pending Approval', icon: <ShieldAlert size={16} />, count: pendingUsers.length },
+                    { id: 'approved', label: 'Active Tutors', icon: <Check size={16} />, count: approvedUsers.length },
+                    { id: 'maintenance', label: 'Matrix Control', icon: <Database size={16} /> }
+                ].map((t) => (
+                    <button 
+                        key={t.id}
+                        className={`tab ${tab === t.id ? 'active' : ''}`} 
+                        onClick={() => setTab(t.id)}
+                        style={{ 
+                            padding: '10px 18px', 
+                            borderRadius: '10px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            fontSize: '13px',
+                            fontWeight: 800,
+                            background: tab === t.id ? 'var(--color-primary)' : 'transparent',
+                            color: tab === t.id ? 'white' : 'var(--color-text-muted)',
+                            border: 'none',
+                            transition: 'all 0.2s ease',
+                            cursor: 'pointer'
+                        }}
+                    >
+                        {t.icon}
+                        {t.label} {t.count !== undefined && <span style={{ opacity: 0.6 }}>({t.count})</span>}
+                    </button>
+                ))}
             </div>
 
-            {tab === 'pending' && (
-                <div>
-                    {pendingUsers.length === 0 ? (
-                        <div className="card"><div className="empty-state">
-                            <Users size={48} className="empty-state-icon" />
-                            <div className="empty-state-title">No pending registrations</div>
-                            <div className="empty-state-text">New tutor registrations will appear here for approval.</div>
-                        </div></div>
-                    ) : (
-                        <div className="admin-pending-list">
-                            {pendingUsers.map((user) => (
-                                <div key={user.id} className="admin-user-card">
-                                    <div className="admin-user-info">
-                                        <div className="sidebar-avatar" style={{ width: 40, height: 40, fontSize: 'var(--font-size-sm)' }}>
-                                            {user.displayName?.charAt(0).toUpperCase() || '?'}
-                                        </div>
-                                        <div>
-                                            <div style={{ fontWeight: 600 }}>{user.displayName || 'Unknown'}</div>
-                                            <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>
-                                                {user.email} · Registered {user.createdAt?.toDate ? format(user.createdAt.toDate(), 'MMM d, yyyy') : 'recently'}
+            <div className="tab-content">
+                {tab === 'pending' && (
+                    <div className="animate-fade-in">
+                        {pendingUsers.length === 0 ? (
+                            <div className="glass-card" style={{ padding: '80px 0', textAlign: 'center' }}>
+                                <div style={{ width: '80px', height: '80px', background: 'rgba(255,255,255,0.03)', color: 'var(--color-text-muted)', borderRadius: '50%', margin: '0 auto 24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <Users size={32} />
+                                </div>
+                                <h3 style={{ fontSize: '20px', fontWeight: 800 }}>Clearance Buffer Empty</h3>
+                                <p style={{ color: 'var(--color-text-muted)', maxWidth: '300px', margin: '8px auto' }}>No new registration requests detected in the buffer.</p>
+                            </div>
+                        ) : (
+                            <div style={{ display: 'grid', gap: '16px' }}>
+                                {pendingUsers.map((user) => (
+                                    <div key={user.id} className="glass-card hover-lift" style={{ padding: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                                            <div style={{ width: 50, height: 50, borderRadius: '14px', background: 'var(--color-primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: '18px' }}>
+                                                {user.displayName?.charAt(0).toUpperCase() || '?'}
+                                            </div>
+                                            <div>
+                                                <div style={{ fontWeight: 800, fontSize: '17px', marginBottom: '4px' }}>{user.displayName || 'Anonymous Tutor'}</div>
+                                                <div style={{ fontSize: '13px', color: 'var(--color-text-muted)', fontWeight: 600 }}>
+                                                    {user.email} · Registered {user.createdAt?.toDate ? format(user.createdAt.toDate(), 'PPP') : 'Processing...'}
+                                                </div>
                                             </div>
                                         </div>
+                                        <div style={{ display: 'flex', gap: '12px' }}>
+                                            <button className="btn btn-primary" onClick={() => approveUser(user.id)} style={{ padding: '0 20px', height: '40px', fontSize: '12px', fontWeight: 900 }}>
+                                                <Check size={16} /> GRANT ACCESS
+                                            </button>
+                                            <button className="btn btn-ghost" onClick={() => rejectUser(user.id)} style={{ color: '#ef4444', height: '40px', fontSize: '12px', fontWeight: 900 }}>
+                                                <X size={16} /> REJECT
+                                            </button>
+                                        </div>
                                     </div>
-                                    <div className="admin-user-actions">
-                                        <button className="btn btn-primary btn-sm" onClick={() => approveUser(user.id)}>
-                                            <Check size={14} /> Approve
-                                        </button>
-                                        <button className="btn btn-danger btn-sm" onClick={() => rejectUser(user.id)}>
-                                            <X size={14} /> Reject
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            )}
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
 
-            {tab === 'approved' && (
-                <div>
-                    {approvedUsers.length === 0 ? (
-                        <div className="card"><div className="empty-state">
-                            <Users size={48} className="empty-state-icon" />
-                            <div className="empty-state-title">No approved tutors</div>
-                        </div></div>
-                    ) : (
-                        <div className="admin-pending-list">
-                            {approvedUsers.map((user) => (
-                                <div key={user.id} className="admin-user-card">
-                                    <div className="admin-user-info">
-                                        <div className="sidebar-avatar" style={{ width: 40, height: 40, fontSize: 'var(--font-size-sm)' }}>
-                                            {user.displayName?.charAt(0).toUpperCase() || '?'}
-                                        </div>
-                                        <div>
-                                            <div style={{ fontWeight: 600 }}>{user.displayName || 'Unknown'}</div>
-                                            <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>
-                                                {user.email}
+                {tab === 'approved' && (
+                    <div className="animate-fade-in">
+                        {approvedUsers.length === 0 ? (
+                            <div className="glass-card" style={{ padding: '80px 0', textAlign: 'center' }}>
+                                <h3 style={{ fontSize: '20px', fontWeight: 800 }}>No Active Tutors</h3>
+                            </div>
+                        ) : (
+                            <div style={{ display: 'grid', gap: '16px' }}>
+                                {approvedUsers.map((user) => (
+                                    <div key={user.id} className="glass-card" style={{ padding: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                                            <div style={{ width: 50, height: 50, borderRadius: '14px', background: 'rgba(255,255,255,0.03)', color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: '18px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                                {user.displayName?.charAt(0).toUpperCase() || '?'}
+                                            </div>
+                                            <div>
+                                                <div style={{ fontWeight: 800, fontSize: '17px', marginBottom: '4px' }}>{user.displayName || 'Authorized Tutor'}</div>
+                                                <div style={{ fontSize: '13px', color: 'var(--color-text-muted)', fontWeight: 600 }}>
+                                                    {user.email}
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                    <div className="admin-user-actions">
-                                        <button className="btn btn-danger btn-sm" onClick={() => revokeAccess(user.id)}>
-                                            Revoke Access
+                                        <button className="btn btn-ghost" onClick={() => revokeAccess(user.id)} style={{ color: '#ef4444', height: '40px', fontSize: '12px', fontWeight: 900 }}>
+                                            REVOKE SECURITY CLEARANCE
                                         </button>
                                     </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {tab === 'maintenance' && (
+                    <div className="animate-fade-in">
+                        <div className="glass-card" style={{ padding: '40px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '32px' }}>
+                                <div style={{ background: 'rgba(59, 130, 246, 0.1)', color: 'var(--color-primary)', padding: '12px', borderRadius: '16px' }}>
+                                    <Database size={28} />
                                 </div>
-                            ))}
+                                <div>
+                                    <h3 style={{ fontSize: '20px', fontWeight: 900 }}>Central Data Matrix</h3>
+                                    <p style={{ color: 'var(--color-text-muted)', fontSize: '14px' }}>Platform-wide consistency and legacy record synchronization</p>
+                                </div>
+                            </div>
+
+                            <div className="glass-panel" style={{ padding: '32px', background: 'rgba(255, 255, 255, 0.02)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div style={{ flex: 1 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                                        <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--color-primary)' }} />
+                                        <div style={{ fontWeight: 800, fontSize: '16px' }}>Legacy Enrollment Logic Sync</div>
+                                    </div>
+                                    <p style={{ fontSize: '14px', color: 'var(--color-text-muted)', lineHeight: 1.5, maxWidth: '500px' }}>
+                                        Applies modern state containers to legacy records. Sets <code style={{ color: 'var(--color-primary)' }}>isClosed: false</code> for all active batches and <code style={{ color: 'var(--color-primary)' }}>status: 'enrolled'</code> for all active student profiles.
+                                    </p>
+                                </div>
+                                <button 
+                                    className="btn btn-primary" 
+                                    onClick={runInitialSync}
+                                    disabled={isMigrating}
+                                    style={{ padding: '0 32px', height: '48px', fontWeight: 900, boxShadow: '0 8px 20px rgba(59, 130, 246, 0.3)' }}
+                                >
+                                    {isMigrating ? <span className="loading-spinner" style={{ width: 16, height: 16, borderWeight: 2 }} /> : <><Zap size={16} /> TRIGGER SYNC</>}
+                                </button>
+                            </div>
+
+                            <div style={{ marginTop: '32px', padding: '20px', borderRadius: '12px', background: 'rgba(239, 68, 68, 0.05)', display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
+                                <ShieldAlert size={20} style={{ color: '#ef4444', marginTop: '2px' }} />
+                                <div>
+                                    <div style={{ fontWeight: 900, fontSize: '14px', color: '#ef4444', marginBottom: '4px' }}>DANGER ZONE</div>
+                                    <p style={{ fontSize: '13px', color: '#ef4444', opacity: 0.8, fontWeight: 600 }}>This operation modifies broad datasets. Ensure all educators are offline during synchronization to prevent race conditions.</p>
+                                </div>
+                            </div>
                         </div>
-                    )}
-                </div>
-            )}
+                    </div>
+                )}
+            </div>
         </div>
     );
 }

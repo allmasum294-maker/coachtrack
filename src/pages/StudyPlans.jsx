@@ -2,8 +2,13 @@ import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { BrainCircuit, Loader2, Sparkles, BookOpen, Target, Clock, CheckCircle2, Calendar } from 'lucide-react';
+import { 
+    BrainCircuit, Loader2, Sparkles, BookOpen, 
+    Target, Clock, CheckCircle2, Calendar,
+    Zap, Cpu, Lightbulb, ArrowRight, Info
+} from 'lucide-react';
 import toast from 'react-hot-toast';
+import { batchService } from '../services/batchService';
 
 export default function StudyPlans() {
     const { currentUser } = useAuth();
@@ -25,26 +30,33 @@ export default function StudyPlans() {
     async function loadData() {
         try {
             const uid = currentUser.uid;
-            const [studentSnap, batchSnap, examSnap] = await Promise.all([
-                getDocs(query(collection(db, 'students'), where('teacherId', '==', uid))),
-                getDocs(query(collection(db, 'batches'), where('teacherId', '==', uid))),
+            const [studentSnap, activeBatches, examSnap] = await Promise.all([
+                getDocs(query(
+                    collection(db, 'students'), 
+                    where('teacherId', '==', uid),
+                    where('status', '==', 'enrolled')
+                )),
+                batchService.getBatches(uid, true),
                 getDocs(query(collection(db, 'exams'), where('teacherId', '==', uid))),
             ]);
             setStudents(studentSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
-            setBatches(batchSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
+            setBatches(activeBatches);
             setExams(examSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
         } catch (err) {
-            console.error('Error loading data:', err);
+            console.error('Error loading academic landscape:', err);
         } finally {
             setLoading(false);
         }
     }
 
-    const filteredStudents = selectedBatchId
-        ? students.filter(s => s.batchIds?.includes(selectedBatchId))
-        : students;
+    const filteredStudents = useMemo(() => {
+        let list = students.filter(s => s.status === 'enrolled');
+        if (selectedBatchId) {
+            list = list.filter(s => s.batchIds?.includes(selectedBatchId));
+        }
+        return list;
+    }, [students, selectedBatchId]);
 
-    // Reset selected student and plan if batch changes
     useEffect(() => {
         if (selectedStudentId && !filteredStudents.find(s => s.id === selectedStudentId)) {
             setSelectedStudentId('');
@@ -52,23 +64,22 @@ export default function StudyPlans() {
         }
     }, [selectedBatchId, filteredStudents, selectedStudentId]);
 
-    // Generate the AI plan heuristically based on topics
     function handleGeneratePlan() {
         if (!selectedStudentId) return;
         setIsGenerating(true);
         setStudyPlan(null);
 
-        // Simulate API call delay for "AI" effect
+        // Simulation of high-compute AI synthesis
         setTimeout(() => {
             const plan = buildHeuristicPlan(selectedStudentId);
             setStudyPlan(plan);
             setIsGenerating(false);
             if (plan.topics.length === 0) {
-                toast.error("Not enough exam data to build a personalized plan.");
+                toast.error("Insufficient analytical data for this profile.");
             } else {
-                toast.success("Study plan generated successfully!");
+                toast.success("AI Synthesis Complete: Plan Authorized.");
             }
-        }, 1500);
+        }, 2000);
     }
 
     function buildHeuristicPlan(studentId) {
@@ -114,21 +125,20 @@ export default function StudyPlans() {
             return { topic, avgDiff, absoluteAvgScore };
         });
 
-        analyzedTopics.sort((a, b) => a.avgDiff - b.avgDiff); // Lowest difference first (weakest)
+        analyzedTopics.sort((a, b) => a.avgDiff - b.avgDiff);
 
         const topWeaknesses = analyzedTopics.filter(t => t.avgDiff <= 0).slice(0, 3);
         const topStrengths = analyzedTopics.filter(t => t.avgDiff > 0).slice(0, 2);
 
-        // Generate action items
         const actionItems = [];
         
         topWeaknesses.forEach((weak, i) => {
-            const minutes = 45 + (i * 15); // Allocate more time to the absolute weakest
-            const days = i === 0 ? "Daily" : "Every alternate day";
+            const minutes = 45 + (i * 15);
+            const days = i === 0 ? "Daily Routine" : "Alternate Days";
             actionItems.push({
                 title: `Intensive Review: ${weak.topic}`,
-                description: `Your scores in ${weak.topic} are below the batch average. Focus on core concepts and resolve previous test mistakes.`,
-                time: `${minutes} mins`,
+                description: `Analytical deficit identified in ${weak.topic}. Focus on foundational logic and error-mapping from previous assessments.`,
+                time: `${minutes}m`,
                 frequency: days,
                 type: 'weakness'
             });
@@ -136,20 +146,19 @@ export default function StudyPlans() {
 
         topStrengths.forEach((strong, i) => {
             actionItems.push({
-                title: `Advanced Practice: ${strong.topic}`,
-                description: `You are performing exceptionally well in ${strong.topic}. Attempt higher-order thinking questions to maintain momentum.`,
-                time: `30 mins`,
+                title: `Advanced Application: ${strong.topic}`,
+                description: `Demonstrated mastery in ${strong.topic}. Transition to high-complexity problem sets to reinforce competitive edge.`,
+                time: `30m`,
                 frequency: "Weekend Review",
                 type: 'strength'
             });
         });
 
-        // Add a generic one if data is sparse
         if (actionItems.length === 0 && analyzedTopics.length > 0) {
             actionItems.push({
-                title: "General Consistency",
-                description: "Maintain a steady review of all recent class notes. Try to spend 30 minutes reading ahead before the next class.",
-                time: "30 mins",
+                title: "Cognitive Consistency",
+                description: "Maintain linear progression through active course materials. Review previous session logs daily for at least 30 minutes.",
+                time: "30m",
                 frequency: "Daily",
                 type: 'general'
             });
@@ -170,135 +179,173 @@ export default function StudyPlans() {
         <div className="animate-fade-in">
             <div className="page-header">
                 <div>
-                    <h1 className="page-title">AI Study Plans</h1>
-                    <p className="page-subtitle">Generate personalized revision strategies based on topic performance.</p>
+                    <h1 className="page-title">Cognitive Roadmap</h1>
+                    <p className="page-subtitle">AI-synthesized revision strategies tailored to individual performance metrics</p>
+                </div>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                    <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'rgba(59, 130, 246, 0.1)', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Cpu size={20} />
+                    </div>
                 </div>
             </div>
 
-            <div className="card" style={{ marginBottom: 'var(--space-6)' }}>
-                <div style={{ padding: 'var(--space-4)', display: 'flex', gap: 'var(--space-4)', flexWrap: 'wrap', alignItems: 'flex-end' }}>
-                    
-                    <div style={{ flex: '1 1 250px' }}>
-                        <label className="form-label" style={{ marginBottom: 'var(--space-2)' }}>Filter by Batch (Optional)</label>
-                        <select className="form-select" value={selectedBatchId} onChange={(e) => { setSelectedBatchId(e.target.value); setStudyPlan(null); }}>
-                            <option value="">-- All Batches --</option>
+            {/* AI Generator Interface */}
+            <div className="glass-panel" style={{ padding: '32px', marginBottom: 'var(--space-8)', position: 'relative', overflow: 'hidden' }}>
+                <div style={{ position: 'absolute', top: -50, right: -50, width: 200, height: 200, background: 'var(--color-primary)', filter: 'blur(100px)', opacity: 0.05, pointerEvents: 'none' }} />
+                
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px', position: 'relative', zIndex: 1 }}>
+                    <div>
+                        <label style={{ display: 'block', fontSize: '11px', fontWeight: 900, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '10px', letterSpacing: '0.05em' }}>Batch Intelligence</label>
+                        <select className="form-select" value={selectedBatchId} onChange={(e) => { setSelectedBatchId(e.target.value); setStudyPlan(null); }} style={{ height: '48px', fontWeight: 700 }}>
+                            <option value="">Scan All Batches</option>
                             {batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                         </select>
                     </div>
 
-                    <div style={{ flex: '1 1 250px' }}>
-                        <label className="form-label" style={{ marginBottom: 'var(--space-2)' }}>Select Student</label>
-                        <select className="form-select" value={selectedStudentId} onChange={(e) => { setSelectedStudentId(e.target.value); setStudyPlan(null); }}>
-                            <option value="">-- Choose a Student --</option>
-                            {filteredStudents.map(s => <option key={s.id} value={s.id}>{s.name} (Class {s.grade})</option>)}
+                    <div>
+                        <label style={{ display: 'block', fontSize: '11px', fontWeight: 900, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '10px', letterSpacing: '0.05em' }}>Target Subject Profile</label>
+                        <select className="form-select" value={selectedStudentId} onChange={(e) => { setSelectedStudentId(e.target.value); setStudyPlan(null); }} style={{ height: '48px', fontWeight: 700 }}>
+                            <option value="">Locate Student...</option>
+                            {filteredStudents.map(s => <option key={s.id} value={s.id}>{s.name} (Grade {s.grade})</option>)}
                         </select>
                     </div>
 
-                    <div>
+                    <div style={{ display: 'flex', alignItems: 'flex-end' }}>
                         <button 
                             className="btn btn-primary" 
                             onClick={handleGeneratePlan} 
                             disabled={!selectedStudentId || isGenerating}
-                            style={{ padding: '0 var(--space-6)', height: '42px', display: 'flex', alignItems: 'center', gap: '8px' }}
+                            style={{ height: '48px', width: '100%', borderRadius: '14px', fontWeight: 900, boxShadow: '0 10px 25px -5px rgba(59, 130, 246, 0.4)', gap: '12px', fontSize: '15px' }}
                         >
-                            {isGenerating ? <Loader2 size={18} className="animate-spin" /> : <BrainCircuit size={18} />}
-                            {isGenerating ? 'Analyzing Data...' : 'Generate AI Plan'}
+                            {isGenerating ? <Loader2 size={18} className="animate-spin" /> : <BrainCircuit size={20} />}
+                            {isGenerating ? 'Synthesizing...' : 'Generate Roadmap'}
                         </button>
                     </div>
-
                 </div>
             </div>
 
             {!studyPlan && !isGenerating && (
-                <div className="empty-state card">
-                    <Sparkles size={48} className="empty-state-icon" style={{ color: 'var(--color-gold)', marginBottom: 'var(--space-4)' }} />
-                    <div className="empty-state-title">Ready to Generate?</div>
-                    <div className="empty-state-text">Select a student and click generate. The system algorithmically analyzes past exam topics to pinpoint exact areas requiring focus.</div>
+                <div className="glass-panel" style={{ padding: '60px var(--space-8)', textAlign: 'center' }}>
+                    <div style={{ width: '100px', height: '100px', borderRadius: '30px', background: 'rgba(255,255,255,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto var(--space-8)' }}>
+                        <Sparkles size={48} style={{ color: '#fbbf24', opacity: 0.5 }} />
+                    </div>
+                    <h2 style={{ fontSize: '26px', fontWeight: 900, marginBottom: '12px' }}>Awaiting Analytical Input</h2>
+                    <p style={{ color: 'var(--color-text-muted)', maxWidth: '440px', margin: '0 auto' }}>Select a student profile to initiate a heuristic analysis of historical assessment data and generate a personalized revision Directive.</p>
                 </div>
             )}
 
             {isGenerating && (
-                <div className="card" style={{ padding: 'var(--space-12)', textAlign: 'center' }}>
-                    <div className="loading-spinner" style={{ margin: '0 auto var(--space-4)' }} />
-                    <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 600, color: 'var(--color-text-primary)' }}>Constructing Study Plan...</h3>
-                    <p style={{ color: 'var(--color-text-muted)' }}>Analyzing batch averages and topic-wise historical performance.</p>
+                <div className="glass-panel" style={{ padding: '80px var(--space-8)', textAlign: 'center' }}>
+                    <div className="loading-spinner" style={{ margin: '0 auto 32px' }} />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        <h3 className="animate-pulse" style={{ fontSize: '24px', fontWeight: 900, color: 'var(--color-primary)' }}>Constructing Neural Logic...</h3>
+                        <p style={{ color: 'var(--color-text-muted)', maxWidth: '500px', margin: '0 auto' }}>Aggregating batch performance curves, topic metadata, and individual historical accuracy to formulate an optimal revision sequence.</p>
+                    </div>
                 </div>
             )}
 
             {studyPlan && studyPlan.topics.length === 0 && (
-                <div className="card empty-state" style={{ borderLeft: '4px solid var(--color-warning)' }}>
-                    <div className="empty-state-title" style={{ color: 'var(--color-warning)' }}>Insufficient Exam Data</div>
-                    <div className="empty-state-text">We need more exam records with detailed topic-wise marks for this student to generate an accurate plan. Check back later!</div>
+                <div className="glass-panel" style={{ borderLeft: '4px solid var(--color-warning)', textAlign: 'center', padding: '60px' }}>
+                    <div style={{ width: '80px', height: '80px', background: 'rgba(245, 158, 11, 0.1)', color: 'var(--color-warning)', borderRadius: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
+                        <Target size={40} />
+                    </div>
+                    <h2 style={{ fontSize: '22px', fontWeight: 900, color: 'var(--color-warning)' }}>Insufficient Analytical Density</h2>
+                    <p style={{ color: 'var(--color-text-muted)', maxWidth: '400px', margin: '0 auto' }}>We require more granular exam records with topic-wise point distribution to construct an accurate predictive roadmap for this profile.</p>
                 </div>
             )}
 
             {studyPlan && studyPlan.topics.length > 0 && (
-                <div className="card animate-fade-in-up">
-                    <div className="card-header" style={{ borderBottom: '1px solid var(--color-border)', paddingBottom: 'var(--space-4)', background: 'linear-gradient(to right, var(--color-primary-soft), transparent)', borderTopLeftRadius: 'var(--radius-lg)', borderTopRightRadius: 'var(--radius-lg)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-4)' }}>
+                <div className="animate-fade-in-up">
+                    <div className="glass-card" style={{ padding: 0, overflow: 'hidden' }}>
+                        <div style={{ padding: '32px 40px', background: 'rgba(59, 130, 246, 0.05)', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '24px' }}>
                             <div>
-                                <div className="card-title" style={{ color: 'var(--color-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <Sparkles size={20} /> Personalized Study Directive
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                                    <div style={{ padding: '8px', background: 'var(--color-primary)', borderRadius: '10px', color: 'white' }}><Zap size={18} /></div>
+                                    <h2 style={{ fontSize: '24px', fontWeight: 900, letterSpacing: '-0.02em' }}>Personalized Revision Directive</h2>
                                 </div>
-                                <div className="card-subtitle" style={{ fontSize: '15px' }}>Custom plan for <strong style={{color: 'var(--color-text-primary)'}}>{studyPlan.studentName}</strong> (Class {studyPlan.grade})</div>
+                                <div style={{ fontSize: '15px', color: 'var(--color-text-muted)', fontWeight: 600 }}>Algorithmically tailored for <strong style={{color: 'var(--color-text-primary)'}}>{studyPlan.studentName}</strong> • Grade {studyPlan.grade}</div>
                             </div>
-                            <button className="btn btn-secondary btn-sm" onClick={() => window.print()}>
-                                Print Plan
-                            </button>
-                        </div>
-                    </div>
-
-                    <div style={{ padding: 'var(--space-6)' }}>
-                        {/* Summary of findings */}
-                        <div style={{ marginBottom: 'var(--space-6)', background: 'var(--color-bg-secondary)', padding: 'var(--space-4)', borderRadius: 'var(--radius-md)' }}>
-                            <p style={{ margin: 0, lineHeight: 1.6, fontSize: '15px' }}>
-                                Based on a heuristic analysis of past exam data, we've identified that immediate focus is required on <strong>{studyPlan.weakTopics.join(', ')}</strong>. 
-                                By dedicating structured review time to these areas, the student can significantly elevate their overall average.
-                            </p>
+                            <div style={{ display: 'flex', gap: '12px' }}>
+                                <button className="btn btn-secondary" onClick={() => window.print()} style={{ height: '44px', borderRadius: '12px', padding: '0 24px', fontWeight: 800 }}>
+                                    Print Directive
+                                </button>
+                            </div>
                         </div>
 
-                        {/* Action Items List */}
-                        <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: 'var(--space-4)', paddingBottom: 'var(--space-2)', borderBottom: '1px solid var(--color-border)' }}>
-                            Action Plan
-                        </h3>
-                        
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-                            {studyPlan.actionItems.map((item, index) => (
-                                <div key={index} style={{ 
-                                    display: 'flex', 
-                                    gap: 'var(--space-4)', 
-                                    padding: 'var(--space-4)',
-                                    background: 'var(--color-bg-card)',
-                                    border: '1px solid var(--color-border)',
-                                    borderRadius: 'var(--radius-lg)',
-                                    borderLeft: `4px solid ${item.type === 'weakness' ? 'var(--color-warning)' : item.type === 'strength' ? 'var(--color-success)' : 'var(--color-primary)'}`
-                                }}>
-                                    <div style={{ 
-                                        width: 48, height: 48, borderRadius: 'var(--radius-md)', 
-                                        background: 'var(--color-bg-elevated)', display: 'flex', 
-                                        alignItems: 'center', justifyContent: 'center', flexShrink: 0 
+                        <div style={{ padding: '40px' }}>
+                            {/* Executive Summary */}
+                            <div className="glass-panel" style={{ padding: '24px', marginBottom: '40px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
+                                <div style={{ padding: '12px', background: 'rgba(251, 191, 36, 0.1)', color: '#fbbf24', borderRadius: '14px' }}><Lightbulb size={24} /></div>
+                                <div>
+                                    <h4 style={{ fontSize: '13px', fontWeight: 900, color: '#fbbf24', textTransform: 'uppercase', marginBottom: '6px', letterSpacing: '0.1em' }}>Core Analytical Finding</h4>
+                                    <p style={{ margin: 0, lineHeight: 1.7, fontSize: '16px', fontWeight: 500 }}>
+                                        Immediate prioritization required for <strong style={{ color: 'var(--color-text-primary)' }}>{studyPlan.weakTopics.join(', ')}</strong>. 
+                                        Heuristic mapping suggests that isolating these technical segments will yield the highest incremental improvement in aggregate mastery.
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Strategic Action Items */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '24px' }}>
+                                <div style={{ height: '1px', flex: 1, background: 'linear-gradient(to right, transparent, rgba(255,255,255,0.05))' }} />
+                                <h3 style={{ fontSize: '15px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.2em', opacity: 0.6 }}>Operational Roadmap</h3>
+                                <div style={{ height: '1px', flex: 1, background: 'linear-gradient(to left, transparent, rgba(255,255,255,0.05))' }} />
+                            </div>
+                            
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px' }}>
+                                {studyPlan.actionItems.map((item, index) => (
+                                    <div key={index} className="glass-card hover-lift" style={{ 
+                                        padding: '28px',
+                                        display: 'flex',
+                                        gap: '24px',
+                                        borderLeft: `5px solid ${item.type === 'weakness' ? 'var(--color-warning)' : item.type === 'strength' ? 'var(--color-teal)' : 'var(--color-primary)'}`,
+                                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
                                     }}>
-                                        {item.type === 'weakness' ? <Target size={24} style={{ color: 'var(--color-warning)' }} /> : 
-                                         item.type === 'strength' ? <CheckCircle2 size={24} style={{ color: 'var(--color-success)' }} /> : 
-                                         <BookOpen size={24} style={{ color: 'var(--color-primary)' }} />}
-                                    </div>
-                                    <div style={{ flex: 1 }}>
-                                        <h4 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '4px' }}>{item.title}</h4>
-                                        <p style={{ fontSize: '14px', color: 'var(--color-text-secondary)', lineHeight: 1.5, marginBottom: 'var(--space-3)' }}>
-                                            {item.description}
-                                        </p>
-                                        <div style={{ display: 'flex', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
-                                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12px', background: 'var(--color-bg-elevated)', padding: '4px 10px', borderRadius: '12px', fontWeight: 500 }}>
-                                                <Clock size={14} style={{ color: 'var(--color-text-muted)' }} /> Required Time: {item.time}
-                                            </span>
-                                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12px', background: 'var(--color-bg-elevated)', padding: '4px 10px', borderRadius: '12px', fontWeight: 500 }}>
-                                                <Calendar size={14} style={{ color: 'var(--color-text-muted)' }} /> Frequency: {item.frequency}
-                                            </span>
+                                        <div style={{ 
+                                            width: '56px', height: '56px', borderRadius: '18px', 
+                                            background: 'rgba(255,255,255,0.03)', display: 'flex', 
+                                            alignItems: 'center', justifyContent: 'center', flexShrink: 0 
+                                        }}>
+                                            {item.type === 'weakness' ? <Target size={28} style={{ color: 'var(--color-warning)' }} /> : 
+                                             item.type === 'strength' ? <ArrowRight size={28} style={{ color: 'var(--color-teal)' }} /> : 
+                                             <BookOpen size={28} style={{ color: 'var(--color-primary)' }} />}
+                                        </div>
+                                        <div style={{ flex: 1 }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                                                <h4 style={{ fontSize: '18px', fontWeight: 900 }}>{item.title}</h4>
+                                                <div style={{ display: 'flex', gap: '8px' }}>
+                                                    <span style={{ fontSize: '11px', fontWeight: 900, color: 'var(--color-text-muted)', background: 'rgba(255,255,255,0.05)', padding: '4px 10px', borderRadius: '10px', textTransform: 'uppercase' }}>{item.type}</span>
+                                                </div>
+                                            </div>
+                                            <p style={{ fontSize: '15px', color: 'var(--color-text-muted)', lineHeight: 1.6, marginBottom: '20px', fontWeight: 500 }}>
+                                                {item.description}
+                                            </p>
+                                            <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                    <div style={{ padding: '6px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px' }}><Clock size={16} /></div>
+                                                    <div>
+                                                        <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Duration</div>
+                                                        <div style={{ fontSize: '13px', fontWeight: 800 }}>{item.time} / Session</div>
+                                                    </div>
+                                                </div>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                    <div style={{ padding: '6px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px' }}><Calendar size={16} /></div>
+                                                    <div>
+                                                        <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Frequency</div>
+                                                        <div style={{ fontSize: '13px', fontWeight: 800 }}>{item.frequency}</div>
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            ))}
+                                ))}
+                            </div>
                         </div>
+                    </div>
+                    
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', padding: '32px', color: 'var(--color-text-muted)', fontSize: '13px', fontWeight: 600 }}>
+                        <Info size={16} />
+                        Analyzed topics and frequency depend on historical point distribution from the database.
                     </div>
                 </div>
             )}

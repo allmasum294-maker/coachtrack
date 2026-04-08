@@ -5,11 +5,13 @@ import {
 } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import {
-    Users, Plus, Edit2, Trash2, Search, X, Eye, Phone, Mail, School, MapPin, BookOpen, User, Calendar, Upload, Download, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Activity, Award, CheckCircle
+    Users, Plus, Edit2, Trash2, Search, X, Eye, Phone, Mail, School, MapPin, BookOpen, User, Calendar, Upload, Download, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Activity, Award, CheckCircle, Shield, Sparkles, Filter
 } from 'lucide-react';
+import { format } from 'date-fns';
 import Papa from 'papaparse';
 import toast from 'react-hot-toast';
 import { setStudentStatus } from '../services/studentService';
+import Modal from '../components/Modal';
 
 export default function Students() {
     const { currentUser } = useAuth();
@@ -55,7 +57,6 @@ export default function Students() {
             const studentData = studentSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
             setStudents(studentData);
 
-            // Extract unique school names from students
             const schools = [...new Set(studentData.map(s => s.school).filter(Boolean))];
             setSchoolList(schools);
 
@@ -64,7 +65,7 @@ export default function Students() {
             setExams(examSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
             setHomeworks(hwSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
         } catch (err) {
-            console.error('Error loading students:', err);
+            console.error('Core Roster Fault:', err);
         } finally {
             setLoading(false);
         }
@@ -93,6 +94,7 @@ export default function Students() {
             notes: student.notes || '',
             batchIds: student.batchIds || [],
             unenrolledBatchIds: student.unenrolledBatchIds || [],
+            status: student.status || 'enrolled'
         });
         setShowModal(true);
     }
@@ -115,18 +117,21 @@ export default function Students() {
             }
             setShowModal(false);
             loadData();
+            toast.success(editingStudent ? 'Roster Updated' : 'Identity Materialized');
         } catch (err) {
-            console.error('Error saving student:', err);
+            console.error('Save Failure:', err);
+            toast.error('Initialization Failed');
         }
     }
 
     async function handleDelete(studentId) {
-        if (!confirm('Are you sure you want to remove this student?')) return;
+        if (!confirm('Are you sure you want to terminate this identity record?')) return;
         try {
             await deleteDoc(doc(db, 'students', studentId));
             loadData();
+            toast.success('Identity Terminated');
         } catch (err) {
-            console.error('Error deleting student:', err);
+            console.error('Deletion Fault:', err);
         }
     }
 
@@ -170,8 +175,8 @@ export default function Students() {
                     const bTime = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
                     return sortConfig.direction === 'asc' ? aTime - bTime : bTime - aTime;
                 }
-                const aVal = a[sortConfig.key] || '';
-                const bVal = b[sortConfig.key] || '';
+                const aVal = String(a[sortConfig.key] || '').toLowerCase();
+                const bVal = String(b[sortConfig.key] || '').toLowerCase();
                 if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
                 if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
                 return 0;
@@ -190,7 +195,6 @@ export default function Students() {
         return batches.find((b) => b.id === batchId)?.name || batchId;
     }
 
-    // Collect unique school/college names for autocomplete
     const schoolSuggestions = useMemo(() => {
         const names = students.map((s) => s.school).filter(Boolean);
         return [...new Set(names)];
@@ -201,7 +205,6 @@ export default function Students() {
 
         let totalClasses = 0;
         let presentClasses = 0;
-        
         attendance.forEach((a) => {
             if (viewingStudent.batchIds?.includes(a.batchId)) {
                 (a.records || []).forEach(r => {
@@ -217,7 +220,6 @@ export default function Students() {
 
         let totalExamMarks = 0;
         let totalMarksEarned = 0;
-
         exams.forEach(e => {
             if (viewingStudent.batchIds?.includes(e.batchId)) {
                 const sScore = (e.scores || []).find(sc => sc.studentId === viewingStudent.id);
@@ -232,7 +234,6 @@ export default function Students() {
 
         let totalHomeworks = 0;
         let completedHomeworks = 0;
-
         homeworks.forEach(hw => {
             if (viewingStudent.batchIds?.includes(hw.batchId)) {
                 totalHomeworks++;
@@ -265,10 +266,7 @@ export default function Students() {
                         const studentVal = parseFloat(mark) || 0;
                         const batchAvg = batchTopicSums[topic] / (batchTopicCounts[topic] || 1); 
                         const diff = studentVal - batchAvg;
-                        
-                        if (!topicsPerformance[topic]) {
-                            topicsPerformance[topic] = { count: 0, diffSum: 0 };
-                        }
+                        if (!topicsPerformance[topic]) topicsPerformance[topic] = { count: 0, diffSum: 0 };
                         topicsPerformance[topic].diffSum += diff;
                         topicsPerformance[topic].count += 1;
                     });
@@ -276,15 +274,11 @@ export default function Students() {
             }
         });
 
-        const analyzedTopics = Object.entries(topicsPerformance).map(([topic, data]) => {
-            return { topic, avgDiff: data.diffSum / data.count };
-        });
+        const analyzedTopics = Object.entries(topicsPerformance).map(([topic, data]) => ({ topic, avgDiff: data.diffSum / data.count }));
         analyzedTopics.sort((a, b) => b.avgDiff - a.avgDiff);
 
         return {
-            attRate,
-            avgScore,
-            hwRate,
+            attRate, avgScore, hwRate,
             strengths: analyzedTopics.filter(t => t.avgDiff >= 0).slice(0, 3).map(t => t.topic),
             weaknesses: [...analyzedTopics].reverse().filter(t => t.avgDiff < 0).slice(0, 3).map(t => t.topic)
         };
@@ -298,7 +292,7 @@ export default function Students() {
             skipEmptyLines: true,
             complete: (results) => {
                 if (results.errors.length > 0) {
-                    toast.error('Error parsing CSV');
+                    toast.error('Parse Interrupted: Invalid CSV Structure');
                     return;
                 }
                 setCsvPreview(results.data);
@@ -311,18 +305,18 @@ export default function Students() {
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
         link.setAttribute("href", encodedUri);
-        link.setAttribute("download", "students_demo.csv");
+        link.setAttribute("download", "academy_telemetry_template.csv");
         document.body.appendChild(link);
         link.click();
         link.remove();
     }
 
     async function handleImportCSV() {
-        if (csvPreview.length === 0) return toast.error('No valid data to import');
+        if (csvPreview.length === 0) return toast.error('No telemetry data detected');
         setIsImporting(true);
         try {
             const promises = csvPreview.map(row => {
-                if (!row.name) return Promise.resolve(); // Skip rows without name
+                if (!row.name) return Promise.resolve();
                 const data = {
                     name: row.name || '',
                     email: row.email || '',
@@ -337,236 +331,231 @@ export default function Students() {
                     unenrolledBatchIds: [],
                     teacherId: currentUser.uid,
                     createdAt: serverTimestamp(),
+                    status: 'enrolled'
                 };
                 return addDoc(collection(db, 'students'), data);
             });
             await Promise.all(promises);
-            toast.success(`Imported ${csvPreview.length} students successfully!`);
+            toast.success(`Success: ${csvPreview.length} entities integrated.`);
             setShowImportModal(false);
             setCsvPreview([]);
             loadData();
         } catch (err) {
-            console.error('Error importing:', err);
-            toast.error('Failed to import some students');
+            console.error('Migration Error:', err);
+            toast.error('Integration Fault: Some entities failed to upload.');
         } finally {
             setIsImporting(false);
         }
     }
 
-    if (loading) {
-        return <div className="loading-page"><div className="loading-spinner" /></div>;
-    }
+    if (loading) return <div className="loading-page"><div className="loading-spinner" /></div>;
 
     return (
         <div className="animate-fade-in">
-            <div className="page-header">
+            <div className="page-header" style={{ marginBottom: 'var(--space-8)' }}>
                 <div>
-                    <h1 className="page-title">Students</h1>
-                    <p className="page-subtitle">Manage your student profiles</p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                        <div style={{ padding: '4px 10px', background: 'rgba(59, 130, 246, 0.1)', color: 'var(--color-primary)', borderRadius: '8px', fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Registry Control</div>
+                    </div>
+                    <h1 className="page-title" style={{ fontSize: '32px', fontWeight: 900 }}>Academy Roster</h1>
+                    <p className="page-subtitle" style={{ fontWeight: 600 }}>Command and control for student entity data</p>
                 </div>
-                <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-                    <button className="btn btn-secondary" onClick={() => { setShowImportModal(true); setCsvPreview([]); }}>
-                        <Upload size={18} /> Import CSV
+                <div style={{ display: 'flex', gap: '12px' }}>
+                    <button className="btn btn-secondary" onClick={() => { setShowImportModal(true); setCsvPreview([]); }} style={{ padding: '0 20px', height: '48px', fontWeight: 800 }}>
+                        <Upload size={18} /> BULK INGEST
                     </button>
-                    <button className="btn btn-primary" onClick={openCreate}>
-                        <Plus size={18} /> Add Student
+                    <button className="btn btn-primary" onClick={openCreate} style={{ padding: '0 24px', height: '48px', fontWeight: 900, boxShadow: '0 8px 20px rgba(59, 130, 246, 0.2)' }}>
+                        <Plus size={18} /> REGISTER ENTITY
                     </button>
                 </div>
             </div>
 
-            {/* Tabs and School Filter */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-4)', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
-                <div className="tabs" style={{ display: 'flex', gap: 'var(--space-2)' }}>
-                    <button
-                        className={`btn ${viewMode === 'enrolled' ? 'btn-primary' : 'btn-ghost'}`}
-                        onClick={() => { setViewMode('enrolled'); setCurrentPage(1); }}
-                    >
-                        Enrolled
-                    </button>
-                    <button
-                        className={`btn ${viewMode === 'unenrolled' ? 'btn-primary' : 'btn-ghost'}`}
-                        onClick={() => { setViewMode('unenrolled'); setCurrentPage(1); }}
-                    >
-                        Unenrolled
-                    </button>
-                </div>
-                <div style={{ display: 'flex', gap: 'var(--space-3)', flex: 1, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                    <div className="search-bar" style={{ minWidth: 200, flex: 1 }}>
-                        <Search className="search-icon" />
-                        <input
-                            className="form-input"
-                            placeholder="Search students..."
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                        />
+            <div className="glass-panel" style={{ padding: '24px', marginBottom: 'var(--space-8)', background: 'rgba(255, 255, 255, 0.03)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '24px' }}>
+                    <div style={{ display: 'flex', background: 'rgba(255, 255, 255, 0.05)', padding: '4px', borderRadius: '12px' }}>
+                        <button
+                            className={`tab ${viewMode === 'enrolled' ? 'active' : ''}`}
+                            onClick={() => { setViewMode('enrolled'); setCurrentPage(1); }}
+                            style={{ borderRadius: '10px', padding: '8px 20px', fontSize: '13px', fontWeight: 800 }}
+                        >
+                            Operational
+                        </button>
+                        <button
+                            className={`tab ${viewMode === 'unenrolled' ? 'active' : ''}`}
+                            onClick={() => { setViewMode('unenrolled'); setCurrentPage(1); }}
+                            style={{ borderRadius: '10px', padding: '8px 20px', fontSize: '13px', fontWeight: 800 }}
+                        >
+                            Inactive
+                        </button>
                     </div>
-                    <select
-                        className="form-select"
-                        style={{ width: 180 }}
-                        value={filterBatch}
-                        onChange={(e) => setFilterBatch(e.target.value)}
-                    >
-                        <option value="">All Batches</option>
-                        {batches.map((b) => (
-                            <option key={b.id} value={b.id}>{b.name}</option>
-                        ))}
-                    </select>
-                    <select
-                        className="form-select"
-                        style={{ width: 180 }}
-                        value={filterSchool}
-                        onChange={(e) => setFilterSchool(e.target.value)}
-                    >
-                        <option value="">All Schools</option>
-                        {schoolList.map((s) => (
-                            <option key={s} value={s}>{s}</option>
-                        ))}
-                    </select>
+                    
+                    <div style={{ display: 'flex', gap: '12px', flex: 1, minWidth: '300px', justifyContent: 'flex-end' }}>
+                        <div className="search-bar" style={{ flex: 1, maxWidth: '300px' }}>
+                            <Search className="search-icon" size={16} />
+                            <input
+                                className="form-input"
+                                placeholder="Locate entity..."
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                style={{ height: '44px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)' }}
+                            />
+                        </div>
+                        <select
+                            className="form-select"
+                            style={{ width: '160px', height: '44px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)' }}
+                            value={filterBatch}
+                            onChange={(e) => setFilterBatch(e.target.value)}
+                        >
+                            <option value="">All Clusters</option>
+                            {batches.map((b) => (
+                                <option key={b.id} value={b.id}>{b.name}</option>
+                            ))}
+                        </select>
+                        <select
+                            className="form-select"
+                            style={{ width: '160px', height: '44px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)' }}
+                            value={filterSchool}
+                            onChange={(e) => setFilterSchool(e.target.value)}
+                        >
+                            <option value="">All Institutions</option>
+                            {schoolList.map((s) => (
+                                <option key={s} value={s}>{s}</option>
+                            ))}
+                        </select>
+                    </div>
                 </div>
             </div>
 
             {filteredStudents.length === 0 ? (
-                <div className="card">
-                    <div className="empty-state">
-                        <Users size={48} className="empty-state-icon" />
-                        <div className="empty-state-title">
-                            {students.length === 0 ? 'No students yet' : 'No students match your filter'}
-                        </div>
-                        <div className="empty-state-text">
-                            {students.length === 0
-                                ? 'Add your first student to get started.'
-                                : 'Try adjusting your search or filter.'}
-                        </div>
+                <div className="glass-card" style={{ padding: '100px 0', textAlign: 'center' }}>
+                    <div style={{ width: '100px', height: '100px', background: 'rgba(255,255,255,0.03)', color: 'var(--color-text-muted)', borderRadius: '50%', margin: '0 auto 24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Users size={40} opacity={0.3} />
                     </div>
+                    <h2 style={{ fontSize: '24px', fontWeight: 900, marginBottom: '12px' }}>Registry Empty</h2>
+                    <p style={{ color: 'var(--color-text-muted)', maxWidth: '400px', margin: '0 auto 32px', fontWeight: 500 }}>
+                        No entities detected the current parameters. Register your first student or ingest a telemetry file to begin.
+                    </p>
+                    {students.length === 0 && (
+                        <button className="btn btn-primary" onClick={openCreate} style={{ padding: '0 32px', height: '48px', fontWeight: 900 }}>
+                            <Plus size={18} /> INITIALIZE ENTITY
+                        </button>
+                    )}
                 </div>
             ) : (
-                <div>
+                <div className="glass-panel animate-fade-in-up" style={{ padding: '0', overflow: 'hidden', background: 'rgba(255, 255, 255, 0.02)' }}>
                     <div className="table-container">
-                    <table className="table">
-                        <thead>
-                            <tr>
-                                <th onClick={() => handleSort('name')} style={{ cursor: 'pointer', userSelect: 'none' }}>Name {renderSortIcon('name')}</th>
-                                <th onClick={() => handleSort('grade')} style={{ cursor: 'pointer', userSelect: 'none' }}>Grade {renderSortIcon('grade')}</th>
-                                <th onClick={() => handleSort('school')} style={{ cursor: 'pointer', userSelect: 'none' }}>School {renderSortIcon('school')}</th>
-                                <th>Batches</th>
-                                <th>Contact</th>
-                                <th onClick={() => handleSort('createdAt')} style={{ cursor: 'pointer', userSelect: 'none' }}>Added {renderSortIcon('createdAt')}</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {paginatedStudents.map((student) => (
-                                <tr key={student.id}>
-                                    <td>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-                                            <div className="attendance-student-avatar">
-                                                {student.name?.charAt(0).toUpperCase()}
+                        <table className="table">
+                            <thead>
+                                <tr>
+                                    <th onClick={() => handleSort('name')} style={{ cursor: 'pointer', padding: '20px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>Entity {renderSortIcon('name')}</div>
+                                    </th>
+                                    <th onClick={() => handleSort('grade')} style={{ cursor: 'pointer' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>Level {renderSortIcon('grade')}</div>
+                                    </th>
+                                    <th>Assigned Clusters</th>
+                                    <th>Comms Channel</th>
+                                    <th onClick={() => handleSort('createdAt')} style={{ cursor: 'pointer' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>Established {renderSortIcon('createdAt')}</div>
+                                    </th>
+                                    <th style={{ textAlign: 'right', paddingRight: '20px' }}>Command</th>
+                                </tr>
+                            </thead>
+                            <tbody style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                                {paginatedStudents.map((student) => (
+                                    <tr key={student.id} className="hover-lift" style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                                        <td style={{ padding: '20px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                                                <div style={{
+                                                    width: 44, height: 44, borderRadius: '14px',
+                                                    background: 'rgba(59, 130, 246, 0.1)', color: 'var(--color-primary)',
+                                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                    fontWeight: 900, fontSize: '18px', border: '1px solid rgba(59, 130, 246, 0.2)'
+                                                }}>
+                                                    {student.name?.charAt(0).toUpperCase()}
+                                                </div>
+                                                <div>
+                                                    <div style={{ fontWeight: 800, fontSize: '15px' }}>{student.name}</div>
+                                                    <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 600 }}>{student.school || 'External Entity'}</div>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <div style={{ fontWeight: 600 }}>{student.name}</div>
-                                                {student.email && (
-                                                    <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>
-                                                        {student.email}
-                                                    </div>
+                                        </td>
+                                        <td>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <Shield size={14} style={{ color: '#10b981' }} />
+                                                <span style={{ fontSize: '13px', fontWeight: 700 }}>Grade {student.grade}</span>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                                {(student.batchIds || []).map((bid) => (
+                                                    <span key={bid} style={{ padding: '3px 8px', background: 'rgba(59, 130, 246, 0.1)', color: 'var(--color-primary)', borderRadius: '6px', fontSize: '10px', fontWeight: 800 }}>{getBatchName(bid)}</span>
+                                                ))}
+                                                {(!student.batchIds || student.batchIds.length === 0) && (
+                                                    <span style={{ fontSize: '10px', color: '#ef4444', fontWeight: 900 }}>UNASSIGNED</span>
                                                 )}
                                             </div>
-                                        </div>
-                                    </td>
-                                    <td>Class {student.grade}</td>
-                                    <td>{student.school || '—'}</td>
-                                    <td>
-                                        <div style={{ display: 'flex', gap: 'var(--space-1)', flexWrap: 'wrap' }}>
-                                            {(student.batchIds || []).map((bid) => (
-                                                <span key={bid} className="badge badge-teal">{getBatchName(bid)}</span>
-                                            ))}
-                                            {(student.unenrolledBatchIds || []).map((bid) => (
-                                                <span key={'u'+bid} className="badge badge-red" style={{ opacity: 0.8 }} title="Unenrolled">
-                                                    {getBatchName(bid)} (Unenrolled)
-                                                </span>
-                                            ))}
-                                            {(!student.batchIds || student.batchIds.length === 0) && (!student.unenrolledBatchIds || student.unenrolledBatchIds.length === 0) && (
-                                                <span className="badge badge-red">Unassigned</span>
-                                            )}
-                                        </div>
-                                    </td>
-                                    <td>
-                                        {student.phone && (
-                                            <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
-                                                {student.phone}
+                                        </td>
+                                        <td>
+                                            <div style={{ fontSize: '12px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                                <span style={{ color: 'var(--color-text-primary)', fontWeight: 700 }}>{student.phone || '—'}</span>
+                                                <span style={{ color: 'var(--color-text-muted)', fontSize: '10px' }}>{student.email || ''}</span>
                                             </div>
-                                        )}
-                                    </td>
-                                    <td>
-                                        <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
-                                            {student.createdAt?.toDate ? student.createdAt.toDate().toLocaleDateString() : '—'}
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <div style={{ display: 'flex', gap: 'var(--space-1)' }}>
-                                            <button className="btn btn-ghost btn-icon" onClick={() => setViewingStudent(student)} title="View details">
-                                                <Eye size={16} />
-                                            </button>
-                                            <button className="btn btn-ghost btn-icon" onClick={() => openEdit(student)} title="Edit">
-                                                <Edit2 size={16} />
-                                            </button>
-                                            <button 
-                                                className={`btn btn-ghost btn-icon ${student.status === 'unenrolled' ? 'text-success' : 'text-warning'}`}
-                                                onClick={async () => {
-                                                    const newStatus = (student.status || 'enrolled') === 'enrolled' ? 'unenrolled' : 'enrolled';
-                                                    if (confirm(`Are you sure you want to ${newStatus === 'unenrolled' ? 'unenroll' : 're-enroll'} ${student.name}?`)) {
-                                                        try {
-                                                            await setStudentStatus(student.id, newStatus);
-                                                            toast.success(`Student ${newStatus === 'unenrolled' ? 'unenrolled' : 're-enrolled'} successfully`);
-                                                            loadData();
-                                                        } catch (err) {
-                                                            toast.error('Failed to update status');
+                                        </td>
+                                        <td>
+                                            <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 600 }}>
+                                                {student.createdAt?.toDate ? format(student.createdAt.toDate(), 'MMM d, yyyy') : '—'}
+                                            </div>
+                                        </td>
+                                        <td style={{ paddingRight: '20px' }}>
+                                            <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
+                                                <button className="btn btn-ghost btn-icon" onClick={() => setViewingStudent(student)} title="View Analytics" style={{ width: '36px', height: '36px', borderRadius: '10px' }}>
+                                                    <Eye size={18} />
+                                                </button>
+                                                <button className="btn btn-ghost btn-icon" onClick={() => openEdit(student)} title="Modify Registry" style={{ width: '36px', height: '36px', borderRadius: '10px' }}>
+                                                    <Edit2 size={18} />
+                                                </button>
+                                                <button 
+                                                    className="btn btn-ghost btn-icon"
+                                                    onClick={async () => {
+                                                        const newStatus = (student.status || 'enrolled') === 'enrolled' ? 'unenrolled' : 'enrolled';
+                                                        if (confirm(`Are you sure you want to ${newStatus === 'unenrolled' ? 'deactivate' : 'reactivate'} ${student.name}?`)) {
+                                                            try {
+                                                                await setStudentStatus(student.id, newStatus);
+                                                                toast.success(`Entity Status: ${newStatus.toUpperCase()}`);
+                                                                loadData();
+                                                            } catch (err) {
+                                                                toast.error('Sync Interrupted');
+                                                            }
                                                         }
-                                                    }
-                                                }}
-                                                title={student.status === 'unenrolled' ? 'Enroll' : 'Unenroll'}
-                                            >
-                                                {student.status === 'unenrolled' ? <CheckCircle size={16} /> : <CheckCircle size={16} style={{ color: 'var(--color-text-muted)', opacity: 0.3 }} />}
-                                            </button>
-                                            <button className="btn btn-ghost btn-icon" onClick={() => handleDelete(student.id)} title="Delete">
-                                                <Trash2 size={16} style={{ color: 'var(--color-danger)' }} />
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                                                    }}
+                                                    title={student.status === 'unenrolled' ? 'Activate Entity' : 'Deactivate Entity'}
+                                                    style={{ width: '36px', height: '36px', borderRadius: '10px', color: student.status === 'unenrolled' ? '#10b981' : '#f59e0b' }}
+                                                >
+                                                    <CheckCircle size={18} />
+                                                </button>
+                                                <button className="btn btn-ghost btn-icon" onClick={() => handleDelete(student.id)} title="Purge Record" style={{ width: '36px', height: '36px', borderRadius: '10px' }}>
+                                                    <Trash2 size={18} style={{ color: '#ef4444', opacity: 0.7 }} />
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
                     </div>
                     
-                    {/* Pagination Controls */}
-                    {sortedStudents.length > 0 && (
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'var(--space-4)' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                                <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>Show</span>
-                                <select 
-                                    className="form-select" 
-                                    style={{ width: 70, padding: 'var(--space-1) var(--space-2)' }}
-                                    value={studentsPerPage} 
-                                    onChange={(e) => { setStudentsPerPage(Number(e.target.value)); setCurrentPage(1); }}
-                                >
-                                    <option value={10}>10</option>
-                                    <option value={25}>25</option>
-                                    <option value={50}>50</option>
-                                    <option value={100}>100</option>
-                                </select>
-                                <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginLeft: 'var(--space-2)' }}>
-                                    Showing {(currentPage - 1) * studentsPerPage + 1} to {Math.min(currentPage * studentsPerPage, sortedStudents.length)} of {sortedStudents.length} entries
-                                </span>
+                    {totalPages > 1 && (
+                        <div style={{ padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.01)' }}>
+                            <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', fontWeight: 600 }}>
+                                Displaying {(currentPage - 1) * studentsPerPage + 1}-{Math.min(currentPage * studentsPerPage, sortedStudents.length)} / {sortedStudents.length} ENROLLED
                             </div>
-                            
-                            <div style={{ display: 'flex', gap: 'var(--space-1)' }}>
-                                <button className="btn btn-secondary btn-icon" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                <button className="btn btn-ghost btn-icon" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} style={{ width: 32, height: 32, borderRadius: 8 }}>
                                     <ChevronLeft size={16} />
                                 </button>
-                                <div style={{ display: 'flex', alignItems: 'center', padding: '0 var(--space-3)', fontSize: 'var(--font-size-sm)' }}>
-                                    Page {currentPage} of {totalPages}
-                                </div>
-                                <button className="btn btn-secondary btn-icon" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages || totalPages === 0}>
+                                <span style={{ fontSize: '13px', fontWeight: 900, padding: '0 8px' }}>{currentPage} <span style={{ opacity: 0.3, fontWeight: 400 }}>OF</span> {totalPages}</span>
+                                <button className="btn btn-ghost btn-icon" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} style={{ width: 32, height: 32, borderRadius: 8 }}>
                                     <ChevronRight size={16} />
                                 </button>
                             </div>
@@ -575,323 +564,289 @@ export default function Students() {
                 </div>
             )}
 
-            {/* Modal */}
-            {showModal && (
-                <div className="modal-overlay" onClick={() => setShowModal(false)}>
-                    <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 640 }}>
-                        <div className="modal-header">
-                            <h2 className="modal-title">{editingStudent ? 'Edit Student' : 'Add New Student'}</h2>
-                            <button className="btn btn-ghost btn-icon" onClick={() => setShowModal(false)}>
-                                <X size={20} />
-                            </button>
+            {/* Entity Registration Modal */}
+            <Modal
+                isOpen={showModal}
+                onClose={() => setShowModal(false)}
+                title={editingStudent ? 'Adjust Registry' : 'Establish Entity identity'}
+            >
+                <form onSubmit={handleSave} style={{ display: 'grid', gap: '20px' }}>
+                    <div className="form-row" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '16px' }}>
+                        <div className="form-group">
+                            <label className="form-label" style={{ fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', marginBottom: '8px', color: 'var(--color-text-muted)' }}>Legal Name</label>
+                            <input className="form-input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required style={{ height: '48px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)' }} />
                         </div>
-                        <form onSubmit={handleSave}>
-                            <div className="modal-body">
-                                <div className="form-row">
-                                    <div className="form-group">
-                                        <label className="form-label">Full Name *</label>
-                                        <input className="form-input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-                                    </div>
-                                    <div className="form-group">
-                                        <label className="form-label">Grade</label>
-                                        <select className="form-select" value={form.grade} onChange={(e) => setForm({ ...form, grade: e.target.value })}>
-                                            <option value="">Select</option>
-                                            <option value="9">Class 9</option>
-                                            <option value="10">Class 10</option>
-                                            <option value="11">Class 11</option>
-                                            <option value="12">Class 12</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div className="form-row">
-                                    <div className="form-group">
-                                        <label className="form-label">Email</label>
-                                        <input className="form-input" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-                                    </div>
-                                    <div className="form-group">
-                                        <label className="form-label">Phone</label>
-                                        <input className="form-input" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-                                    </div>
-                                </div>
-                                <div className="form-row">
-                                    <div className="form-group">
-                                        <label className="form-label">Guardian Name</label>
-                                        <input className="form-input" value={form.guardianName} onChange={(e) => setForm({ ...form, guardianName: e.target.value })} />
-                                    </div>
-                                    <div className="form-group">
-                                        <label className="form-label">Guardian Phone</label>
-                                        <input className="form-input" value={form.guardianPhone} onChange={(e) => setForm({ ...form, guardianPhone: e.target.value })} />
-                                    </div>
-                                </div>
-                                <div className="form-group">
-                                    <label className="form-label">School/College</label>
-                                    <input className="form-input" list="school-suggestions" value={form.school} onChange={(e) => setForm({ ...form, school: e.target.value })} placeholder="Start typing to see suggestions..." />
-                                    <datalist id="school-suggestions">
-                                        {schoolSuggestions.map((name, i) => (
-                                            <option key={i} value={name} />
-                                        ))}
-                                    </datalist>
-                                </div>
-                                <div className="form-group">
-                                    <label className="form-label">Address</label>
-                                    <textarea className="form-textarea" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} rows={2} />
-                                </div>
-                                <div className="form-group">
-                                    <label className="form-label">Notes</label>
-                                    <textarea className="form-textarea" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2} placeholder="Any additional notes about the student..." />
-                                </div>
-                                <div className="form-group">
-                                    <label className="form-label">Batch Configuration</label>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-                                        {batches.map((b) => {
-                                            const isEnrolled = (form.batchIds || []).includes(b.id);
-                                            const isUnenrolled = (form.unenrolledBatchIds || []).includes(b.id);
-                                            return (
-                                                <div key={b.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--color-bg-secondary)', padding: 'var(--space-2) var(--space-3)', borderRadius: 'var(--radius-md)' }}>
-                                                    <span style={{ fontWeight: 600, fontSize: 'var(--font-size-sm)' }}>{b.name}</span>
-                                                    <div style={{ display: 'flex', gap: '4px' }}>
-                                                        <button type="button" onClick={() => setBatchStatus(b.id, 'none')} className={`btn btn-sm ${!isEnrolled && !isUnenrolled ? 'btn-secondary' : 'btn-ghost'}`} style={{ padding: '4px 8px', fontSize: '11px' }}>None</button>
-                                                        <button type="button" onClick={() => setBatchStatus(b.id, 'enrolled')} className={`btn btn-sm ${isEnrolled ? 'btn-primary' : 'btn-ghost'}`} style={{ padding: '4px 8px', fontSize: '11px' }}>Enrolled</button>
-                                                        <button type="button" onClick={() => setBatchStatus(b.id, 'unenrolled')} className={`btn btn-sm ${isUnenrolled ? 'btn-danger' : 'btn-ghost'}`} style={{ padding: '4px 8px', fontSize: '11px' }}>Unenrolled</button>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                        {batches.length === 0 && (
-                                            <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)' }}>
-                                                Create batches first to assign students.
-                                            </p>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="modal-footer">
-                                <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
-                                <button type="submit" className="btn btn-primary">{editingStudent ? 'Save Changes' : 'Add Student'}</button>
-                            </div>
-                        </form>
+                        <div className="form-group">
+                            <label className="form-label" style={{ fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', marginBottom: '8px', color: 'var(--color-text-muted)' }}>Grade Level</label>
+                            <select className="form-select" value={form.grade} onChange={(e) => setForm({ ...form, grade: e.target.value })} style={{ height: '48px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                                <option value="">Select</option>
+                                <option value="9">Class 9</option>
+                                <option value="10">Class 10</option>
+                                <option value="11">Class 11</option>
+                                <option value="12">Class 12</option>
+                            </select>
+                        </div>
                     </div>
-                </div>
-            )}
+                    <div className="form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                        <div className="form-group">
+                            <label className="form-label" style={{ fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', marginBottom: '8px', color: 'var(--color-text-muted)' }}>Email Pulse</label>
+                            <input className="form-input" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="pulse@node.net" style={{ height: '48px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)' }} />
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label" style={{ fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', marginBottom: '8px', color: 'var(--color-text-muted)' }}>Primary Contact</label>
+                            <input className="form-input" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+880..." style={{ height: '48px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)' }} />
+                        </div>
+                    </div>
+                    <div className="form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                        <div className="form-group">
+                            <label className="form-label" style={{ fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', marginBottom: '8px', color: 'var(--color-text-muted)' }}>Guardian Key</label>
+                            <input className="form-input" value={form.guardianName} onChange={(e) => setForm({ ...form, guardianName: e.target.value })} style={{ height: '48px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)' }} />
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label" style={{ fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', marginBottom: '8px', color: 'var(--color-text-muted)' }}>Guardian Comms</label>
+                            <input className="form-input" value={form.guardianPhone} onChange={(e) => setForm({ ...form, guardianPhone: e.target.value })} style={{ height: '48px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)' }} />
+                        </div>
+                    </div>
+                    <div className="form-group">
+                        <label className="form-label" style={{ fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', marginBottom: '8px', color: 'var(--color-text-muted)' }}>Host Institution</label>
+                        <input className="form-input" list="school-suggestions" value={form.school} onChange={(e) => setForm({ ...form, school: e.target.value })} placeholder="School/College name" style={{ height: '48px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)' }} />
+                    </div>
+                    
+                    <div style={{ marginTop: '12px', padding: '24px', background: 'rgba(255,255,255,0.03)', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                        <label className="form-label" style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 900, fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-primary)' }}>
+                            <Box size={14} /> Cluster Affiliation
+                        </label>
+                        <div style={{ display: 'grid', gap: '8px' }}>
+                            {batches.length === 0 ? (
+                                <p style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>Initialize clusters to assign entities.</p>
+                            ) : batches.filter(b => !b.isClosed).map((b) => {
+                                const isEnrolled = (form.batchIds || []).includes(b.id);
+                                const isUnenrolled = (form.unenrolledBatchIds || []).includes(b.id);
+                                return (
+                                    <div key={b.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(255,255,255,0.02)', padding: '10px 16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                        <span style={{ fontWeight: 800, fontSize: '13px' }}>{b.name}</span>
+                                        <div style={{ display: 'flex', gap: '4px' }}>
+                                            <button type="button" onClick={() => setBatchStatus(b.id, 'none')} className={`btn btn-sm ${!isEnrolled && !isUnenrolled ? 'btn-primary' : 'btn-ghost'}`} style={{ padding: '4px 12px', fontSize: '10px', height: '28px' }}>NONE</button>
+                                            <button type="button" onClick={() => setBatchStatus(b.id, 'enrolled')} className={`btn btn-sm ${isEnrolled ? 'btn-primary' : 'btn-ghost'}`} style={{ padding: '4px 12px', fontSize: '10px', height: '28px', color: isEnrolled ? '#fff' : '#10b981' }}>ENROLL</button>
+                                            <button type="button" onClick={() => setBatchStatus(b.id, 'unenrolled')} className={`btn btn-sm ${isUnenrolled ? 'btn-danger' : 'btn-ghost'}`} style={{ padding: '4px 12px', fontSize: '10px', height: '28px' }}>DISSOLVE</button>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
 
-            {/* View Student Detail Modal */}
-            {viewingStudent && (
-                <div className="modal-overlay" onClick={() => setViewingStudent(null)}>
-                    <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 700, padding: 0, overflow: 'hidden' }}>
-                        <div style={{ background: 'linear-gradient(135deg, var(--color-primary), var(--color-accent))', padding: 'var(--space-6)', color: 'white', position: 'relative' }}>
-                            <button className="btn btn-ghost btn-icon" onClick={() => setViewingStudent(null)} style={{ position: 'absolute', top: 'var(--space-4)', right: 'var(--space-4)', color: 'white' }}>
+                    <div className="modal-footer" style={{ padding: '0', marginTop: '12px', border: 'none', display: 'flex', gap: '12px' }}>
+                        <button type="button" className="btn btn-ghost" onClick={() => setShowModal(false)} style={{ flex: 1, height: '48px', fontWeight: 800 }}>ABORT</button>
+                        <button type="submit" className="btn btn-primary" style={{ flex: 2, height: '48px', fontWeight: 900 }}>{editingStudent ? 'SAVE MODIFICATIONS' : 'MATERIALIZE ENTITY'}</button>
+                    </div>
+                </form>
+            </Modal>
+
+            {/* Student Viewing Console - Cinematic Profile */}
+            <Modal
+                isOpen={!!viewingStudent}
+                onClose={() => setViewingStudent(null)}
+                title={null}
+                maxWidth={720}
+            >
+                {viewingStudent && viewingStats && (
+                    <div style={{ margin: '-24px', position: 'relative' }}>
+                        <div style={{ 
+                            background: 'linear-gradient(135deg, #1e3a8a 0%, #1e1b4b 100%)', 
+                            padding: '60px 40px', 
+                            color: 'white', 
+                            position: 'relative',
+                            overflow: 'hidden',
+                            borderRadius: '24px 24px 0 0'
+                        }}>
+                             <div style={{ position: 'absolute', top: -50, right: -50, width: 200, height: 200, background: 'rgba(59, 130, 246, 0.2)', borderRadius: '50%', filter: 'blur(60px)' }} />
+                             <div style={{ position: 'absolute', bottom: -20, left: -20, width: 100, height: 100, background: 'rgba(139, 92, 246, 0.2)', borderRadius: '50%', filter: 'blur(40px)' }} />
+                            
+                            <button className="btn btn-ghost btn-icon" onClick={() => setViewingStudent(null)} style={{ position: 'absolute', top: '24px', right: '24px', color: 'white', zIndex: 2, background: 'rgba(0,0,0,0.2)', backdropFilter: 'blur(10px)' }}>
                                 <X size={20} />
                             </button>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
+                            
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '32px', position: 'relative', zIndex: 1 }}>
                                 <div style={{
-                                    width: 72, height: 72, borderRadius: 'var(--radius-full)',
-                                    background: 'rgba(255,255,255,0.2)', backdropFilter: 'blur(10px)',
+                                    width: 100, height: 100, borderRadius: '30px',
+                                    background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(20px)',
                                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    fontSize: '28px', fontWeight: 800, color: '#fff', border: '2px solid rgba(255,255,255,0.4)'
+                                    fontSize: '44px', fontWeight: 900, color: '#fff', border: '2px solid rgba(255,255,255,0.15)',
+                                    boxShadow: '0 20px 40px rgba(0,0,0,0.3)'
                                 }}>
                                     {viewingStudent.name?.charAt(0).toUpperCase()}
                                 </div>
                                 <div>
-                                    <h2 style={{ fontSize: '24px', fontWeight: 700, margin: 0 }}>{viewingStudent.name}</h2>
-                                    <div style={{ opacity: 0.9, fontSize: 'var(--font-size-sm)', marginTop: '4px' }}>Class {viewingStudent.grade} | {viewingStudent.school || 'No School specified'}</div>
-                                    <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', marginTop: 'var(--space-2)' }}>
-                                        {(viewingStudent.batchIds || []).map((bid) => (
-                                            <span key={bid} style={{ background: 'rgba(255,255,255,0.2)', padding: '2px 8px', borderRadius: '12px', fontSize: '12px' }}>{getBatchName(bid)}</span>
+                                    <h2 style={{ fontSize: '36px', fontWeight: 900, margin: 0, letterSpacing: '-0.04em', color: 'white' }}>{viewingStudent.name}</h2>
+                                    <div style={{ opacity: 0.8, fontSize: '15px', marginTop: '4px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <Shield size={16} /> Grade Level {viewingStudent.grade} | {viewingStudent.school || 'Private Node'}
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '20px' }}>
+                                        {viewingStudent.batchIds?.map((bid) => (
+                                            <span key={bid} style={{ background: 'rgba(59, 130, 246, 0.3)', padding: '4px 12px', borderRadius: '10px', fontSize: '11px', fontWeight: 900, border: '1px solid rgba(255,255,255,0.1)' }}>{getBatchName(bid)}</span>
                                         ))}
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <div className="modal-body" style={{ maxHeight: '70vh', overflowY: 'auto', padding: 'var(--space-6)' }}>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.2fr) minmax(0, 1fr)', gap: 'var(--space-6)' }}>
-                                
-                                {/* Left Column: System Stats */}
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
-                                    
-                                    {/* Performance Overview */}
-                                    <div>
-                                        <h3 style={{ fontSize: '14px', color: 'var(--color-text-muted)', fontWeight: 600, textTransform: 'uppercase', marginBottom: 'var(--space-3)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                            <Activity size={16} /> Performance Overview
-                                        </h3>
-                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 'var(--space-3)' }}>
-                                            <div style={{ background: 'var(--color-surface-2)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
-                                                <div style={{ color: 'var(--color-teal)', marginBottom: '4px', display: 'flex', justifyContent: 'center' }}><Calendar size={20} /></div>
-                                                <div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--color-text-primary)' }}>{viewingStats?.attRate}%</div>
-                                                <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>Attendance</div>
-                                            </div>
-                                            <div style={{ background: 'var(--color-surface-2)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
-                                                <div style={{ color: 'var(--color-blue)', marginBottom: '4px', display: 'flex', justifyContent: 'center' }}><Award size={20} /></div>
-                                                <div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--color-text-primary)' }}>{viewingStats?.avgScore}%</div>
-                                                <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>Avg Score</div>
-                                            </div>
-                                            <div style={{ background: 'var(--color-surface-2)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
-                                                <div style={{ color: 'var(--color-purple)', marginBottom: '4px', display: 'flex', justifyContent: 'center' }}><CheckCircle size={20} /></div>
-                                                <div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--color-text-primary)' }}>{viewingStats?.hwRate}%</div>
-                                                <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>Homework</div>
-                                            </div>
+                        <div style={{ padding: '32px 40px', display: 'grid', gridTemplateColumns: '1fr 240px', gap: '40px', background: 'var(--color-bg-primary)' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '40px' }}>
+                                <div>
+                                    <h3 style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 900, textTransform: 'uppercase', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px', letterSpacing: '0.15em' }}>
+                                        <Activity size={16} style={{ color: 'var(--color-primary)' }} /> ACADEMIC TELEMETRY
+                                    </h3>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+                                        <div className="glass-panel" style={{ padding: '24px 16px', textAlign: 'center', background: 'rgba(20, 184, 166, 0.03)' }}>
+                                            <div style={{ color: '#10b981', marginBottom: '12px' }}><Calendar size={24} style={{ margin: '0 auto' }} /></div>
+                                            <div style={{ fontSize: '28px', fontWeight: 900 }}>{viewingStats.attRate}%</div>
+                                            <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Attendance</div>
                                         </div>
-                                    </div>
-
-                                    {/* Strengths & Weaknesses */}
-                                    <div>
-                                        <h3 style={{ fontSize: '14px', color: 'var(--color-text-muted)', fontWeight: 600, textTransform: 'uppercase', marginBottom: 'var(--space-3)' }}>Topic Analysis</h3>
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                                            <div style={{ background: 'var(--color-success-soft)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--color-success)', fontWeight: 600, fontSize: '13px', marginBottom: '8px' }}>
-                                                    <TrendingUp size={16} /> Top Strengths
-                                                </div>
-                                                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                                                    {viewingStats?.strengths?.length > 0 ? viewingStats.strengths.map(t => (
-                                                        <span key={t} style={{ background: '#fff', color: 'var(--color-success)', padding: '2px 8px', borderRadius: '4px', fontSize: '12px', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>{t}</span>
-                                                    )) : <span style={{ fontSize: '12px', color: 'var(--color-success)' }}>Not enough data</span>}
-                                                </div>
-                                            </div>
-                                            <div style={{ background: 'var(--color-danger-soft)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--color-danger)', fontWeight: 600, fontSize: '13px', marginBottom: '8px' }}>
-                                                    <TrendingDown size={16} /> Areas to Improve
-                                                </div>
-                                                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                                                    {viewingStats?.weaknesses?.length > 0 ? viewingStats.weaknesses.map(t => (
-                                                        <span key={t} style={{ background: '#fff', color: 'var(--color-danger)', padding: '2px 8px', borderRadius: '4px', fontSize: '12px', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>{t}</span>
-                                                    )) : <span style={{ fontSize: '12px', color: 'var(--color-danger)' }}>Not enough data</span>}
-                                                </div>
-                                            </div>
+                                        <div className="glass-panel" style={{ padding: '24px 16px', textAlign: 'center', background: 'rgba(59, 130, 246, 0.03)' }}>
+                                            <div style={{ color: 'var(--color-primary)', marginBottom: '12px' }}><Award size={24} style={{ margin: '0 auto' }} /></div>
+                                            <div style={{ fontSize: '28px', fontWeight: 900 }}>{viewingStats.avgScore}%</div>
+                                            <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Exam Avg</div>
+                                        </div>
+                                        <div className="glass-panel" style={{ padding: '24px 16px', textAlign: 'center', background: 'rgba(139, 92, 246, 0.03)' }}>
+                                            <div style={{ color: '#8b5cf6', marginBottom: '12px' }}><CheckCircle size={24} style={{ margin: '0 auto' }} /></div>
+                                            <div style={{ fontSize: '28px', fontWeight: 900 }}>{viewingStats.hwRate}%</div>
+                                            <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Completion</div>
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* Right Column: Contact & Personal Info */}
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', borderLeft: '1px solid var(--color-border)', paddingLeft: 'var(--space-5)' }}>
-                                    
-                                    <div>
-                                        <h3 style={{ fontSize: '14px', color: 'var(--color-text-muted)', fontWeight: 600, textTransform: 'uppercase', marginBottom: 'var(--space-3)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                            <User size={16} /> Contact Details
-                                        </h3>
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                                            {viewingStudent.email && (
-                                                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-2)' }}>
-                                                    <Mail size={15} style={{ color: 'var(--color-text-muted)', marginTop: '2px' }} />
-                                                    <div style={{ fontSize: '13px', color: 'var(--color-text-primary)' }}>{viewingStudent.email}</div>
-                                                </div>
-                                            )}
-                                            {viewingStudent.phone && (
-                                                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-2)' }}>
-                                                    <Phone size={15} style={{ color: 'var(--color-text-muted)', marginTop: '2px' }} />
-                                                    <div style={{ fontSize: '13px', color: 'var(--color-text-primary)' }}>{viewingStudent.phone}</div>
-                                                </div>
-                                            )}
-                                            {viewingStudent.address && (
-                                                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-2)' }}>
-                                                    <MapPin size={15} style={{ color: 'var(--color-text-muted)', marginTop: '2px' }} />
-                                                    <div style={{ fontSize: '13px', color: 'var(--color-text-primary)' }}>{viewingStudent.address}</div>
-                                                </div>
-                                            )}
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                                    <div className="glass-panel" style={{ padding: '24px', background: 'rgba(16, 185, 129, 0.05)', border: '1px solid rgba(16, 185, 129, 0.1)' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#10b981', fontWeight: 900, fontSize: '12px', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                                            <TrendingUp size={16} /> STRENGTHS
+                                        </div>
+                                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                            {viewingStats.strengths.length > 0 ? viewingStats.strengths.map(t => (
+                                                <span key={t} style={{ padding: '4px 10px', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', borderRadius: '8px', fontSize: '11px', fontWeight: 800 }}>{t}</span>
+                                            )) : <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>Analyzing patterns...</span>}
                                         </div>
                                     </div>
-
-                                    {(viewingStudent.guardianName || viewingStudent.guardianPhone) && (
-                                        <div>
-                                            <h3 style={{ fontSize: '14px', color: 'var(--color-text-muted)', fontWeight: 600, textTransform: 'uppercase', marginBottom: 'var(--space-2)' }}>Guardian</h3>
-                                            <div style={{ background: 'var(--color-surface-2)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)' }}>
-                                                <div style={{ fontSize: '13px', fontWeight: 600 }}>{viewingStudent.guardianName || '—'}</div>
-                                                {viewingStudent.guardianPhone && (
-                                                    <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '2px' }}>{viewingStudent.guardianPhone}</div>
-                                                )}
-                                            </div>
+                                    <div className="glass-panel" style={{ padding: '24px', background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.1)' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#ef4444', fontWeight: 900, fontSize: '12px', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                                            <TrendingDown size={16} /> VULNERABILITIES
                                         </div>
-                                    )}
-
-                                    {viewingStudent.notes && (
-                                        <div>
-                                            <h3 style={{ fontSize: '14px', color: 'var(--color-text-muted)', fontWeight: 600, textTransform: 'uppercase', marginBottom: 'var(--space-2)' }}>Notes</h3>
-                                            <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)', lineHeight: 1.5, background: 'var(--color-surface-2)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)' }}>
-                                                {viewingStudent.notes}
-                                            </div>
+                                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                            {viewingStats.weaknesses.length > 0 ? viewingStats.weaknesses.map(t => (
+                                                <span key={t} style={{ padding: '4px 10px', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', borderRadius: '8px', fontSize: '11px', fontWeight: 800 }}>{t}</span>
+                                            )) : <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>High resilience detected</span>}
                                         </div>
-                                    )}
-
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                        
-                        <div className="modal-footer" style={{ background: 'var(--color-surface-2)', borderTop: '1px solid var(--color-border)', margin: 0 }}>
-                            <button className="btn btn-secondary" onClick={() => { setViewingStudent(null); openEdit(viewingStudent); }}>Edit Profile</button>
-                            <button className="btn btn-primary" onClick={() => setViewingStudent(null)}>Close</button>
-                        </div>
-                    </div>
-                </div>
-            )}
-            {/* Import Modal */}
-            {showImportModal && (
-                <div className="modal-overlay" onClick={() => !isImporting && setShowImportModal(false)}>
-                    <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 800 }}>
-                        <div className="modal-header">
-                            <h2 className="modal-title">Bulk Import Students</h2>
-                            <button className="btn btn-ghost btn-icon" onClick={() => !isImporting && setShowImportModal(false)} disabled={isImporting}>
-                                <X size={20} />
-                            </button>
-                        </div>
-                        <div className="modal-body">
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-4)' }}>
-                                <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
-                                    Upload a CSV file containing your student records.
-                                </p>
-                                <button type="button" className="btn btn-ghost btn-sm" onClick={downloadDemoCSV} disabled={isImporting}>
-                                    <Download size={14} style={{ marginRight: '4px' }} /> Demo Template
-                                </button>
-                            </div>
-                            
-                            <div className="form-group">
-                                <input type="file" accept=".csv" className="form-input" onChange={handleFileUpload} disabled={isImporting} />
-                            </div>
 
-                            {csvPreview.length > 0 && (
-                                <div style={{ marginTop: 'var(--space-4)' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-2)' }}>
-                                        <h4 style={{ fontWeight: 600 }}>Preview ({csvPreview.length} rows)</h4>
-                                    </div>
-                                    <div className="table-container" style={{ maxHeight: 300, overflowY: 'auto' }}>
-                                        <table className="table" style={{ fontSize: 'var(--font-size-xs)' }}>
-                                            <thead>
-                                                <tr>
-                                                    <th>Name</th>
-                                                    <th>Email</th>
-                                                    <th>Phone</th>
-                                                    <th>Grade</th>
-                                                    <th>School</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {csvPreview.slice(0, 50).map((row, i) => (
-                                                    <tr key={i}>
-                                                        <td>{row.name || '—'}</td>
-                                                        <td>{row.email || '—'}</td>
-                                                        <td>{row.phone || '—'}</td>
-                                                        <td>{row.grade || '—'}</td>
-                                                        <td>{row.school || '—'}</td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                        {csvPreview.length > 50 && (
-                                            <div style={{ textAlign: 'center', padding: 'var(--space-2)', color: 'var(--color-text-muted)', fontSize: '12px' }}>
-                                                Showing first 50 rows...
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+                                <div>
+                                    <h3 style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 900, textTransform: 'uppercase', marginBottom: '16px', letterSpacing: '0.12em' }}>COMMS RECAP</h3>
+                                    <div className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', background: 'rgba(255,255,255,0.02)' }}>
+                                        {viewingStudent.email && (
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '14px' }}>
+                                                <Mail size={18} style={{ color: 'var(--color-primary)', opacity: 0.6 }} /> 
+                                                <span style={{ fontWeight: 600 }}>{viewingStudent.email}</span>
+                                            </div>
+                                        )}
+                                        {viewingStudent.phone && (
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '14px' }}>
+                                                <Phone size={18} style={{ color: 'var(--color-primary)', opacity: 0.6 }} /> 
+                                                <span style={{ fontWeight: 600 }}>{viewingStudent.phone}</span>
+                                            </div>
+                                        )}
+                                        {viewingStudent.address && (
+                                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', fontSize: '14px' }}>
+                                                <MapPin size={18} style={{ color: 'var(--color-primary)', opacity: 0.6, marginTop: '2px' }} /> 
+                                                <span style={{ color: 'var(--color-text-muted)', lineHeight: 1.4 }}>{viewingStudent.address}</span>
                                             </div>
                                         )}
                                     </div>
                                 </div>
-                            )}
+                                
+                                {viewingStudent.notes && (
+                                    <div>
+                                        <h3 style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 900, textTransform: 'uppercase', marginBottom: '12px', letterSpacing: '0.12em' }}>ENTITY LOGS</h3>
+                                        <div style={{ fontSize: '13px', color: 'var(--color-text-muted)', background: 'rgba(0,0,0,0.2)', padding: '16px', borderRadius: '14px', lineHeight: 1.6, borderLeft: '4px solid var(--color-primary)' }}>
+                                            {viewingStudent.notes}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
                         </div>
-                        <div className="modal-footer">
-                            <button className="btn btn-secondary" onClick={() => setShowImportModal(false)} disabled={isImporting}>Cancel</button>
-                            <button className="btn btn-primary" onClick={handleImportCSV} disabled={isImporting || csvPreview.length === 0}>
-                                {isImporting ? 'Importing...' : 'Import Students'}
-                            </button>
+                        
+                        <div style={{ padding: '24px 40px', borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'flex-end', gap: '12px', background: 'var(--color-bg-primary)', borderRadius: '0 0 24px 24px' }}>
+                            <button className="btn btn-secondary btn-sm" onClick={() => { setViewingStudent(null); openEdit(viewingStudent); }} style={{ height: '40px', padding: '0 20px', fontWeight: 800 }}>ADJUST REGISTRY</button>
+                            <button className="btn btn-primary btn-sm" onClick={() => setViewingStudent(null)} style={{ height: '40px', padding: '0 20px', fontWeight: 900 }}>CLOSE CONSOLE</button>
                         </div>
                     </div>
+                )}
+            </Modal>
+
+            {/* Bulk Ingestion Modal */}
+            <Modal
+                isOpen={showImportModal}
+                onClose={() => !isImporting && setShowImportModal(false)}
+                title="Telemetry Aggregation (Bulk Import)"
+            >
+                <div>
+                    <div style={{ padding: '40px', border: '2px dashed rgba(255,255,255,0.1)', borderRadius: '20px', textAlign: 'center', background: 'rgba(255,255,255,0.02)', marginBottom: '24px' }}>
+                        <div style={{ width: 64, height: 64, background: 'rgba(59, 130, 246, 0.1)', color: 'var(--color-primary)', borderRadius: '18px', margin: '0 auto 20px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Upload size={32} />
+                        </div>
+                        <h4 style={{ fontSize: '18px', fontWeight: 900, marginBottom: '8px' }}>Select Telemetry File</h4>
+                        <p style={{ fontSize: '14px', color: 'var(--color-text-muted)', marginBottom: '24px' }}>Ingest standardized CSV records into the registry.</p>
+                        <input type="file" accept=".csv" onChange={handleFileUpload} style={{ color: 'var(--color-text-muted)', fontSize: '13px', display: 'block', margin: '0 auto' }} />
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '24px', alignItems: 'center' }}>
+                        <button className="btn btn-ghost btn-sm" onClick={downloadDemoCSV} style={{ fontWeight: 800 }}>
+                            <Download size={14} /> DEMO TEMPLATE
+                        </button>
+                        {csvPreview.length > 0 && (
+                            <div style={{ fontSize: '13px', color: '#10b981', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <Sparkles size={14} /> {csvPreview.length} ENTITIES PARSED
+                            </div>
+                        )}
+                    </div>
+
+                    {csvPreview.length > 0 && (
+                        <div style={{ maxHeight: '200px', overflowY: 'auto', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px', marginBottom: '24px', background: 'rgba(0,0,0,0.2)' }}>
+                            <table className="table table-compact" style={{ fontSize: '11px' }}>
+                                <thead>
+                                    <tr style={{ background: 'rgba(255,255,255,0.05)' }}>
+                                        <th style={{ padding: '12px' }}>Name</th>
+                                        <th>Level</th>
+                                        <th>Source Instance</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {csvPreview.slice(0, 5).map((row, i) => (
+                                        <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                                            <td style={{ padding: '12px', fontWeight: 700 }}>{row.name}</td>
+                                            <td>{row.grade}</td>
+                                            <td>{row.school}</td>
+                                        </tr>
+                                    ))}
+                                    {csvPreview.length > 5 && (
+                                        <tr>
+                                            <td colSpan="3" style={{ textAlign: 'center', padding: '12px', color: 'var(--color-text-muted)', fontWeight: 600 }}>+ {csvPreview.length - 5} additional records...</td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+
+                    <div className="modal-footer" style={{ padding: '0', border: 'none', display: 'flex', gap: '12px' }}>
+                        <button className="btn btn-ghost" onClick={() => setShowImportModal(false)} style={{ flex: 1, height: '48px', fontWeight: 800 }}>ABORT</button>
+                        <button className="btn btn-primary" onClick={handleImportCSV} disabled={isImporting || csvPreview.length === 0} style={{ flex: 2, height: '48px', fontWeight: 900 }}>
+                            {isImporting ? 'INGESTING...' : 'START AGGREGATION'}
+                        </button>
+                    </div>
                 </div>
-            )}
+            </Modal>
         </div>
     );
 }

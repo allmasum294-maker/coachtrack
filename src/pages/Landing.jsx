@@ -10,265 +10,242 @@ import {
     ArrowRight,
     Shield,
     Zap,
+    TrendingUp,
+    Layout,
+    Sparkles
 } from 'lucide-react';
 
 const features = [
     {
-        icon: GraduationCap,
-        title: 'Batch Management',
-        description: 'Organize classes by grade — Class 9 through 12. Track each batch\'s progress, students, and schedules independently.',
-        color: 'var(--color-accent)',
-        bg: 'var(--color-accent-soft)',
+        icon: Layout,
+        title: 'Glassmorphism UI',
+        description: 'Experience a stunning, futuristic interface designed for maximum pedagogical focus and aesthetic excellence.',
+        color: '#3b82f6',
+        delay: '0s'
     },
     {
         icon: ClipboardCheck,
-        title: 'Smart Attendance',
-        description: 'Quick checklist-based attendance marking per batch. Track presence, absence, and late arrivals with full history.',
-        color: 'var(--color-success)',
-        bg: 'var(--color-success-soft)',
+        title: 'Mission-Control Sync',
+        description: 'Real-time attendance and session tracking with enrollment-aware filtering. Never miss a single pedagogical beat.',
+        color: '#10b981',
+        delay: '0.1s'
     },
     {
         icon: BarChart3,
         title: 'Deep Analytics',
-        description: 'Visualize attendance trends, exam performance, syllabus coverage, and teaching productivity with professional charts.',
-        color: 'var(--color-info)',
-        bg: 'var(--color-info-soft)',
+        description: 'Quantum-level insights into student performance, attendance trends, and predictive risk assessment.',
+        color: '#f59e0b',
+        delay: '0.2s'
     },
     {
         icon: BookOpen,
-        title: 'Curriculum Tracking',
-        description: 'Create lesson plans, mark topics covered, and monitor syllabus completion rates per batch in real time.',
-        color: 'var(--color-gold)',
-        bg: 'var(--color-gold-soft)',
+        title: 'Curriculum Ledger',
+        description: 'Comprehensive syllabus tracking and lesson planning. Map the entire academic journey with precision.',
+        color: '#8b5cf6',
+        delay: '0.3s'
     },
     {
         icon: Calendar,
-        title: 'Schedule & Calendar',
-        description: 'Manage your class schedules with a visual calendar. Integrates with Google Calendar for external schedules.',
-        color: '#a78bfa',
-        bg: 'rgba(167, 139, 250, 0.15)',
+        title: 'Temporal Manager',
+        description: 'Advanced scheduling matrix with visual calendar integration. Orchestrate your sessions with zero friction.',
+        color: '#ec4899',
+        delay: '0.4s'
     },
     {
         icon: Shield,
-        title: 'Secure & Private',
-        description: 'Teacher-only access with admin verification. Your data stays private — no student access, ever.',
-        color: 'var(--color-danger)',
-        bg: 'var(--color-danger-soft)',
+        title: 'Fortified Security',
+        description: 'Level-0 administrative clearance and teacher-only data silos. Your intellectual property is safe.',
+        color: '#ef4444',
+        delay: '0.5s'
     },
 ];
 
 const benefits = [
-    'Private tutoring centers managing multiple batches across grades',
-    'Freelance tutors teaching academic English (Classes 9–12)',
-    'Coaching centers that need rigorous progress tracking',
-    'Teachers who want statistical insights into student performance',
-    'Educators who need exportable reports for analysis',
-    'Professionals who manage schedules across multiple institutions',
+    'Private tutoring centers managing multi-grade clusters',
+    'Elite academic freelancers (Class 9–12 Specialists)',
+    'Growth-stage coaching centers seeking scientific management',
+    'Educators focused on statistical performance optimization',
+    'Professional mentors requiring exportable clinical reports',
 ];
 
 export default function Landing() {
     return (
-        <div className="landing-page">
+        <div className="landing-page" style={{ 
+            background: 'var(--color-bg-primary)',
+            minHeight: '100vh',
+            color: 'var(--color-text-primary)',
+            overflowX: 'hidden'
+        }}>
+            {/* Mesh Gradient Backgrounds */}
+            <div style={{ position: 'fixed', top: '-10%', left: '-10%', width: '50%', height: '50%', background: 'radial-gradient(circle, rgba(59, 130, 246, 0.08) 0%, transparent 70%)', zIndex: 0, pointerEvents: 'none' }} />
+            <div style={{ position: 'fixed', bottom: '-10%', right: '-10%', width: '60%', height: '60%', background: 'radial-gradient(circle, rgba(139, 92, 246, 0.05) 0%, transparent 70%)', zIndex: 0, pointerEvents: 'none' }} />
+
             {/* Navbar */}
-            <nav
-                style={{
-                    position: 'fixed',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    zIndex: 100,
-                    background: 'rgba(10, 15, 30, 0.85)',
-                    backdropFilter: 'blur(12px)',
-                    borderBottom: '1px solid var(--color-border)',
-                    padding: '0 var(--space-8)',
-                    height: 'var(--header-height)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                }}
-            >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-                    <div
-                        style={{
-                            width: 32,
-                            height: 32,
-                            background: 'linear-gradient(135deg, var(--color-accent), #0d9488)',
-                            borderRadius: 'var(--radius-md)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: 'white',
-                            fontWeight: 800,
-                            fontSize: 'var(--font-size-sm)',
-                        }}
-                    >
-                        CT
+            <nav className="glass-panel" style={{ 
+                position: 'fixed', 
+                top: 0, 
+                left: 0, 
+                right: 0, 
+                zIndex: 100, 
+                borderRadius: 0,
+                borderLeft: 'none',
+                borderRight: 'none',
+                borderTop: 'none',
+                height: '72px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '0 clamp(1rem, 5vw, 4rem)',
+                background: 'rgba(10, 15, 30, 0.7)'
+            }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ 
+                        width: 40, height: 40, 
+                        background: 'linear-gradient(135deg, var(--color-primary), #10b981)',
+                        borderRadius: '12px',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        color: 'white', fontWeight: 900, boxShadow: '0 8px 16px rgba(59, 130, 246, 0.3)'
+                    }}>
+                        GT
                     </div>
-                    <span style={{ fontWeight: 800, fontSize: 'var(--font-size-lg)' }}>
-                        Coach<span style={{ color: 'var(--color-accent)' }}>Track</span>
+                    <span style={{ fontWeight: 900, fontSize: '20px', letterSpacing: '-0.02em' }}>
+                        Coach<span className="text-gradient">Track</span>
                     </span>
                 </div>
-                <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
-                    <Link to="/login" className="btn btn-ghost">
-                        Login
-                    </Link>
-                    <Link to="/register" className="btn btn-primary">
-                        Get Started
-                    </Link>
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                    <Link to="/login" className="btn btn-ghost" style={{ fontWeight: 800 }}>Login</Link>
+                    <Link to="/register" className="btn btn-primary" style={{ padding: '0 24px', height: '42px', borderRadius: '10px', fontWeight: 900, boxShadow: '0 10px 20px -5px rgba(59, 130, 246, 0.3)' }}>GET STARTED</Link>
                 </div>
             </nav>
 
             {/* Hero */}
-            <section className="landing-hero">
-                <div className="landing-hero-content animate-fade-in-up">
-                    <div className="landing-hero-badge">
-                        <Zap size={16} />
-                        Built for Coaching Tutors
+            <section style={{ 
+                padding: '160px 20px 100px', 
+                textAlign: 'center', 
+                position: 'relative',
+                zIndex: 1
+            }}>
+                <div className="animate-fade-in-up">
+                    <div style={{ 
+                        display: 'inline-flex', alignItems: 'center', gap: '8px', 
+                        padding: '8px 16px', background: 'rgba(59, 130, 246, 0.1)', 
+                        color: 'var(--color-primary)', borderRadius: '100px', 
+                        fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', 
+                        letterSpacing: '0.1em', marginBottom: '32px'
+                    }}>
+                        <Sparkles size={14} /> The Elite Standard for Educators
                     </div>
-                    <h1>
-                        The <span className="highlight">Smarter Way</span> to
-                        <br />
-                        Manage Your <span className="highlight-gold">Coaching Center</span>
+                    <h1 style={{ 
+                        fontSize: 'clamp(40px, 8vw, 84px)', 
+                        fontWeight: 900, 
+                        lineHeight: 1.05, 
+                        marginBottom: '24px',
+                        letterSpacing: '-0.04em'
+                    }}>
+                        The <span className="text-gradient">Scientific Way</span><br />
+                        to Orchestrate <span style={{ color: 'var(--color-text-primary)', opacity: 0.9 }}>Coaching</span>
                     </h1>
-                    <p className="landing-hero-text">
-                        Track batches, students, attendance, lessons, and exams — all in one
-                        beautifully designed dashboard. Get statistical insights that drive
-                        real teaching improvement.
+                    <p style={{ 
+                        fontSize: 'clamp(16px, 1.5vw, 20px)', 
+                        color: 'var(--color-text-muted)', 
+                        maxWidth: '700px', 
+                        margin: '0 auto 48px',
+                        lineHeight: 1.6,
+                        fontWeight: 500
+                    }}>
+                        Engineered for elite pedagogical centers. Manage batches, students, and cognitive performance via a stunning mission-control interface.
                     </p>
-                    <div className="landing-hero-buttons">
-                        <Link to="/register" className="btn btn-primary btn-lg">
-                            Start for Free
-                            <ArrowRight size={18} />
+                    <div style={{ display: 'flex', gap: '20px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                        <Link to="/register" className="btn btn-primary" style={{ padding: '0 40px', height: '60px', borderRadius: '16px', fontSize: '16px', fontWeight: 900, boxShadow: '0 20px 40px -10px rgba(59, 130, 246, 0.4)' }}>
+                            ESTABLISH CLEARANCE <ArrowRight size={20} style={{ marginLeft: '10px' }} />
                         </Link>
-                        <a href="#features" className="btn btn-secondary btn-lg">
-                            Explore Features
+                        <a href="#features" className="btn btn-ghost" style={{ padding: '0 32px', height: '60px', borderRadius: '16px', fontSize: '16px', fontWeight: 900, background: 'rgba(255,255,255,0.03)' }}>
+                            VIEW TELEMETRY
                         </a>
                     </div>
                 </div>
             </section>
 
-            {/* Features */}
-            <section className="landing-section" id="features">
-                <div className="landing-section-header">
-                    <h2>
-                        Everything You Need to{' '}
-                        <span style={{ color: 'var(--color-accent)' }}>Excel</span>
-                    </h2>
-                    <p>
-                        A comprehensive toolkit designed specifically for coaching tutors who
-                        take their teaching seriously.
-                    </p>
+            {/* Feature Matrix */}
+            <section id="features" style={{ padding: '100px clamp(1rem, 5vw, 4rem)', position: 'relative', zIndex: 1 }}>
+                <div style={{ textAlign: 'center', marginBottom: '80px' }}>
+                    <h2 style={{ fontSize: 'clamp(32px, 4vw, 48px)', fontWeight: 900, marginBottom: '16px', letterSpacing: '-0.02em' }}>Omniscient Feature Matrix</h2>
+                    <p style={{ color: 'var(--color-text-muted)', fontSize: '18px', fontWeight: 500 }}>A unified ecosystem engineered for data-driven academic directors.</p>
                 </div>
-                <div className="landing-features">
-                    {features.map((feature, i) => (
-                        <div
-                            key={i}
-                            className={`landing-feature-card animate-fade-in-up stagger-${i + 1}`}
-                        >
-                            <div
-                                className="landing-feature-icon"
-                                style={{ background: feature.bg, color: feature.color }}
-                            >
-                                <feature.icon size={28} />
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
+                    {features.map((f, i) => (
+                        <div key={i} className="glass-card hover-lift animate-fade-in-up" style={{ padding: '40px', animationDelay: f.delay }}>
+                            <div style={{ 
+                                width: '56px', height: '56px', borderRadius: '16px', 
+                                background: `${f.color}15`, color: f.color,
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                marginBottom: '24px'
+                            }}>
+                                <f.icon size={28} />
                             </div>
-                            <h3>{feature.title}</h3>
-                            <p>{feature.description}</p>
+                            <h3 style={{ fontSize: '22px', fontWeight: 800, marginBottom: '16px' }}>{f.title}</h3>
+                            <p style={{ color: 'var(--color-text-muted)', fontSize: '15px', lineHeight: 1.6, fontWeight: 500 }}>{f.description}</p>
                         </div>
                     ))}
                 </div>
             </section>
 
-            {/* Who is this for? */}
-            <section className="landing-section landing-who" id="who">
-                <div className="landing-section-header">
-                    <h2>
-                        Who Is{' '}
-                        <span style={{ color: 'var(--color-gold)' }}>CoachTrack</span> For?
-                    </h2>
-                    <p>
-                        Designed for dedicated educators who want data-driven coaching
-                        management.
-                    </p>
-                </div>
-                <div className="landing-who-grid">
+            {/* Target Core Section */}
+            <section style={{ padding: '100px clamp(1rem, 5vw, 4rem)', background: 'rgba(59, 130, 246, 0.02)', position: 'relative', zIndex: 1 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '60px', alignItems: 'center' }}>
                     <div>
-                        <h3
-                            style={{
-                                fontSize: 'var(--font-size-xl)',
-                                fontWeight: 700,
-                                marginBottom: 'var(--space-6)',
-                            }}
-                        >
-                            Perfect for tutors and coaching centers that demand{' '}
-                            <span style={{ color: 'var(--color-accent)' }}>
-                                rigorous management
-                            </span>
-                        </h3>
-                        <ul className="landing-who-list">
-                            {benefits.map((benefit, i) => (
-                                <li key={i}>
-                                    <CheckCircle size={20} />
-                                    <span>{benefit}</span>
-                                </li>
+                        <div style={{ 
+                            padding: '6px 14px', background: 'rgba(245, 158, 11, 0.1)', 
+                            color: 'var(--color-gold)', borderRadius: '8px', 
+                            fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', 
+                            letterSpacing: '0.1em', marginBottom: '24px', display: 'inline-block'
+                        }}>Target Demographics</div>
+                        <h2 style={{ fontSize: '40px', fontWeight: 900, marginBottom: '32px', lineHeight: 1.2 }}>Who is <span className="text-gradient">CoachTrack</span> Engineered For?</h2>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                            {benefits.map((b, i) => (
+                                <div key={i} style={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
+                                    <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                        <CheckCircle size={16} />
+                                    </div>
+                                    <span style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-text-secondary)' }}>{b}</span>
+                                </div>
                             ))}
-                        </ul>
-                    </div>
-                    <div
-                        style={{
-                            background: 'var(--color-bg-card)',
-                            borderRadius: 'var(--radius-xl)',
-                            border: '1px solid var(--color-border)',
-                            padding: 'var(--space-8)',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            textAlign: 'center',
-                            gap: 'var(--space-4)',
-                        }}
-                    >
-                        <div
-                            style={{
-                                width: 80,
-                                height: 80,
-                                background:
-                                    'linear-gradient(135deg, var(--color-accent), var(--color-gold))',
-                                borderRadius: 'var(--radius-xl)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                            }}
-                        >
-                            <GraduationCap size={40} color="white" />
                         </div>
-                        <h3 style={{ fontSize: 'var(--font-size-xl)', fontWeight: 700 }}>
-                            Ready to Transform Your Teaching?
-                        </h3>
-                        <p
-                            style={{
-                                color: 'var(--color-text-secondary)',
-                                fontSize: 'var(--font-size-sm)',
-                            }}
-                        >
-                            Join CoachTrack today and bring scientific management to your
-                            coaching practice.
-                        </p>
-                        <Link
-                            to="/register"
-                            className="btn btn-gold btn-lg"
-                            style={{ width: '100%' }}
-                        >
-                            Create Free Account
-                        </Link>
+                    </div>
+
+                    <div className="glass-card" style={{ padding: '60px', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
+                        <div style={{ position: 'absolute', top: '-50px', right: '-50px', width: '200px', height: '200px', background: 'var(--color-primary)', filter: 'blur(100px)', opacity: 0.1 }} />
+                        
+                        <div style={{ 
+                            width: '100px', height: '100px', background: 'linear-gradient(135deg, var(--color-primary), var(--color-gold))',
+                            borderRadius: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            margin: '0 auto 32px', boxShadow: '0 20px 40px -10px rgba(59, 130, 246, 0.4)'
+                        }}>
+                            <GraduationCap size={50} color="white" />
+                        </div>
+                        <h3 style={{ fontSize: '28px', fontWeight: 900, marginBottom: '16px' }}>Evolve Your Practice</h3>
+                        <p style={{ color: 'var(--color-text-muted)', fontSize: '16px', marginBottom: '40px', fontWeight: 500 }}>Join the elite tier of educators leveraging scientific management for superior outcomes.</p>
+                        <Link to="/register" className="btn btn-primary" style={{ width: '100%', height: '56px', borderRadius: '14px', fontSize: '15px', fontWeight: 900 }}>INITIALIZE FREE ACCOUNT</Link>
                     </div>
                 </div>
             </section>
 
             {/* Footer */}
-            <footer className="landing-footer">
-                <p>
-                    © {new Date().getFullYear()} CoachTrack — Built for educators who care
-                    about progress.
-                </p>
+            <footer style={{ 
+                padding: '60px clamp(1rem, 5vw, 4rem)', 
+                borderTop: '1px solid var(--color-border)',
+                textAlign: 'center',
+                color: 'var(--color-text-muted)',
+                fontSize: '14px',
+                fontWeight: 600
+            }}>
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '24px', marginBottom: '24px' }}>
+                    <span style={{ color: 'var(--color-text-primary)', fontWeight: 900 }}>COACHTRACK v2.0</span>
+                    <span>SYSTEM READY</span>
+                    <span>ENCRYPTION ACTIVE</span>
+                </div>
+                <p>© {new Date().getFullYear()} CoachTrack — Built for the Next Generation of Elite Educators.</p>
             </footer>
         </div>
     );

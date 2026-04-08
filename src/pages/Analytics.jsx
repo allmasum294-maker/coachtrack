@@ -1,19 +1,21 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { collection, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
+import { batchService } from '../services/batchService';
 import toast from 'react-hot-toast';
 import {
-    BarChart3, TrendingUp, Users, BookOpen, Calendar, ClipboardCheck,
+    BarChart3, TrendingUp, Users, BookOpen, Calendar, 
+    ClipboardCheck, Filter, Target, Award, Brain, Clock, Zap
 } from 'lucide-react';
 import {
     LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, RadarChart, Radar,
     PolarGrid, PolarAngleAxis, PolarRadiusAxis,
     XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, AreaChart, Area,
 } from 'recharts';
-import { format, subDays, differenceInHours } from 'date-fns';
+import { format, subDays } from 'date-fns';
 
-const COLORS = ['#14b8a6', '#f59e0b', '#3b82f6', '#ef4444', '#a78bfa', '#22c55e'];
+const COLORS = ['#3b82f6', '#14b8a6', '#f59e0b', '#ef4444', '#a78bfa', '#22c55e'];
 
 export default function Analytics() {
     const { currentUser } = useAuth();
@@ -28,6 +30,8 @@ export default function Analytics() {
     const [startDate, setStartDate] = useState(format(subDays(new Date(), 30), 'yyyy-MM-dd'));
     const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
     const [targetClasses, setTargetClasses] = useState('');
+
+    const enrolledStudentIds = useMemo(() => new Set(students.map(s => s.id)), [students]);
 
     useEffect(() => {
         if (selectedBatch) {
@@ -45,22 +49,27 @@ export default function Analytics() {
     async function loadAllData() {
         try {
             const uid = currentUser.uid;
-            const [batchSnap, studentSnap, attSnap, lessonSnap, examSnap, schedSnap] = await Promise.all([
-                getDocs(query(collection(db, 'batches'), where('teacherId', '==', uid))),
-                getDocs(query(collection(db, 'students'), where('teacherId', '==', uid))),
+            const [activeBatches, studentSnap, attSnap, lessonSnap, examSnap, schedSnap] = await Promise.all([
+                batchService.getBatches(uid, true),
+                getDocs(query(
+                    collection(db, 'students'), 
+                    where('teacherId', '==', uid),
+                    where('status', '==', 'enrolled')
+                )),
                 getDocs(query(collection(db, 'attendance'), where('teacherId', '==', uid))),
                 getDocs(query(collection(db, 'lessons'), where('teacherId', '==', uid))),
                 getDocs(query(collection(db, 'exams'), where('teacherId', '==', uid))),
                 getDocs(query(collection(db, 'schedules'), where('teacherId', '==', uid))),
             ]);
-            setBatches(batchSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
+            setBatches(activeBatches);
             setStudents(studentSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
             setAttendance(attSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
             setLessons(lessonSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
             setExams(examSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
             setSchedules(schedSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
         } catch (err) {
-            console.error('Error:', err);
+            console.error('Error loading analytics data:', err);
+            toast.error('Failed to load dashboard data');
         } finally {
             setLoading(false);
         }
@@ -72,7 +81,7 @@ export default function Analytics() {
             const val = parseInt(targetClasses, 10) || 0;
             await updateDoc(doc(db, 'batches', selectedBatch), { targetClasses: val });
             setBatches(batches.map(b => b.id === selectedBatch ? { ...b, targetClasses: val } : b));
-            toast.success('Target classes updated');
+            toast.success('Batch goals updated');
         } catch (err) {
             console.error(err);
             toast.error('Failed to update target');
@@ -88,23 +97,43 @@ export default function Analytics() {
         });
     }
 
-    function getTargetFulfillmentData() {
-        const filtered = getFilteredSchedules();
-        const fulfilled = filtered.filter(s => s.status === 'completed').length;
-        const cancelled = filtered.filter(s => s.status === 'cancelled').length;
-        const scheduled = filtered.filter(s => s.status === 'scheduled').length;
-        
-        let target = 0;
-        if (selectedBatch) {
-            target = batches.find(b => b.id === selectedBatch)?.targetClasses || 0;
-        } else {
-            target = batches.reduce((sum, b) => sum + (b.targetClasses || 0), 0);
-        }
+    // --- Computed Analytics ---
+    const stats = useMemo(() => {
+        // Attendance Rate
+        const filteredAtt = selectedBatch ? attendance.filter(a => a.batchId === selectedBatch) : attendance;
+        let totalRecords = 0, presentCount = 0;
+        filteredAtt.forEach(a => {
+            (a.records || []).forEach(r => {
+                if (enrolledStudentIds.has(r.studentId)) {
+                    totalRecords++;
+                    if (r.status === 'present') presentCount++;
+                }
+            });
+        });
+        const attRate = totalRecords > 0 ? Math.round((presentCount / totalRecords) * 100) : 0;
 
-        return { fulfilled, cancelled, scheduled, target };
-    }
+        // Syllabus Progress
+        const filteredLessons = selectedBatch ? lessons.filter(l => l.batchId === selectedBatch) : lessons;
+        const covered = filteredLessons.filter(l => l.status === 'covered').length;
+        const totalL = filteredLessons.length;
+        const sylProgress = totalL > 0 ? Math.round((covered / totalL) * 100) : 0;
 
-    // --- Computed Data ---
+        // Exam Average
+        const filteredExams = selectedBatch ? exams.filter(e => e.batchId === selectedBatch) : exams;
+        let totalPct = 0, examCount = 0;
+        filteredExams.forEach(e => {
+            const scores = (e.scores || []).filter(s => enrolledStudentIds.has(s.studentId));
+            if (scores.length > 0 && e.totalMarks > 0) {
+                const avg = scores.reduce((sum, s) => sum + s.marksObtained, 0) / scores.length;
+                totalPct += (avg / e.totalMarks) * 100;
+                examCount++;
+            }
+        });
+        const avgPerf = examCount > 0 ? Math.round(totalPct / examCount) : 0;
+
+        return { attRate, sylProgress, avgPerf, studentCount: students.length };
+    }, [attendance, lessons, exams, students, selectedBatch, enrolledStudentIds]);
+
     function getAttendanceTrend() {
         const filtered = selectedBatch ? attendance.filter((a) => a.batchId === selectedBatch) : attendance;
         const byDate = {};
@@ -113,8 +142,10 @@ export default function Analytics() {
             const key = format(dateVal, 'MMM d');
             if (!byDate[key]) byDate[key] = { present: 0, total: 0 };
             (a.records || []).forEach((r) => {
-                byDate[key].total++;
-                if (r.status === 'present') byDate[key].present++;
+                if (enrolledStudentIds.has(r.studentId)) {
+                    byDate[key].total++;
+                    if (r.status === 'present') byDate[key].present++;
+                }
             });
         });
         return Object.entries(byDate).map(([date, v]) => ({
@@ -127,7 +158,12 @@ export default function Analytics() {
             const batchAtt = attendance.filter((a) => a.batchId === batch.id);
             let total = 0, present = 0;
             batchAtt.forEach((a) => {
-                (a.records || []).forEach((r) => { total++; if (r.status === 'present') present++; });
+                (a.records || []).forEach((r) => { 
+                    if (enrolledStudentIds.has(r.studentId)) {
+                        total++; 
+                        if (r.status === 'present') present++; 
+                    }
+                });
             });
             return { name: batch.name, rate: total > 0 ? Math.round((present / total) * 100) : 0 };
         });
@@ -145,15 +181,16 @@ export default function Analytics() {
     function getExamPerformanceTrend() {
         const filtered = selectedBatch ? exams.filter((e) => e.batchId === selectedBatch) : exams;
         return filtered
-            .filter((e) => (e.scores || []).length > 0)
+            .filter((e) => (e.scores || []).some(s => enrolledStudentIds.has(s.studentId)))
             .sort((a, b) => {
                 const da = a.date?.toDate ? a.date.toDate() : new Date(a.date);
                 const db2 = b.date?.toDate ? b.date.toDate() : new Date(b.date);
                 return da - db2;
             })
             .map((exam) => {
-                const marks = exam.scores.map((s) => s.marksObtained);
-                const avg = Math.round(marks.reduce((a, b) => a + b, 0) / marks.length);
+                const scores = exam.scores.filter(s => enrolledStudentIds.has(s.studentId));
+                const marks = scores.map((s) => s.marksObtained);
+                const avg = marks.reduce((acc, m) => acc + m, 0) / marks.length;
                 const percent = exam.totalMarks > 0 ? Math.round((avg / exam.totalMarks) * 100) : 0;
                 return { name: exam.title, avg: percent };
             });
@@ -163,24 +200,30 @@ export default function Analytics() {
         return batches.map((batch) => {
             const batchAtt = attendance.filter((a) => a.batchId === batch.id);
             let totalR = 0, presentR = 0;
-            batchAtt.forEach((a) => (a.records || []).forEach((r) => { totalR++; if (r.status === 'present') presentR++; }));
+            batchAtt.forEach((a) => (a.records || []).forEach((r) => { 
+                if (enrolledStudentIds.has(r.studentId)) {
+                    totalR++; 
+                    if (r.status === 'present') presentR++; 
+                }
+            }));
             const attRate = totalR > 0 ? Math.round((presentR / totalR) * 100) : 0;
 
             const batchLessons = lessons.filter((l) => l.batchId === batch.id);
             const coveredL = batchLessons.filter((l) => l.status === 'covered').length;
             const sylRate = batchLessons.length > 0 ? Math.round((coveredL / batchLessons.length) * 100) : 0;
 
-            const batchExams = exams.filter((e) => e.batchId === batch.id && (e.scores || []).length > 0);
+            const batchExams = exams.filter((e) => e.batchId === batch.id);
             let examPerf = 0;
-            if (batchExams.length > 0) {
-                const avgs = batchExams.map((e) => {
-                    const marks = e.scores.map((s) => s.marksObtained);
-                    return e.totalMarks > 0 ? (marks.reduce((a, b) => a + b, 0) / marks.length / e.totalMarks) * 100 : 0;
-                });
-                examPerf = Math.round(avgs.reduce((a, b) => a + b, 0) / avgs.length);
-            }
-
-            const studentCount = students.filter((s) => (s.batchIds || []).includes(batch.id) && (s.status || 'enrolled') === 'enrolled').length;
+            let totalPct = 0, examCount = 0;
+            batchExams.forEach(e => {
+                const scores = (e.scores || []).filter(s => enrolledStudentIds.has(s.studentId));
+                if (scores.length > 0 && e.totalMarks > 0) {
+                    const avg = scores.reduce((sum, s) => sum + s.marksObtained, 0) / scores.length;
+                    totalPct += (avg / e.totalMarks) * 100;
+                    examCount++;
+                }
+            });
+            examPerf = examCount > 0 ? Math.round(totalPct / examCount) : 0;
 
             return { subject: batch.name, Attendance: attRate, Syllabus: sylRate, Performance: examPerf };
         });
@@ -196,253 +239,258 @@ export default function Analytics() {
             if (!byWeek[weekKey]) byWeek[weekKey] = 0;
             const [sh, sm] = s.startTime.split(':').map(Number);
             const [eh, em] = s.endTime.split(':').map(Number);
-            byWeek[weekKey] += (eh * 60 + em - sh * 60 - sm) / 60;
+            byWeek[weekKey] += ((eh * 60 + em) - (sh * 60 + sm)) / 60;
         });
         return Object.entries(byWeek).map(([week, hours]) => ({ week, hours: Math.round(hours * 10) / 10 }));
     }
 
-    if (loading) {
-        return <div className="loading-page"><div className="loading-spinner" /></div>;
-    }
+    if (loading) return <div className="loading-page"><div className="loading-spinner" /></div>;
+
+    const targetData = (() => {
+        const filtered = getFilteredSchedules();
+        const fulfilled = filtered.filter(s => s.status === 'completed').length;
+        const cancelled = filtered.filter(s => s.status === 'cancelled').length;
+        const scheduled = filtered.filter(s => s.status === 'scheduled').length;
+        let target = selectedBatch ? (batches.find(b => b.id === selectedBatch)?.targetClasses || 0) : batches.reduce((sum, b) => sum + (b.targetClasses || 0), 0);
+        return { fulfilled, cancelled, scheduled, target };
+    })();
 
     return (
         <div className="animate-fade-in">
             <div className="page-header">
                 <div>
-                    <h1 className="page-title">Analytics</h1>
-                    <p className="page-subtitle">Deep insights into your coaching performance</p>
+                    <h1 className="page-title">Performance Intelligence</h1>
+                    <p className="page-subtitle">Unified insights into coaching metrics and student engagement</p>
                 </div>
             </div>
 
-            <div className="analytics-filters" style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap', alignItems: 'center' }}>
-                <select className="form-select" style={{ width: 200 }} value={selectedBatch} onChange={(e) => setSelectedBatch(e.target.value)}>
-                    <option value="">All Batches</option>
-                    {batches.map((b) => (<option key={b.id} value={b.id}>{b.name}</option>))}
-                </select>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                    <input type="date" className="form-input" style={{ width: 150 }} value={startDate} onChange={e => setStartDate(e.target.value)} />
-                    <span style={{ color: 'var(--color-text-muted)' }}>to</span>
-                    <input type="date" className="form-input" style={{ width: 150 }} value={endDate} onChange={e => setEndDate(e.target.value)} />
+            {/* Quick Stats Summary */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-4)', marginBottom: 'var(--space-8)' }}>
+                {[
+                    { label: 'Enrolled Students', value: stats.studentCount, icon: Users, color: 'var(--color-primary)' },
+                    { label: 'Avg Attendance', value: `${stats.attRate}%`, icon: ClipboardCheck, color: 'var(--color-teal)' },
+                    { label: 'Syllabus Covered', value: `${stats.sylProgress}%`, icon: BookOpen, color: 'var(--color-warning)' },
+                    { label: 'Academic Performance', value: `${stats.avgPerf}%`, icon: Award, color: 'var(--color-primary)' },
+                ].map((stat, i) => (
+                    <div key={i} className="glass-panel" style={{ padding: 'var(--space-5)', display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
+                        <div style={{ 
+                            width: '48px', height: '48px', borderRadius: '14px', 
+                            background: `${stat.color}15`, color: stat.color,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center'
+                        }}>
+                            <stat.icon size={24} />
+                        </div>
+                        <div>
+                            <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{stat.label}</div>
+                            <div style={{ fontSize: '24px', fontWeight: 800 }}>{stat.value}</div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            {/* Control Panel */}
+            <div className="glass-card" style={{ padding: 'var(--space-6)', marginBottom: 'var(--space-8)', display: 'flex', gap: 'var(--space-6)', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                <div style={{ flex: 2, minWidth: '240px' }}>
+                    <div className="form-group">
+                        <label className="form-label" style={{ fontSize: '11px', fontWeight: 800 }}><Filter size={12} style={{ marginRight: '4px' }} /> Focus Area</label>
+                        <select className="form-select" value={selectedBatch} onChange={(e) => setSelectedBatch(e.target.value)}>
+                            <option value="">All Active Batches</option>
+                            {batches.map((b) => (<option key={b.id} value={b.id}>{b.name}</option>))}
+                        </select>
+                    </div>
                 </div>
+
+                <div style={{ flex: 3, display: 'flex', gap: 'var(--space-3)' }}>
+                    <div className="form-group" style={{ flex: 1 }}>
+                        <label className="form-label" style={{ fontSize: '11px', fontWeight: 800 }}>Time Horizon Start</label>
+                        <input type="date" className="form-input" value={startDate} onChange={e => setStartDate(e.target.value)} />
+                    </div>
+                    <div className="form-group" style={{ flex: 1 }}>
+                        <label className="form-label" style={{ fontSize: '11px', fontWeight: 800 }}>Time Horizon End</label>
+                        <input type="date" className="form-input" value={endDate} onChange={e => setEndDate(e.target.value)} />
+                    </div>
+                </div>
+
                 {selectedBatch && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginLeft: 'auto', background: 'var(--color-surface-2)', padding: '4px', borderRadius: 'var(--radius-md)' }}>
-                        <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginLeft: 'var(--space-2)' }}>Target:</span>
-                        <input type="number" className="form-input" style={{ width: 80, padding: '4px 8px' }} placeholder="Classes" value={targetClasses} onChange={e => setTargetClasses(e.target.value)} />
-                        <button className="btn btn-primary btn-sm" onClick={handleSaveTarget}>Save</button>
+                    <div className="form-group" style={{ flex: 2 }}>
+                        <label className="form-label" style={{ fontSize: '11px', fontWeight: 800 }}>Monthly Lesson Goal</label>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                            <input type="number" className="form-input" placeholder="Classes" value={targetClasses} onChange={e => setTargetClasses(e.target.value)} />
+                            <button className="btn btn-primary" onClick={handleSaveTarget} style={{ height: '42px', padding: '0 20px' }}><Zap size={16} /> Set</button>
+                        </div>
                     </div>
                 )}
             </div>
 
-            <div className="analytics-charts">
-                {/* Target Fulfillment (Newly Added) */}
-                <div className="chart-card" style={{ gridColumn: '1 / -1' }}>
-                    <div className="chart-card-header">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 'var(--space-6)' }}>
+                {/* Target Fulfillment Card */}
+                <div className="glass-panel" style={{ gridColumn: 'span 12', padding: 'var(--space-6)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--space-8)' }}>
                         <div>
-                            <div className="chart-card-title">Target Fulfillment & Class Status</div>
-                            <div className="chart-card-subtitle">Completed vs Cancelled classes within {format(new Date(startDate), 'MMM d')} - {format(new Date(endDate), 'MMM d')}</div>
+                            <h3 style={{ fontSize: '20px', fontWeight: 800, color: 'var(--color-primary)' }}>Session Analytics</h3>
+                            <p style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>Fulfillment metrics for the selected time horizon</p>
+                        </div>
+                        <div className="glass-card" style={{ padding: '8px 16px', background: 'rgba(59, 130, 246, 0.05)', color: 'var(--color-primary)', fontSize: '12px', fontWeight: 800 }}>
+                            {targetData.fulfilled} Classes Delivered
                         </div>
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--space-6)', padding: 'var(--space-4)' }}>
-                        {(() => {
-                            const { fulfilled, cancelled, scheduled, target } = getTargetFulfillmentData();
-                            const totalFiltered = fulfilled + cancelled + scheduled;
-                            const progress = target > 0 ? Math.min(Math.round((fulfilled / target) * 100), 100) : 0;
-                            
-                            return (
-                                <>
-                                    <div style={{ background: 'var(--color-surface-2)', padding: 'var(--space-5)', borderRadius: 'var(--radius-lg)', textAlign: 'center' }}>
-                                        <div style={{ fontSize: '36px', fontWeight: 800, color: 'var(--color-accent)' }}>{fulfilled}</div>
-                                        <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', fontWeight: 600 }}>Fulfilled Classes</div>
-                                        {target > 0 && (
-                                            <div style={{ marginTop: 'var(--space-4)' }}>
-                                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--font-size-xs)', marginBottom: '4px' }}>
-                                                    <span style={{ color: 'var(--color-text-muted)' }}>Progress to Target ({target})</span>
-                                                    <span style={{ fontWeight: 600, color: 'var(--color-accent)' }}>{progress}%</span>
-                                                </div>
-                                                <div className="progress-bar" style={{ height: 8 }}>
-                                                    <div className="progress-bar-fill" style={{ width: `${progress}%`, background: progress >= 100 ? 'var(--color-success)' : 'var(--color-accent)' }} />
-                                                </div>
-                                            </div>
-                                        )}
-                                        {target === 0 && selectedBatch && (
-                                            <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-warning)', marginTop: 'var(--space-2)' }}>Set a target to track progress</div>
-                                        )}
-                                    </div>
-                                    <div style={{ background: 'var(--color-surface-2)', padding: 'var(--space-5)', borderRadius: 'var(--radius-lg)', textAlign: 'center' }}>
-                                        <div style={{ fontSize: '36px', fontWeight: 800, color: 'var(--color-danger)' }}>{cancelled}</div>
-                                        <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', fontWeight: 600 }}>Cancelled Classes</div>
-                                        <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', marginTop: 'var(--space-2)' }}>
-                                            {totalFiltered > 0 ? Math.round((cancelled / totalFiltered) * 100) : 0}% of scheduled
-                                        </div>
-                                    </div>
-                                    <div style={{ background: 'var(--color-surface-2)', padding: 'var(--space-5)', borderRadius: 'var(--radius-lg)', textAlign: 'center' }}>
-                                        <div style={{ fontSize: '36px', fontWeight: 800, color: 'var(--color-teal)' }}>{scheduled}</div>
-                                        <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', fontWeight: 600 }}>Upcoming / Scheduled</div>
-                                        <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', marginTop: 'var(--space-2)' }}>
-                                            Pending completion
-                                        </div>
-                                    </div>
-                                    
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '150px' }}>
-                                        {totalFiltered > 0 ? (
-                                            <ResponsiveContainer width="100%" height={150}>
-                                                <PieChart>
-                                                    <Pie data={[
-                                                        { name: 'Fulfilled', value: fulfilled, color: 'var(--color-accent)' },
-                                                        { name: 'Cancelled', value: cancelled, color: 'var(--color-danger)' },
-                                                        { name: 'Scheduled', value: scheduled, color: 'var(--color-teal)' }
-                                                    ].filter(x => x.value > 0)} cx="50%" cy="50%" innerRadius={40} outerRadius={60} dataKey="value" stroke="none">
-                                                        {
-                                                            [
-                                                                { name: 'Fulfilled', value: fulfilled, color: 'var(--color-accent)' },
-                                                                { name: 'Cancelled', value: cancelled, color: 'var(--color-danger)' },
-                                                                { name: 'Scheduled', value: scheduled, color: 'var(--color-teal)' }
-                                                            ].filter(x => x.value > 0).map((entry, index) => (
-                                                                <Cell key={`cell-${index}`} fill={entry.color} />
-                                                            ))
-                                                        }
-                                                    </Pie>
-                                                    <Tooltip contentStyle={{ background: '#1a2235', border: '1px solid #2a3654', borderRadius: 8, color: '#f1f5f9' }} />
-                                                    <Legend />
-                                                </PieChart>
-                                            </ResponsiveContainer>
-                                        ) : (
-                                            <div style={{ color: 'var(--color-text-muted)' }}>No data in selected range</div>
-                                        )}
-                                    </div>
-                                </>
-                            );
-                        })()}
-                    </div>
-                </div>
-                {/* Attendance Trend */}
-                <div className="chart-card">
-                    <div className="chart-card-header">
-                        <div>
-                            <div className="chart-card-title">Attendance Trend</div>
-                            <div className="chart-card-subtitle">Attendance rate over time</div>
+                    
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--space-6)', alignItems: 'center' }}>
+                        <div className="glass-card" style={{ padding: 'var(--space-5)', textAlign: 'center' }}>
+                            <Clock size={32} style={{ color: 'var(--color-primary)', marginBottom: '12px' }} />
+                            <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Fulfilled</div>
+                            <div style={{ fontSize: '36px', fontWeight: 900 }}>{targetData.fulfilled}</div>
+                        </div>
+                        <div className="glass-card" style={{ padding: 'var(--space-5)', textAlign: 'center' }}>
+                            <Calendar size={32} style={{ color: 'var(--color-teal)', marginBottom: '12px' }} />
+                            <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Upcoming</div>
+                            <div style={{ fontSize: '36px', fontWeight: 900 }}>{targetData.scheduled}</div>
+                        </div>
+                        <div className="glass-card" style={{ padding: 'var(--space-5)', textAlign: 'center' }}>
+                            <Target size={32} style={{ color: 'var(--color-warning)', marginBottom: '12px' }} />
+                            <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Target Progress</div>
+                            <div style={{ fontSize: '36px', fontWeight: 900 }}>{targetData.target > 0 ? Math.min(Math.round((targetData.fulfilled / targetData.target) * 100), 100) : 0}%</div>
+                        </div>
+                        
+                        <div style={{ height: '180px', gridColumn: 'span 2' }}>
+                            <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                    <Pie 
+                                        data={[
+                                            { name: 'Fulfilled', value: targetData.fulfilled, color: 'var(--color-primary)' },
+                                            { name: 'Cancelled', value: targetData.cancelled, color: 'var(--color-danger)' },
+                                            { name: 'Scheduled', value: targetData.scheduled, color: 'var(--color-teal)' }
+                                        ].filter(x => x.value > 0)} 
+                                        cx="50%" cy="50%" innerRadius={60} outerRadius={80} dataKey="value" stroke="none" paddingAngle={8}
+                                    >
+                                        {
+                                            [
+                                                { name: 'Fulfilled', value: targetData.fulfilled, color: 'var(--color-primary)' },
+                                                { name: 'Cancelled', value: targetData.cancelled, color: 'var(--color-danger)' },
+                                                { name: 'Scheduled', value: targetData.scheduled, color: 'var(--color-teal)' }
+                                            ].filter(x => x.value > 0).map((entry, index) => (
+                                                <Cell key={`cell-${index}`} fill={entry.color} />
+                                            ))
+                                        }
+                                    </Pie>
+                                    <Tooltip contentStyle={{ background: 'rgba(15, 23, 42, 0.9)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', color: '#fff' }} />
+                                    <Legend verticalAlign="middle" align="right" layout="vertical" />
+                                </PieChart>
+                            </ResponsiveContainer>
                         </div>
                     </div>
-                    <ResponsiveContainer width="100%" height={250}>
-                        <AreaChart data={getAttendanceTrend()}>
-                            <defs>
-                                <linearGradient id="attGrad" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#14b8a6" stopOpacity={0.3} />
-                                    <stop offset="95%" stopColor="#14b8a6" stopOpacity={0} />
-                                </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#2a3654" />
-                            <XAxis dataKey="date" stroke="#64748b" fontSize={12} />
-                            <YAxis stroke="#64748b" fontSize={12} domain={[0, 100]} />
-                            <Tooltip contentStyle={{ background: '#1a2235', border: '1px solid #2a3654', borderRadius: 8, color: '#f1f5f9' }} />
-                            <Area type="monotone" dataKey="rate" stroke="#14b8a6" fill="url(#attGrad)" strokeWidth={2} />
-                        </AreaChart>
-                    </ResponsiveContainer>
                 </div>
 
-                {/* Batch Attendance Comparison */}
-                <div className="chart-card">
-                    <div className="chart-card-header">
-                        <div>
-                            <div className="chart-card-title">Batch Comparison</div>
-                            <div className="chart-card-subtitle">Attendance rate by batch</div>
-                        </div>
+                {/* Attendance Area Chart */}
+                <div className="glass-panel" style={{ gridColumn: 'span 8', padding: 'var(--space-6)' }}>
+                    <div style={{ marginBottom: 'var(--space-6)' }}>
+                        <h3 style={{ fontSize: '18px', fontWeight: 800 }}>Attendance Progression</h3>
+                        <p style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>Roll-call engagement over the last 15 sessions</p>
                     </div>
-                    <ResponsiveContainer width="100%" height={250}>
-                        <BarChart data={getBatchAttendanceComparison()}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#2a3654" />
-                            <XAxis dataKey="name" stroke="#64748b" fontSize={12} />
-                            <YAxis stroke="#64748b" fontSize={12} domain={[0, 100]} />
-                            <Tooltip contentStyle={{ background: '#1a2235', border: '1px solid #2a3654', borderRadius: 8, color: '#f1f5f9' }} />
-                            <Bar dataKey="rate" fill="#14b8a6" radius={[4, 4, 0, 0]} />
-                        </BarChart>
-                    </ResponsiveContainer>
+                    <div style={{ height: '320px' }}>
+                        <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart data={getAttendanceTrend()}>
+                                <defs>
+                                    <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="var(--color-primary)" stopOpacity={0.3} />
+                                        <stop offset="95%" stopColor="var(--color-primary)" stopOpacity={0} />
+                                    </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                                <XAxis dataKey="date" stroke="var(--color-text-muted)" fontSize={11} tickLine={false} axisLine={false} />
+                                <YAxis stroke="var(--color-text-muted)" fontSize={11} domain={[0, 100]} tickLine={false} axisLine={false} />
+                                <Tooltip contentStyle={{ background: 'rgba(15, 23, 42, 0.9)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', color: '#fff' }} />
+                                <Area type="monotone" dataKey="rate" stroke="var(--color-primary)" fill="url(#chartGrad)" strokeWidth={4} animationDuration={2000} />
+                            </AreaChart>
+                        </ResponsiveContainer>
+                    </div>
                 </div>
 
-                {/* Exam Performance Trend */}
-                <div className="chart-card">
-                    <div className="chart-card-header">
-                        <div>
-                            <div className="chart-card-title">Performance Trend</div>
-                            <div className="chart-card-subtitle">Average exam scores over time (%)</div>
-                        </div>
+                {/* Academic Radar */}
+                <div className="glass-panel" style={{ gridColumn: 'span 4', padding: 'var(--space-6)' }}>
+                    <div style={{ marginBottom: 'var(--space-6)' }}>
+                        <h3 style={{ fontSize: '18px', fontWeight: 800 }}>Radar Overview</h3>
+                        <p style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>Multi-dimensional performance</p>
                     </div>
-                    <ResponsiveContainer width="100%" height={250}>
-                        <LineChart data={getExamPerformanceTrend()}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#2a3654" />
-                            <XAxis dataKey="name" stroke="#64748b" fontSize={12} />
-                            <YAxis stroke="#64748b" fontSize={12} domain={[0, 100]} />
-                            <Tooltip contentStyle={{ background: '#1a2235', border: '1px solid #2a3654', borderRadius: 8, color: '#f1f5f9' }} />
-                            <Line type="monotone" dataKey="avg" stroke="#f59e0b" strokeWidth={2} dot={{ fill: '#f59e0b' }} />
-                        </LineChart>
-                    </ResponsiveContainer>
+                    <div style={{ height: '320px' }}>
+                        <ResponsiveContainer width="100%" height="100%">
+                            <RadarChart data={getBatchRadarData()}>
+                                <PolarGrid stroke="rgba(255,255,255,0.1)" />
+                                <PolarAngleAxis dataKey="subject" stroke="var(--color-text-muted)" fontSize={10} />
+                                <PolarRadiusAxis domain={[0, 100]} stroke="rgba(255,255,255,0.1)" fontSize={9} />
+                                <Radar name="Attendance" dataKey="Attendance" stroke="var(--color-teal)" fill="var(--color-teal)" fillOpacity={0.4} />
+                                <Radar name="Performance" dataKey="Performance" stroke="var(--color-primary)" fill="var(--color-primary)" fillOpacity={0.4} />
+                                <Tooltip contentStyle={{ background: 'rgba(15, 23, 42, 0.9)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', color: '#fff' }} />
+                                <Legend />
+                            </RadarChart>
+                        </ResponsiveContainer>
+                    </div>
                 </div>
 
-                {/* Syllabus Coverage */}
-                <div className="chart-card">
-                    <div className="chart-card-header">
-                        <div>
-                            <div className="chart-card-title">Syllabus Coverage</div>
-                            <div className="chart-card-subtitle">Curriculum completion per batch</div>
-                        </div>
+                {/* Performance Line Chart */}
+                <div className="glass-panel" style={{ gridColumn: 'span 6', padding: 'var(--space-6)' }}>
+                    <div style={{ marginBottom: 'var(--space-6)' }}>
+                        <h3 style={{ fontSize: '18px', fontWeight: 800 }}>Exam Trajectory</h3>
+                        <p style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>Average academic score progression</p>
                     </div>
-                    <div style={{ padding: 'var(--space-2)' }}>
+                    <div style={{ height: '300px' }}>
+                        <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={getExamPerformanceTrend()}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                                <XAxis dataKey="name" stroke="var(--color-text-muted)" fontSize={11} tickLine={false} axisLine={false} />
+                                <YAxis stroke="var(--color-text-muted)" fontSize={11} domain={[0, 100]} tickLine={false} axisLine={false} />
+                                <Tooltip contentStyle={{ background: 'rgba(15, 23, 42, 0.9)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', color: '#fff' }} />
+                                <Line type="stepAfter" dataKey="avg" stroke="var(--color-warning)" strokeWidth={4} dot={{ fill: 'var(--color-warning)', r: 5, strokeWidth: 0 }} activeDot={{ r: 8 }} animationDuration={2000} />
+                            </LineChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+
+                {/* Syllabus Gauge List */}
+                <div className="glass-panel" style={{ gridColumn: 'span 6', padding: 'var(--space-6)' }}>
+                    <div style={{ marginBottom: 'var(--space-6)' }}>
+                        <h3 style={{ fontSize: '18px', fontWeight: 800 }}>Curriculum Coverage</h3>
+                        <p style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>Lesson completion by active batch</p>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
                         {getSyllabusCoverage().map((item, i) => (
-                            <div key={i} style={{ marginBottom: 'var(--space-4)' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 'var(--space-2)' }}>
-                                    <span style={{ fontSize: 'var(--font-size-sm)', fontWeight: 600 }}>{item.name}</span>
-                                    <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-accent)' }}>{item.percent}% ({item.covered}/{item.total})</span>
+                            <div key={i} className="glass-card" style={{ padding: 'var(--space-4)' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                                    <div>
+                                        <div style={{ fontSize: '15px', fontWeight: 800 }}>{item.name}</div>
+                                        <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>{item.covered} / {item.total} Modules Covered</div>
+                                    </div>
+                                    <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--color-primary)' }}>{item.percent}%</div>
                                 </div>
-                                <div className="progress-bar" style={{ height: 12 }}>
-                                    <div className="progress-bar-fill" style={{ width: `${item.percent}%` }} />
+                                <div style={{ height: '12px', background: 'rgba(255,255,255,0.05)', borderRadius: '6px', overflow: 'hidden' }}>
+                                    <div style={{ 
+                                        width: `${item.percent}%`, height: '100%', 
+                                        background: `linear-gradient(90deg, ${COLORS[i % COLORS.length]}, var(--color-primary))`,
+                                        boxShadow: `0 0 15px ${COLORS[i % COLORS.length]}40`
+                                    }} />
                                 </div>
                             </div>
                         ))}
-                        {getSyllabusCoverage().length === 0 && (
-                            <p style={{ color: 'var(--color-text-muted)', textAlign: 'center', padding: 'var(--space-8)' }}>No lesson data available</p>
-                        )}
                     </div>
                 </div>
 
-                {/* Batch Radar */}
-                <div className="chart-card">
-                    <div className="chart-card-header">
-                        <div>
-                            <div className="chart-card-title">Batch Overview</div>
-                            <div className="chart-card-subtitle">Overall metrics comparison</div>
-                        </div>
+                {/* Effort Chart */}
+                <div className="glass-panel" style={{ gridColumn: 'span 12', padding: 'var(--space-6)' }}>
+                    <div style={{ marginBottom: 'var(--space-6)' }}>
+                        <h3 style={{ fontSize: '18px', fontWeight: 800 }}>Instructional Intensity</h3>
+                        <p style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>Weekly teaching hours investment</p>
                     </div>
-                    <ResponsiveContainer width="100%" height={300}>
-                        <RadarChart data={getBatchRadarData()}>
-                            <PolarGrid stroke="#2a3654" />
-                            <PolarAngleAxis dataKey="subject" stroke="#94a3b8" fontSize={12} />
-                            <PolarRadiusAxis domain={[0, 100]} stroke="#64748b" fontSize={10} />
-                            <Radar name="Attendance" dataKey="Attendance" stroke="#14b8a6" fill="#14b8a6" fillOpacity={0.2} />
-                            <Radar name="Syllabus" dataKey="Syllabus" stroke="#f59e0b" fill="#f59e0b" fillOpacity={0.2} />
-                            <Radar name="Performance" dataKey="Performance" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.2} />
-                            <Legend />
-                            <Tooltip contentStyle={{ background: '#1a2235', border: '1px solid #2a3654', borderRadius: 8, color: '#f1f5f9' }} />
-                        </RadarChart>
-                    </ResponsiveContainer>
-                </div>
-
-                {/* Teaching Hours */}
-                <div className="chart-card">
-                    <div className="chart-card-header">
-                        <div>
-                            <div className="chart-card-title">Teaching Hours</div>
-                            <div className="chart-card-subtitle">Weekly teaching productivity</div>
-                        </div>
+                    <div style={{ height: '280px' }}>
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={getTeachingHours()}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                                <XAxis dataKey="week" stroke="var(--color-text-muted)" fontSize={11} tickLine={false} axisLine={false} />
+                                <YAxis stroke="var(--color-text-muted)" fontSize={11} tickLine={false} axisLine={false} />
+                                <Tooltip cursor={{ fill: 'rgba(255,255,255,0.02)' }} contentStyle={{ background: 'rgba(15, 23, 42, 0.9)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', color: '#fff' }} />
+                                <Bar dataKey="hours" fill="var(--color-primary)" radius={[8, 8, 0, 0]} animationDuration={2000} />
+                            </BarChart>
+                        </ResponsiveContainer>
                     </div>
-                    <ResponsiveContainer width="100%" height={250}>
-                        <BarChart data={getTeachingHours()}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#2a3654" />
-                            <XAxis dataKey="week" stroke="#64748b" fontSize={12} />
-                            <YAxis stroke="#64748b" fontSize={12} />
-                            <Tooltip contentStyle={{ background: '#1a2235', border: '1px solid #2a3654', borderRadius: 8, color: '#f1f5f9' }} />
-                            <Bar dataKey="hours" fill="#a78bfa" radius={[4, 4, 0, 0]} />
-                        </BarChart>
-                    </ResponsiveContainer>
                 </div>
             </div>
         </div>

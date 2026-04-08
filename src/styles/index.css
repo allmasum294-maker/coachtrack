@@ -241,20 +241,49 @@ img {
   50% { transform: translateY(-10px); }
 }
 
-.animate-fade-in { animation: fadeIn var(--transition-base) ease; }
-.animate-fade-in-up { animation: fadeInUp var(--transition-slow) ease; }
-.animate-fade-in-down { animation: fadeInDown var(--transition-slow) ease; }
-.animate-slide-in-left { animation: slideInLeft var(--transition-slow) ease; }
-.animate-slide-in-right { animation: slideInRight var(--transition-slow) ease; }
-.animate-scale-in { animation: scaleIn var(--transition-base) ease; }
-.animate-pulse { animation: pulse 2s infinite; }
-.animate-spin { animation: spin 1s linear infinite; }
-.animate-float { animation: float 3s ease-in-out infinite; }
+/* ============================================
+   Glassmorphism Utilities
+   ============================================ */
+.glass-panel {
+  background: rgba(26, 34, 53, 0.65);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: var(--shadow-xl);
+}
 
-/* Staggered animation delays */
-.stagger-1 { animation-delay: 0.05s; animation-fill-mode: backwards; }
-.stagger-2 { animation-delay: 0.1s; animation-fill-mode: backwards; }
-.stagger-3 { animation-delay: 0.15s; animation-fill-mode: backwards; }
-.stagger-4 { animation-delay: 0.2s; animation-fill-mode: backwards; }
-.stagger-5 { animation-delay: 0.25s; animation-fill-mode: backwards; }
-.stagger-6 { animation-delay: 0.3s; animation-fill-mode: backwards; }
+.glass-card {
+  background: rgba(30, 41, 59, 0.6);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: var(--shadow-md);
+  transition: all var(--transition-base);
+}
+
+.glass-card:hover {
+  background: rgba(30, 41, 59, 0.75);
+  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-2px);
+}
+
+.list-item-hover {
+  transition: all var(--transition-fast);
+}
+
+.list-item-hover:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+[data-theme="light"] .glass-panel {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+[data-theme="light"] .glass-card {
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { LogIn, Mail, Lock, AlertCircle } from 'lucide-react';
+import { LogIn, Mail, Lock, AlertCircle, ShieldCheck, Sparkles } from 'lucide-react';
 
 export default function Login() {
     const [email, setEmail] = useState('');
@@ -11,13 +11,9 @@ export default function Login() {
     const { login } = useAuth();
     const navigate = useNavigate();
 
-    // NOTE: This assumes standard Firebase authentication flow.
-    // We mock the google login function for now if not implemented in AuthContext,
-    // but provide a beautiful UI button as requested.
     async function handleGoogleLogin() {
         setLoading(true);
-        // await loginWithGoogle() -> if implemented in context
-        // For now, this is just the UI implementation as requested.
+        // UI simulation for Google Login
         setTimeout(() => setLoading(false), 1000); 
     }
 
@@ -29,12 +25,13 @@ export default function Login() {
             await login(email, password);
             navigate('/dashboard');
         } catch (err) {
+            console.error('Authentication Error:', err);
             if (err.code === 'auth/invalid-credential') {
-                setError('Invalid email or password.');
+                setError('Invalid credentials detected.');
             } else if (err.code === 'auth/too-many-requests') {
-                setError('Too many attempts. Please try again later.');
+                setError('System lock: Too many attempts. Try later.');
             } else {
-                setError('Login failed. Please try again.');
+                setError('Verification failed. Re-enter data.');
             }
         } finally {
             setLoading(false);
@@ -42,151 +39,129 @@ export default function Login() {
     }
 
     return (
-        <div className="auth-page">
-            <div className="auth-card">
-                <div className="auth-header">
-                    <div
-                        style={{
-                            width: 48,
-                            height: 48,
-                            background: 'linear-gradient(135deg, var(--color-accent), #0d9488)',
-                            borderRadius: 'var(--radius-lg)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            margin: '0 auto var(--space-4)',
-                        }}
-                    >
-                        <LogIn size={24} color="white" />
+        <div className="auth-page" style={{ 
+            background: 'var(--color-bg-primary)',
+            minHeight: '100vh',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '24px',
+            position: 'relative',
+            overflow: 'hidden'
+        }}>
+            {/* Background Mesh */}
+            <div style={{ position: 'absolute', top: '-10%', left: '-10%', width: '50%', height: '50%', background: 'radial-gradient(circle, rgba(59, 130, 246, 0.1) 0%, transparent 70%)', zIndex: 0 }} />
+            <div style={{ position: 'absolute', bottom: '-10%', right: '-10%', width: '50%', height: '50%', background: 'radial-gradient(circle, rgba(16, 185, 129, 0.05) 0%, transparent 70%)', zIndex: 0 }} />
+
+            <div className="glass-card animate-fade-in-up" style={{ 
+                width: '100%', 
+                maxWidth: '440px', 
+                padding: '48px',
+                position: 'relative',
+                zIndex: 1,
+                boxShadow: '0 40px 100px -20px rgba(0,0,0,0.5)'
+            }}>
+                <div className="auth-header" style={{ textAlign: 'center', marginBottom: '40px' }}>
+                    <div style={{ 
+                        width: 64, height: 64, 
+                        background: 'linear-gradient(135deg, var(--color-primary), #10b981)',
+                        borderRadius: '18px',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        margin: '0 auto 24px', color: 'white',
+                        boxShadow: '0 12px 24px rgba(59, 130, 246, 0.3)'
+                    }}>
+                        <ShieldCheck size={32} />
                     </div>
-                    <h1>Welcome Back</h1>
-                    <p>Login to access your coaching dashboard</p>
+                    <h1 style={{ fontSize: '28px', fontWeight: 900, marginBottom: '8px', letterSpacing: '-0.02em' }}>Identity Verification</h1>
+                    <p style={{ color: 'var(--color-text-muted)', fontSize: '15px', fontWeight: 500 }}>Access your secure coaching frequency</p>
                 </div>
 
                 {error && (
-                    <div
-                        style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 'var(--space-2)',
-                            padding: 'var(--space-3) var(--space-4)',
-                            background: 'var(--color-danger-soft)',
-                            color: 'var(--color-danger)',
-                            borderRadius: 'var(--radius-md)',
-                            fontSize: 'var(--font-size-sm)',
-                            marginBottom: 'var(--space-4)',
-                        }}
-                    >
-                        <AlertCircle size={16} />
+                    <div className="animate-shake" style={{ 
+                        display: 'flex', alignItems: 'center', gap: '12px', 
+                        padding: '16px', background: 'rgba(239, 68, 68, 0.1)', 
+                        color: '#ef4444', borderRadius: '12px', 
+                        fontSize: '13px', fontWeight: 700, marginBottom: '24px',
+                        border: '1px solid rgba(239, 68, 68, 0.2)'
+                    }}>
+                        <AlertCircle size={18} />
                         {error}
                     </div>
                 )}
 
-                <form className="auth-form" onSubmit={handleSubmit}>
+                <form className="auth-form" onSubmit={handleSubmit} style={{ display: 'grid', gap: '20px' }}>
                     <div className="form-group">
-                        <label className="form-label">Email</label>
+                        <label className="form-label" style={{ fontSize: '12px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-muted)', marginBottom: '8px', display: 'block' }}>Teacher Signal (Email)</label>
                         <div style={{ position: 'relative' }}>
-                            <Mail
-                                size={18}
-                                style={{
-                                    position: 'absolute',
-                                    left: 12,
-                                    top: '50%',
-                                    transform: 'translateY(-50%)',
-                                    color: 'var(--color-text-muted)',
-                                }}
-                            />
+                            <Mail size={18} style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }} />
                             <input
                                 className="form-input"
                                 type="email"
-                                placeholder="your@email.com"
+                                placeholder="Enter your email"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 required
-                                style={{ paddingLeft: 40 }}
+                                style={{ paddingLeft: '48px', height: '52px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)' }}
                             />
                         </div>
                     </div>
 
                     <div className="form-group">
-                        <label className="form-label">Password</label>
+                        <label className="form-label" style={{ fontSize: '12px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-muted)', marginBottom: '8px', display: 'block' }}>Access Key (Password)</label>
                         <div style={{ position: 'relative' }}>
-                            <Lock
-                                size={18}
-                                style={{
-                                    position: 'absolute',
-                                    left: 12,
-                                    top: '50%',
-                                    transform: 'translateY(-50%)',
-                                    color: 'var(--color-text-muted)',
-                                }}
-                            />
+                            <Lock size={18} style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }} />
                             <input
                                 className="form-input"
                                 type="password"
-                                placeholder="Enter your password"
+                                placeholder="••••••••"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 required
-                                style={{ paddingLeft: 40 }}
+                                style={{ paddingLeft: '48px', height: '52px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)' }}
                             />
                         </div>
                     </div>
 
                     <button
                         type="submit"
-                        className="btn btn-primary btn-lg"
+                        className="btn btn-primary"
                         disabled={loading}
-                        style={{ width: '100%', marginTop: 'var(--space-2)' }}
+                        style={{ width: '100%', height: '52px', borderRadius: '12px', fontWeight: 900, fontSize: '15px', marginTop: '8px', boxShadow: '0 15px 30px -5px rgba(59, 130, 246, 0.4)' }}
                     >
-                        {loading ? (
-                            <span className="loading-spinner" style={{ width: 20, height: 20 }} />
-                        ) : (
-                            'Login'
-                        )}
+                        {loading ? <span className="loading-spinner" style={{ width: 20, height: 20 }} /> : 'ESTABLISH LINK'}
                     </button>
                 </form>
 
-                <div style={{ marginTop: 'var(--space-6)', textAlign: 'center' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', margin: 'var(--space-4) 0' }}>
-                        <div style={{ flex: 1, height: '1px', background: 'var(--color-border)' }}></div>
-                        <span style={{ padding: '0 var(--space-3)', color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)' }}>OR</span>
-                        <div style={{ flex: 1, height: '1px', background: 'var(--color-border)' }}></div>
+                <div style={{ marginTop: '32px', textAlign: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
+                        <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.05)' }} />
+                        <span style={{ color: 'var(--color-text-muted)', fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em' }}>OR CLONE SIGN-IN</span>
+                        <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.05)' }} />
                     </div>
-                    
-                    <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-3)' }}>
-                        CoachTrack wants to login with Google
-                    </p>
                     
                     <button 
                         type="button" 
                         onClick={handleGoogleLogin}
                         className="btn" 
                         style={{ 
-                            width: '100%', 
-                            background: 'white', 
-                            color: '#333', 
-                            border: '1px solid #ddd',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: 'var(--space-2)',
-                            boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+                            width: '100%', height: '52px', background: 'white', color: '#000', 
+                            borderRadius: '12px', display: 'flex', alignItems: 'center', 
+                            justifyContent: 'center', gap: '12px', fontWeight: 800, fontSize: '14px',
+                            transition: 'all 0.3s ease'
                         }}
                     >
-                        <svg width="18" height="18" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+                        <svg width="20" height="20" viewBox="0 0 48 48">
                             <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
                             <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
                             <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
                             <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
                         </svg>
-                        Sign in with Google
+                        Google Authorization
                     </button>
-                </div>
-
-                <div className="auth-footer" style={{ marginTop: 'var(--space-6)' }}>
-                    Don't have an account?{' '}
-                    <Link to="/register">Register here</Link>
+                    
+                    <p style={{ marginTop: '32px', color: 'var(--color-text-muted)', fontSize: '14px', fontWeight: 600 }}>
+                        New to the cluster? <Link to="/register" style={{ color: 'var(--color-primary)', fontWeight: 900 }}>CREATE ACCOUNT</Link>
+                    </p>
                 </div>
             </div>
         </div>

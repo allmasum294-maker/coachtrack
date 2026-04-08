@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { collection, query, where, getDocs, addDoc, updateDoc, doc, serverTimestamp, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs, updateDoc, doc } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { Bell, CheckCircle, AlertCircle, Calendar, Info, Settings, Check } from 'lucide-react';
+import { Bell, CheckCircle, AlertCircle, Calendar, Info, Check, Sparkles } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
 export default function Notifications() {
@@ -27,7 +27,7 @@ export default function Notifications() {
                 return db2 - da;
             }));
         } catch (err) {
-            console.error('Error:', err);
+            console.error('Core Signaling Error:', err);
         } finally {
             setLoading(false);
         }
@@ -40,7 +40,7 @@ export default function Notifications() {
                 prev.map((n) => (n.id === notificationId ? { ...n, isRead: true } : n))
             );
         } catch (err) {
-            console.error('Error:', err);
+            console.error('Signal Update Error:', err);
         }
     }
 
@@ -52,7 +52,7 @@ export default function Notifications() {
             );
             setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
         } catch (err) {
-            console.error('Error:', err);
+            console.error('Global Signal Reset Error:', err);
         }
     }
 
@@ -65,12 +65,12 @@ export default function Notifications() {
         }
     }
 
-    function getIconColor(type) {
+    function getThemeColor(type) {
         switch (type) {
-            case 'schedule': return { bg: 'var(--color-info-soft)', color: 'var(--color-info)' };
-            case 'attendance': return { bg: 'var(--color-warning-soft)', color: 'var(--color-warning)' };
-            case 'success': return { bg: 'var(--color-success-soft)', color: 'var(--color-success)' };
-            default: return { bg: 'var(--color-accent-soft)', color: 'var(--color-accent)' };
+            case 'schedule': return '#3b82f6';
+            case 'attendance': return '#f59e0b';
+            case 'success': return '#10b981';
+            default: return 'var(--color-primary)';
         }
     }
 
@@ -84,61 +84,87 @@ export default function Notifications() {
 
     return (
         <div className="animate-fade-in">
-            <div className="page-header">
+            <div className="page-header" style={{ marginBottom: 'var(--space-8)' }}>
                 <div>
-                    <h1 className="page-title">Notifications</h1>
-                    <p className="page-subtitle">
-                        {unreadCount > 0 ? `${unreadCount} unread notification${unreadCount > 1 ? 's' : ''}` : 'All caught up!'}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                        <div style={{ padding: '4px 10px', background: 'rgba(59, 130, 246, 0.1)', color: 'var(--color-primary)', borderRadius: '8px', fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Communication Hub</div>
+                    </div>
+                    <h1 className="page-title" style={{ fontSize: '32px', fontWeight: 900 }}>Notifications</h1>
+                    <p className="page-subtitle" style={{ color: unreadCount > 0 ? 'var(--color-primary)' : 'var(--color-text-muted)', fontWeight: 600 }}>
+                        {unreadCount > 0 ? `${unreadCount} Pending Signals` : 'System Synchronized: All clear'}
                     </p>
                 </div>
                 {unreadCount > 0 && (
-                    <button className="btn btn-secondary" onClick={markAllRead}>
-                        <Check size={16} /> Mark All Read
+                    <button className="btn btn-primary" onClick={markAllRead} style={{ padding: '0 24px', height: '44px', fontWeight: 900, boxShadow: '0 8px 20px rgba(59, 130, 246, 0.2)' }}>
+                        <Check size={16} /> CLEAR ALL
                     </button>
                 )}
             </div>
 
-            <div className="tabs">
-                <button className={`tab ${tab === 'all' ? 'active' : ''}`} onClick={() => setTab('all')}>
-                    All ({notifications.length})
+            <div className="glass-panel" style={{ padding: '6px', marginBottom: 'var(--space-8)', display: 'inline-flex', gap: '6px', background: 'rgba(255, 255, 255, 0.03)' }}>
+                <button className={`tab ${tab === 'all' ? 'active' : ''}`} onClick={() => setTab('all')} style={{ padding: '10px 20px', borderRadius: '10px', fontSize: '13px', fontWeight: 800 }}>
+                    Chronicle ({notifications.length})
                 </button>
-                <button className={`tab ${tab === 'unread' ? 'active' : ''}`} onClick={() => setTab('unread')}>
-                    Unread ({unreadCount})
+                <button className={`tab ${tab === 'unread' ? 'active' : ''}`} onClick={() => setTab('unread')} style={{ padding: '10px 20px', borderRadius: '10px', fontSize: '13px', fontWeight: 800 }}>
+                    Critical {unreadCount > 0 && <span className="badge badge-red" style={{ marginLeft: '8px', fontSize: '10px' }}>{unreadCount}</span>}
                 </button>
             </div>
 
             {filteredNotifications.length === 0 ? (
-                <div className="card">
-                    <div className="empty-state">
-                        <Bell size={48} className="empty-state-icon" />
-                        <div className="empty-state-title">
-                            {tab === 'unread' ? 'No unread notifications' : 'No notifications yet'}
-                        </div>
-                        <div className="empty-state-text">
-                            Notifications about your classes, attendance, and schedules will appear here.
-                        </div>
+                <div className="glass-card" style={{ padding: '100px 0', textAlign: 'center' }}>
+                    <div style={{ width: '100px', height: '100px', background: 'rgba(255,255,255,0.03)', color: 'var(--color-text-muted)', borderRadius: '50%', margin: '0 auto 24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Bell size={40} opacity={0.3} />
                     </div>
+                    <h3 style={{ fontSize: '22px', fontWeight: 900 }}>Signal Silence</h3>
+                    <p style={{ color: 'var(--color-text-muted)', maxWidth: '340px', margin: '8px auto', fontWeight: 500 }}>No telemetry or event triggers found in this frequency segment.</p>
                 </div>
             ) : (
-                <div className="notification-list">
-                    {filteredNotifications.map((notif) => {
-                        const iconStyle = getIconColor(notif.type);
+                <div style={{ display: 'grid', gap: '12px' }}>
+                    {filteredNotifications.map((notif, i) => {
+                        const accent = getThemeColor(notif.type);
                         const timeAgo = notif.createdAt?.toDate
                             ? formatDistanceToNow(notif.createdAt.toDate(), { addSuffix: true })
                             : 'recently';
                         return (
                             <div
                                 key={notif.id}
-                                className={`notification-item ${!notif.isRead ? 'unread' : ''}`}
+                                className={`glass-panel hover-lift animate-fade-in-up ${!notif.isRead ? 'unread' : ''}`}
                                 onClick={() => !notif.isRead && markAsRead(notif.id)}
+                                style={{ 
+                                    padding: '24px', 
+                                    display: 'flex', 
+                                    gap: '24px', 
+                                    cursor: notif.isRead ? 'default' : 'pointer',
+                                    borderLeft: `5px solid ${notif.isRead ? 'transparent' : accent}`,
+                                    background: notif.isRead ? 'rgba(255,255,255,0.01)' : 'rgba(255,255,255,0.03)',
+                                    animationDelay: `${i * 0.05}s`
+                                }}
                             >
-                                <div className="notification-item-icon" style={{ background: iconStyle.bg, color: iconStyle.color }}>
+                                <div style={{ 
+                                    width: '48px', height: '48px', borderRadius: '14px', 
+                                    background: `${accent}15`, color: accent,
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    flexShrink: 0
+                                }}>
                                     {getIcon(notif.type)}
                                 </div>
-                                <div className="notification-item-content">
-                                    <div className="notification-item-title">{notif.title}</div>
-                                    <div className="notification-item-text">{notif.message}</div>
-                                    <div className="notification-item-time">{timeAgo}</div>
+                                <div style={{ flex: 1 }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
+                                        <div style={{ fontWeight: 800, fontSize: '16px', color: notif.isRead ? 'var(--color-text-primary)' : accent }}>
+                                            {notif.title}
+                                        </div>
+                                        <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                            {timeAgo}
+                                        </div>
+                                    </div>
+                                    <div style={{ fontSize: '14px', color: 'var(--color-text-muted)', lineHeight: 1.6, fontWeight: 500 }}>
+                                        {notif.message}
+                                    </div>
+                                    {!notif.isRead && (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '12px', color: accent, fontSize: '11px', fontWeight: 900, textTransform: 'uppercase' }}>
+                                            <Sparkles size={12} /> New Transmission
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         );

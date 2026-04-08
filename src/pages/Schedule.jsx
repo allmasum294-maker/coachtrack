@@ -5,11 +5,16 @@ import {
     collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, Timestamp,
 } from 'firebase/firestore';
 import { db } from '../services/firebase';
+import { batchService } from '../services/batchService';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
-import { Plus, X, Calendar as CalIcon, Clock, AlertCircle, RefreshCw, Info } from 'lucide-react';
+import { 
+    Plus, X, Calendar as CalIcon, Clock, AlertCircle, 
+    RefreshCw, Info, CheckCircle2, CalendarDays, 
+    Calendar as CalendarIcon, Filter, Layers, ChevronRight
+} from 'lucide-react';
 import { format, eachDayOfInterval, getDay } from 'date-fns';
 import toast from 'react-hot-toast';
 
@@ -50,16 +55,19 @@ export default function Schedule() {
 
     async function loadData() {
         try {
-            const [schedSnap, batchSnap, studentSnap, examSnap, sessionLogSnap, hwSnap] = await Promise.all([
+            // Only load active batches for the calendar view
+            const activeBatches = await batchService.getBatches(currentUser.uid, true);
+            setBatches(activeBatches);
+
+            const [schedSnap, studentSnap, examSnap, sessionLogSnap, hwSnap] = await Promise.all([
                 getDocs(query(collection(db, 'schedules'), where('teacherId', '==', currentUser.uid))),
-                getDocs(query(collection(db, 'batches'), where('teacherId', '==', currentUser.uid))),
-                getDocs(query(collection(db, 'students'), where('teacherId', '==', currentUser.uid))),
+                getDocs(query(collection(db, 'students'), where('teacherId', '==', currentUser.uid), where('status', '==', 'enrolled'))),
                 getDocs(query(collection(db, 'exams'), where('teacherId', '==', currentUser.uid))),
                 getDocs(query(collection(db, 'sessionLogs'), where('teacherId', '==', currentUser.uid))),
                 getDocs(query(collection(db, 'homeworks'), where('teacherId', '==', currentUser.uid))),
             ]);
+
             setSchedules(schedSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
-            setBatches(batchSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
             setStudents(studentSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
             setExams(examSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
             setSessionLogs(sessionLogSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
@@ -72,17 +80,16 @@ export default function Schedule() {
     }
 
     function getCalendarEvents() {
-        // Build a set of schedule IDs that have session logs
         const loggedScheduleIds = new Set(sessionLogs.filter(l => l.scheduleId).map(l => l.scheduleId));
 
         const classEvents = schedules
             .filter(s => !filterBatch || s.batchId === filterBatch)
             .map((s) => {
                 const dateStr = s.date?.toDate ? format(s.date.toDate(), 'yyyy-MM-dd') : s.date;
-                let color = '#3b82f6'; // Blue for scheduled
-                if (s.status === 'completed') color = '#10b981'; // Green
-                if (s.status === 'cancelled') color = '#ef4444'; // Red
-                if (s.status === 'rescheduled') color = '#f59e0b'; // Amber
+                let color = '#3b82f6'; 
+                if (s.status === 'completed') color = '#14b8a6'; 
+                if (s.status === 'cancelled') color = '#ef4444'; 
+                if (s.status === 'rescheduled') color = '#f59e0b'; 
 
                 return {
                     id: s.id,
@@ -90,7 +97,7 @@ export default function Schedule() {
                     start: `${dateStr}T${s.startTime || '00:00:00'}`,
                     end: `${dateStr}T${s.endTime || '23:59:59'}`,
                     backgroundColor: color,
-                    borderColor: color,
+                    borderColor: 'transparent',
                     extendedProps: { schedule: s, type: 'class' },
                 };
             });
@@ -99,7 +106,7 @@ export default function Schedule() {
             .filter(e => !filterBatch || e.batchId === filterBatch)
             .map((e) => {
                 const dateStr = e.date?.toDate ? format(e.date.toDate(), 'yyyy-MM-dd') : e.date;
-                const color = '#8b5cf6'; // Violet/Purple for Exams
+                const color = '#8b5cf6'; 
 
                 return {
                     id: `exam-${e.id}`,
@@ -107,44 +114,42 @@ export default function Schedule() {
                     start: `${dateStr}T${e.startTime || '00:00:00'}`,
                     end: `${dateStr}T${e.endTime || '23:59:59'}`,
                     backgroundColor: color,
-                    borderColor: color,
+                    borderColor: 'transparent',
                     extendedProps: { exam: e, type: 'exam' },
                 };
             });
 
-        // Session log events (only for logs NOT already linked to a schedule that is shown)
         const sessionLogEvents = sessionLogs
             .filter(l => !filterBatch || l.batchId === filterBatch)
             .filter(l => !l.scheduleId || !loggedScheduleIds.has(l.scheduleId))
             .map((l) => {
                 const dateStr = l.date?.toDate ? format(l.date.toDate(), 'yyyy-MM-dd') : l.date;
-                const color = '#f97316'; // Orange for session logs
+                const color = '#f97316'; 
                 return {
                     id: `log-${l.id}`,
                     title: `LOG: ${l.batchName || ''} — ${l.topicsCovered || 'Session'}`,
                     start: `${dateStr}T00:00:00`,
                     end: `${dateStr}T23:59:59`,
                     backgroundColor: color,
-                    borderColor: color,
+                    borderColor: 'transparent',
                     extendedProps: { sessionLog: l, type: 'sessionLog' },
                 };
             });
 
-        // Homework Events
         const homeworkEvents = homeworks
             .filter(hw => !filterBatch || hw.batchId === filterBatch)
             .filter(hw => hw.dueDate)
             .map((hw) => {
                 const dateStr = hw.dueDate?.toDate ? format(hw.dueDate.toDate(), 'yyyy-MM-dd') : hw.dueDate;
                 const batchMsg = batches.find(b => b.id === hw.batchId)?.name || '';
-                const color = '#ec4899'; // Pink for Homework
+                const color = '#ec4899'; 
                 return {
                     id: `hw-${hw.id}`,
                     title: `HW DUE: ${hw.title}`,
-                    start: `${dateStr}T23:59:59`, // Homework typically due end of day
+                    start: `${dateStr}T23:59:59`,
                     allDay: true,
                     backgroundColor: color,
-                    borderColor: color,
+                    borderColor: 'transparent',
                     extendedProps: { homework: hw, batchName: batchMsg, type: 'homework' },
                 };
             });
@@ -253,8 +258,10 @@ export default function Schedule() {
             }
             setShowModal(false);
             loadData();
+            toast.success(editingSchedule ? 'Schedule updated' : 'Class scheduled');
         } catch (err) {
             console.error('Error saving schedule:', err);
+            toast.error('Failed to save schedule');
         }
     }
 
@@ -264,6 +271,7 @@ export default function Schedule() {
             await deleteDoc(doc(db, 'schedules', editingSchedule.id));
             setShowModal(false);
             loadData();
+            toast.success('Schedule deleted');
         } catch (err) {
             console.error('Error deleting schedule:', err);
         }
@@ -349,7 +357,6 @@ export default function Schedule() {
                 date: Timestamp.fromDate(new Date(format(newDate, 'yyyy-MM-dd')))
             };
             
-            // Only update time if it was dropped on a time slot
             if (!event.allDay) {
                 updateData.startTime = format(newDate, 'HH:mm');
                 if (event.end) {
@@ -404,13 +411,11 @@ export default function Schedule() {
         }
     }
 
-    if (loading) {
-        return <div className="loading-page"><div className="loading-spinner" /></div>;
-    }
+    if (loading) return <div className="loading-page"><div className="loading-spinner" /></div>;
 
     const calendarLegend = [
         { color: '#3b82f6', label: 'Scheduled' },
-        { color: '#10b981', label: 'Completed' },
+        { color: '#14b8a6', label: 'Completed' },
         { color: '#ef4444', label: 'Cancelled' },
         { color: '#f59e0b', label: 'Rescheduled' },
         { color: '#8b5cf6', label: 'Exam' },
@@ -419,123 +424,146 @@ export default function Schedule() {
     ];
 
     return (
-        <div className="animate-fade-in">
-            <div className="page-header">
+        <div className="animate-fade-in" style={{ paddingBottom: 'var(--space-12)' }}>
+            <div className="page-header" style={{ marginBottom: 'var(--space-8)' }}>
                 <div>
-                    <h1 className="page-title">Schedule</h1>
-                    <p className="page-subtitle">Manage your class schedule and calendar</p>
-                </div>
-                <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-                    <button className="btn btn-secondary" onClick={() => openRecurringCreate()}>
-                        <RefreshCw size={18} /> Create Recurring
-                    </button>
-                    <button className="btn btn-primary" onClick={() => openCreate()}>
-                        <Plus size={18} /> Schedule Class
-                    </button>
-                </div>
-            </div>
-
-            {/* Batch Filter + Color Legend */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--space-4)', marginBottom: 'var(--space-4)', flexWrap: 'wrap' }}>
-                <select className="form-select" style={{ width: 240 }} value={filterBatch} onChange={(e) => setFilterBatch(e.target.value)}>
-                    <option value="">All Batches</option>
-                    {batches.map((b) => (<option key={b.id} value={b.id}>{b.name}</option>))}
-                </select>
-                <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap', alignItems: 'center' }}>
-                    {calendarLegend.map(item => (
-                        <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
-                            <div style={{ width: 10, height: 10, borderRadius: 'var(--radius-full)', background: item.color }} />
-                            {item.label}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                        <div style={{ padding: '8px', background: 'rgba(59, 130, 246, 0.1)', color: 'var(--color-primary)', borderRadius: '12px' }}>
+                            <CalendarIcon size={24} />
                         </div>
-                    ))}
+                        <h1 className="page-title" style={{ margin: 0 }}>Operations Timeline</h1>
+                    </div>
+                    <p className="page-subtitle">Personalised view of classes, exams and deadlines</p>
+                </div>
+                <div style={{ display: 'flex', gap: 'var(--space-4)' }}>
+                    <button className="btn btn-secondary" onClick={() => openRecurringCreate()} style={{ height: '48px', padding: '0 24px', borderRadius: '14px', fontWeight: 700 }}>
+                        <RefreshCw size={18} /> Batch Recurring
+                    </button>
+                    <button className="btn btn-primary" onClick={() => openCreate()} style={{ height: '48px', padding: '0 24px', borderRadius: '14px', fontWeight: 800, boxShadow: '0 10px 20px -5px rgba(59, 130, 246, 0.3)' }}>
+                        <Plus size={20} /> New Segment
+                    </button>
                 </div>
             </div>
 
-            <div className="card" style={{ padding: 'var(--space-4)' }}>
-                <FullCalendar
-                    plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-                    initialView="dayGridMonth"
-                    headerToolbar={{
-                        left: 'prev,next today',
-                        center: 'title',
-                        right: 'dayGridMonth,timeGridWeek',
-                    }}
-                    events={getCalendarEvents()}
-                    dateClick={(info) => openCreate(info.dateStr)}
-                    eventClick={(info) => {
-                        const props = info.event.extendedProps;
-                        if (props.type === 'sessionLog') {
-                            navigate(`/sessions?batchId=${props.sessionLog.batchId || ''}`);
-                            return;
-                        }
-                        
-                        let eventData;
-                        if (props.type === 'exam') eventData = props.exam;
-                        else if (props.type === 'homework') eventData = props.homework;
-                        else eventData = props.schedule;
-
-                        setSelectedEvent({ 
-                            ...eventData, 
-                            displayType: props.type,
-                            displayBatchName: props.batchName // used for homework 
-                        });
-                        setShowQuickView(true);
-                    }}
-                    editable={true}
-                    eventDrop={handleEventDrop}
-                    eventResize={handleEventResize}
-                    height="auto"
-                    aspectRatio={1.8}
-                />
+            <div className="glass-panel" style={{ padding: 'var(--space-6)', marginBottom: 'var(--space-8)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--space-8)', flexWrap: 'wrap', background: 'rgba(255, 255, 255, 0.02)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-6)', flex: 1, minWidth: '300px' }}>
+                    <div className="form-group" style={{ marginBottom: 0, minWidth: '280px' }}>
+                        <label className="form-label" style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 900, color: 'var(--color-primary)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Filter size={14} /> Batch Stream
+                        </label>
+                        <select className="form-select" value={filterBatch} onChange={(e) => setFilterBatch(e.target.value)} style={{ height: '48px', borderRadius: '12px', background: 'rgba(255, 255, 255, 0.04)', fontWeight: 700 }}>
+                            <option value="">All Operational Streams</option>
+                            {batches.map((b) => (<option key={b.id} value={b.id}>{b.name}</option>))}
+                        </select>
+                    </div>
+                    <div style={{ width: '1px', height: '40px', background: 'rgba(255, 255, 255, 0.05)' }} />
+                    <div style={{ display: 'flex', gap: 'var(--space-5)', flexWrap: 'wrap', alignItems: 'center' }}>
+                        <div style={{ fontSize: '11px', fontWeight: 900, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginRight: '4px' }}>Legend:</div>
+                        {calendarLegend.map(item => (
+                            <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', fontWeight: 700, color: 'var(--color-text-secondary)' }}>
+                                <div style={{ width: 10, height: 10, borderRadius: '3px', background: item.color, boxShadow: `0 0 10px ${item.color}40` }} />
+                                {item.label}
+                            </div>
+                        ))}
+                    </div>
+                </div>
             </div>
 
-            {/* Modal */}
+            <div className="glass-card" style={{ padding: 'var(--space-6)', borderRadius: '24px', background: 'rgba(255, 255, 255, 0.01)', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                <div className="calendar-styles-override">
+                    <FullCalendar
+                        plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+                        initialView="dayGridMonth"
+                        headerToolbar={{
+                            left: 'prev,next today',
+                            center: 'title',
+                            right: 'dayGridMonth,timeGridWeek',
+                        }}
+                        events={getCalendarEvents()}
+                        dateClick={(info) => openCreate(info.dateStr)}
+                        eventClick={(info) => {
+                            const props = info.event.extendedProps;
+                            if (props.type === 'sessionLog') {
+                                navigate(`/sessions?batchId=${props.sessionLog.batchId || ''}`);
+                                return;
+                            }
+                            
+                            let eventData;
+                            if (props.type === 'exam') eventData = props.exam;
+                            else if (props.type === 'homework') eventData = props.homework;
+                            else eventData = props.schedule;
+
+                            setSelectedEvent({ 
+                                ...eventData, 
+                                displayType: props.type,
+                                displayBatchName: props.batchName 
+                            });
+                            setShowQuickView(true);
+                        }}
+                        editable={true}
+                        eventDrop={handleEventDrop}
+                        eventResize={handleEventResize}
+                        height="auto"
+                        aspectRatio={1.8}
+                        dayMaxEventRows={true}
+                        moreLinkContent={(args) => `+${args.num} more`}
+                    />
+                </div>
+            </div>
+
+            {/* Main Modal */}
             {showModal && (
-                <div className="modal-overlay" onClick={() => setShowModal(false)}>
-                    <div className="modal" onClick={(e) => e.stopPropagation()}>
-                        <div className="modal-header">
-                            <h2 className="modal-title">{editingSchedule ? 'Edit Class' : 'Schedule New Class'}</h2>
-                            <button className="btn btn-ghost btn-icon" onClick={() => setShowModal(false)}>
-                                <X size={20} />
-                            </button>
+                <div className="modal-overlay" onClick={() => setShowModal(false)} style={{ backdropFilter: 'blur(10px)' }}>
+                    <div className="modal glass-panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520, borderRadius: '28px', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                        <div className="modal-header" style={{ padding: '32px', borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                <div style={{ padding: '8px', background: 'rgba(59, 130, 246, 0.1)', color: 'var(--color-primary)', borderRadius: '10px' }}>
+                                    <Layers size={20} />
+                                </div>
+                                <h2 className="modal-title" style={{ fontSize: '22px', fontWeight: 900 }}>{editingSchedule ? 'Edit Timeline Segment' : 'Schedule New Segment'}</h2>
+                            </div>
+                            <button className="btn btn-ghost btn-icon" onClick={() => setShowModal(false)} style={{ borderRadius: '12px' }}><X size={22} /></button>
                         </div>
                         <form onSubmit={handleSave}>
-                            <div className="modal-body">
+                            <div className="modal-body" style={{ padding: '32px', gap: '24px' }}>
                                 <div className="form-group">
-                                    <label className="form-label">Class Title</label>
-                                    <input className="form-input" placeholder="e.g., Class 9 English" value={form.title}
-                                        onChange={(e) => setForm({ ...form, title: e.target.value })} />
-                                </div>
-                                <div className="form-group">
-                                    <label className="form-label">Batch</label>
-                                    <select className="form-select" value={form.batchId}
+                                    <label className="form-label" style={{ fontWeight: 800, fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-primary)' }}>Target Operational Stream *</label>
+                                    <select className="form-select" value={form.batchId} required style={{ height: '52px', borderRadius: '14px', fontWeight: 700 }}
                                         onChange={(e) => setForm({ ...form, batchId: e.target.value, title: batches.find(b => b.id === e.target.value)?.name || form.title })}>
-                                        <option value="">Select Batch</option>
+                                        <option value="">Select Stream...</option>
                                         {batches.map((b) => (
                                             <option key={b.id} value={b.id}>{b.name}</option>
                                         ))}
                                     </select>
                                 </div>
                                 <div className="form-group">
-                                    <label className="form-label">Date</label>
-                                    <input className="form-input" type="date" value={form.date}
-                                        onChange={(e) => setForm({ ...form, date: e.target.value })} required />
+                                    <label className="form-label" style={{ fontWeight: 800, fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-primary)' }}>Segment Designation</label>
+                                    <input className="form-input" placeholder="e.g., Weekly Math Session" value={form.title} style={{ height: '52px', borderRadius: '14px', fontWeight: 700 }}
+                                        onChange={(e) => setForm({ ...form, title: e.target.value })} />
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label" style={{ fontWeight: 800, fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-primary)' }}>Execution Date</label>
+                                    <div style={{ position: 'relative' }}>
+                                        <input className="form-input" type="date" value={form.date} style={{ height: '52px', borderRadius: '14px', fontWeight: 700, paddingLeft: '48px' }}
+                                            onChange={(e) => setForm({ ...form, date: e.target.value })} required />
+                                        <CalendarDays size={18} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }} />
+                                    </div>
                                 </div>
                                 <div className="form-row">
                                     <div className="form-group">
-                                        <label className="form-label">Start Time</label>
-                                        <input className="form-input" type="time" value={form.startTime}
+                                        <label className="form-label" style={{ fontWeight: 800, fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-primary)' }}>Commencement</label>
+                                        <input className="form-input" type="time" value={form.startTime} style={{ height: '52px', borderRadius: '14px', fontWeight: 700 }}
                                             onChange={(e) => setForm({ ...form, startTime: e.target.value })} />
                                     </div>
                                     <div className="form-group">
-                                        <label className="form-label">End Time</label>
-                                        <input className="form-input" type="time" value={form.endTime}
+                                        <label className="form-label" style={{ fontWeight: 800, fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-primary)' }}>Completion</label>
+                                        <input className="form-input" type="time" value={form.endTime} style={{ height: '52px', borderRadius: '14px', fontWeight: 700 }}
                                             onChange={(e) => setForm({ ...form, endTime: e.target.value })} />
                                     </div>
                                 </div>
                                 <div className="form-group">
-                                    <label className="form-label">Status</label>
-                                    <select className="form-select" value={form.status}
+                                    <label className="form-label" style={{ fontWeight: 800, fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-primary)' }}>Clearance Status</label>
+                                    <select className="form-select" value={form.status} style={{ height: '52px', borderRadius: '14px', fontWeight: 700 }}
                                         onChange={(e) => setForm({ ...form, status: e.target.value })}>
                                         <option value="scheduled">Scheduled</option>
                                         <option value="cancelled">Cancelled</option>
@@ -544,62 +572,76 @@ export default function Schedule() {
                                     </select>
                                 </div>
                                 <div className="form-group">
-                                    <label className="form-label">Notes</label>
-                                    <textarea className="form-textarea" value={form.notes}
-                                        onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2} />
+                                    <label className="form-label" style={{ fontWeight: 800, fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-primary)' }}>Operational Intelligence</label>
+                                    <textarea className="form-textarea" value={form.notes} style={{ borderRadius: '16px', padding: '16px', fontWeight: 600 }}
+                                        onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={3} placeholder="Add specific operational directives..." />
                                 </div>
                             </div>
-                            <div className="modal-footer">
+                            <div className="modal-footer" style={{ padding: '24px 32px 32px', border: 'none', background: 'rgba(255, 255, 255, 0.02)' }}>
                                 {editingSchedule && (
-                                    <div style={{ marginRight: 'auto', display: 'flex', gap: 'var(--space-2)' }}>
-                                        <button type="button" className="btn btn-danger" onClick={handleDelete}>
-                                            Delete
+                                    <div style={{ marginRight: 'auto', display: 'flex', gap: 'var(--space-3)' }}>
+                                        <button type="button" className="btn btn-danger" onClick={handleDelete} style={{ borderRadius: '12px', height: '48px', padding: '0 20px', fontWeight: 700 }}>
+                                            Purge
                                         </button>
-                                        <button type="button" className="btn btn-secondary" onClick={openCompleteSession}>
-                                            Complete Session & Attendance
+                                        <button type="button" className="btn btn-secondary" onClick={openCompleteSession} style={{ borderRadius: '12px', height: '48px', padding: '0 20px', fontWeight: 700 }}>
+                                            Finalize & Track
                                         </button>
                                     </div>
                                 )}
-                                <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
-                                <button type="submit" className="btn btn-primary">{editingSchedule ? 'Save' : 'Schedule'}</button>
+                                <button type="button" className="btn btn-ghost" onClick={() => setShowModal(false)} style={{ height: '48px', fontWeight: 700 }}>Cancel</button>
+                                <button type="submit" className="btn btn-primary" style={{ height: '48px', padding: '0 32px', borderRadius: '14px', fontWeight: 800 }}>
+                                    {editingSchedule ? 'Update Timeline' : 'Commit Schedule'}
+                                </button>
                             </div>
                         </form>
                     </div>
                 </div>
             )}
+
             {/* Recurring Modal */}
             {showRecurringModal && (
-                <div className="modal-overlay" onClick={() => setShowRecurringModal(false)}>
-                    <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 600 }}>
-                        <div className="modal-header">
-                            <h2 className="modal-title">Schedule Recurring Classes</h2>
-                            <button className="btn btn-ghost btn-icon" onClick={() => setShowRecurringModal(false)}>
-                                <X size={20} />
-                            </button>
+                <div className="modal-overlay" onClick={() => setShowRecurringModal(false)} style={{ backdropFilter: 'blur(10px)' }}>
+                    <div className="modal glass-panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 620, borderRadius: '28px' }}>
+                        <div className="modal-header" style={{ padding: '32px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                <div style={{ padding: '8px', background: 'rgba(59, 130, 246, 0.1)', color: 'var(--color-primary)', borderRadius: '10px' }}>
+                                    <RefreshCw size={20} />
+                                </div>
+                                <h2 className="modal-title" style={{ fontSize: '22px', fontWeight: 900 }}>Streaming Recursion Setup</h2>
+                            </div>
+                            <button className="btn btn-ghost btn-icon" onClick={() => setShowRecurringModal(false)}><X size={22} /></button>
                         </div>
                         <form onSubmit={handleSaveRecurring}>
-                            <div className="modal-body">
+                            <div className="modal-body" style={{ padding: '32px', gap: '24px' }}>
                                 <div className="form-group">
-                                    <label className="form-label">Title (Optional)</label>
-                                    <input className="form-input" placeholder="e.g., Weekly Math" value={recurringForm.title} onChange={(e) => setRecurringForm({...recurringForm, title: e.target.value})} />
-                                </div>
-                                <div className="form-group">
-                                    <label className="form-label">Batch *</label>
-                                    <select className="form-select" value={recurringForm.batchId} required onChange={(e) => setRecurringForm({...recurringForm, batchId: e.target.value})}>
-                                        <option value="">Select Batch</option>
+                                    <label className="form-label" style={{ fontWeight: 800, fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-primary)' }}>Target Operational Stream *</label>
+                                    <select className="form-select" value={recurringForm.batchId} required style={{ height: '52px', borderRadius: '14px', fontWeight: 700 }} 
+                                        onChange={(e) => setRecurringForm({...recurringForm, batchId: e.target.value})}>
+                                        <option value="">Select Stream...</option>
                                         {batches.map((b) => (<option key={b.id} value={b.id}>{b.name}</option>))}
                                     </select>
                                 </div>
                                 <div className="form-group">
-                                    <label className="form-label">Days of Week *</label>
-                                    <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+                                    <label className="form-label" style={{ fontWeight: 800, fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-primary)' }}>Operational Cycles *</label>
+                                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                                         {daysOfWeek.map(d => (
                                             <button 
                                                 type="button" 
                                                 key={d.value} 
                                                 onClick={() => toggleRecurringDay(d.value)}
-                                                className={`badge ${recurringForm.days.includes(d.value) ? 'badge-primary' : 'badge-neutral'}`}
-                                                style={{ cursor: 'pointer', padding: 'var(--space-2) var(--space-4)' }}
+                                                style={{ 
+                                                    cursor: 'pointer', 
+                                                    padding: '12px 18px', 
+                                                    borderRadius: '12px', 
+                                                    border: '1px solid rgba(255, 255, 255, 0.05)',
+                                                    background: recurringForm.days.includes(d.value) ? 'var(--color-primary)' : 'rgba(255, 255, 255, 0.03)',
+                                                    color: recurringForm.days.includes(d.value) ? 'white' : 'var(--color-text-muted)',
+                                                    fontWeight: 800,
+                                                    fontSize: '11px',
+                                                    textTransform: 'uppercase',
+                                                    boxShadow: recurringForm.days.includes(d.value) ? '0 5px 15px rgba(59, 130, 246, 0.3)' : 'none',
+                                                    transition: 'all 0.3s ease'
+                                                }}
                                             >
                                                 {d.label}
                                             </button>
@@ -608,80 +650,133 @@ export default function Schedule() {
                                 </div>
                                 <div className="form-row">
                                     <div className="form-group">
-                                        <label className="form-label">Start Date *</label>
-                                        <input className="form-input" type="date" value={recurringForm.startDate} required onChange={(e) => setRecurringForm({...recurringForm, startDate: e.target.value})} />
+                                        <label className="form-label" style={{ fontWeight: 800, fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-primary)' }}>Commencement Date *</label>
+                                        <input className="form-input" type="date" value={recurringForm.startDate} required style={{ height: '52px', borderRadius: '14px', fontWeight: 700 }}
+                                            onChange={(e) => setRecurringForm({...recurringForm, startDate: e.target.value})} />
                                     </div>
                                     <div className="form-group">
-                                        <label className="form-label">Repeat Until Date *</label>
-                                        <input className="form-input" type="date" value={recurringForm.endDate} required min={recurringForm.startDate} onChange={(e) => setRecurringForm({...recurringForm, endDate: e.target.value})} />
+                                        <label className="form-label" style={{ fontWeight: 800, fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-primary)' }}>Termination Date *</label>
+                                        <input className="form-input" type="date" value={recurringForm.endDate} required min={recurringForm.startDate} style={{ height: '52px', borderRadius: '14px', fontWeight: 700 }}
+                                            onChange={(e) => setRecurringForm({...recurringForm, endDate: e.target.value})} />
                                     </div>
                                 </div>
                                 <div className="form-row">
                                     <div className="form-group">
-                                        <label className="form-label">Start Time *</label>
-                                        <input className="form-input" type="time" value={recurringForm.startTime} required onChange={(e) => setRecurringForm({...recurringForm, startTime: e.target.value})} />
+                                        <label className="form-label" style={{ fontWeight: 800, fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-primary)' }}>Sync Start *</label>
+                                        <input className="form-input" type="time" value={recurringForm.startTime} required style={{ height: '52px', borderRadius: '14px', fontWeight: 700 }}
+                                            onChange={(e) => setRecurringForm({...recurringForm, startTime: e.target.value})} />
                                     </div>
                                     <div className="form-group">
-                                        <label className="form-label">End Time</label>
-                                        <input className="form-input" type="time" value={recurringForm.endTime} onChange={(e) => setRecurringForm({...recurringForm, endTime: e.target.value})} />
+                                        <label className="form-label" style={{ fontWeight: 800, fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-primary)' }}>Sync End</label>
+                                        <input className="form-input" type="time" value={recurringForm.endTime} style={{ height: '52px', borderRadius: '14px', fontWeight: 700 }}
+                                            onChange={(e) => setRecurringForm({...recurringForm, endTime: e.target.value})} />
                                     </div>
                                 </div>
                             </div>
-                            <div className="modal-footer">
-                                <button type="button" className="btn btn-secondary" onClick={() => setShowRecurringModal(false)}>Cancel</button>
-                                <button type="submit" className="btn btn-primary">Generate Classes</button>
+                            <div className="modal-footer" style={{ padding: '24px 32px 32px', border: 'none' }}>
+                                <button type="button" className="btn btn-ghost" onClick={() => setShowRecurringModal(false)} style={{ height: '48px', fontWeight: 700 }}>Cancel</button>
+                                <button type="submit" className="btn btn-primary" style={{ height: '48px', padding: '0 32px', borderRadius: '14px', fontWeight: 800 }}>Generate Continuous Stream</button>
                             </div>
                         </form>
                     </div>
                 </div>
             )}
+
             {/* Complete Session Modal */}
             {showCompleteModal && editingSchedule && (
-                <div className="modal-overlay" onClick={() => setShowCompleteModal(false)}>
-                    <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 800 }}>
-                        <div className="modal-header">
-                            <h2 className="modal-title">Log Session & Attendance</h2>
-                            <button className="btn btn-ghost btn-icon" onClick={() => setShowCompleteModal(false)}><X size={20} /></button>
+                <div className="modal-overlay" onClick={() => setShowCompleteModal(false)} style={{ backdropFilter: 'blur(15px)' }}>
+                    <div className="modal glass-panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 900, borderRadius: '32px' }}>
+                        <div className="modal-header" style={{ padding: '32px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                <div style={{ padding: '8px', background: 'rgba(20, 184, 166, 0.1)', color: 'var(--color-accent)', borderRadius: '10px' }}>
+                                    <CheckCircle2 size={24} />
+                                </div>
+                                <h2 className="modal-title" style={{ fontSize: '24px', fontWeight: 950 }}>Finalize Mission & Registry</h2>
+                            </div>
+                            <button className="btn btn-ghost btn-icon" onClick={() => setShowCompleteModal(false)}><X size={24} /></button>
                         </div>
                         <form onSubmit={handleSaveCompleteSession}>
-                            <div className="modal-body" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 'var(--space-6)' }}>
-                                {/* Left Side: Session Log */}
-                                <div>
-                                    <h3 style={{ fontSize: 'var(--font-size-md)', fontWeight: 600, marginBottom: 'var(--space-4)' }}>Session Details</h3>
-                                    <div className="form-group">
-                                        <label className="form-label">Topics Covered *</label>
-                                        <input className="form-input" value={completeForm.topicsCovered} onChange={(e) => setCompleteForm({...completeForm, topicsCovered: e.target.value})} placeholder="e.g., Intro to Algebra" required />
+                            <div className="modal-body" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.2fr) minmax(0, 1fr)', gap: '48px', padding: '32px' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--color-accent)' }}>
+                                        <Info size={18} />
+                                        <h3 style={{ fontSize: '16px', fontWeight: 800, margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Operational Summary</h3>
                                     </div>
                                     <div className="form-group">
-                                        <label className="form-label">Homework Assigned</label>
-                                        <textarea className="form-textarea" value={completeForm.homeworkAssigned} onChange={(e) => setCompleteForm({...completeForm, homeworkAssigned: e.target.value})} rows={2} />
+                                        <label className="form-label" style={{ fontWeight: 800, fontSize: '12px', color: 'var(--color-text-muted)' }}>TOPICS EXPLORED *</label>
+                                        <input className="form-input" value={completeForm.topicsCovered} placeholder="e.g., Quantum Entanglement Basics" style={{ height: '52px', borderRadius: '14px', fontWeight: 700 }}
+                                            onChange={(e) => setCompleteForm({...completeForm, topicsCovered: e.target.value})} required />
                                     </div>
                                     <div className="form-group">
-                                        <label className="form-label">Private Notes</label>
-                                        <textarea className="form-textarea" value={completeForm.notes} onChange={(e) => setCompleteForm({...completeForm, notes: e.target.value})} rows={2} />
+                                        <label className="form-label" style={{ fontWeight: 800, fontSize: '12px', color: 'var(--color-text-muted)' }}>INTELLIGENCE DIRECTIVES (HOMEWORK)</label>
+                                        <textarea className="form-textarea" value={completeForm.homeworkAssigned} style={{ borderRadius: '18px', padding: '16px', fontWeight: 600 }}
+                                            onChange={(e) => setCompleteForm({...completeForm, homeworkAssigned: e.target.value})} rows={4} placeholder="Deploy mission directives to students..." />
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label" style={{ fontWeight: 800, fontSize: '12px', color: 'var(--color-text-muted)' }}>PRIVATE DEBRIEF NOTES</label>
+                                        <textarea className="form-textarea" value={completeForm.notes} style={{ borderRadius: '18px', padding: '16px', fontWeight: 600 }}
+                                            onChange={(e) => setCompleteForm({...completeForm, notes: e.target.value})} rows={3} placeholder="Confidential observations about the stream..." />
                                     </div>
                                 </div>
 
-                                {/* Right Side: Attendance */}
-                                <div>
-                                    <h3 style={{ fontSize: 'var(--font-size-md)', fontWeight: 600, marginBottom: 'var(--space-4)' }}>Attendance</h3>
-                                    <div style={{ maxHeight: '400px', overflowY: 'auto', paddingRight: 'var(--space-2)' }}>
-                                        {students.filter(s => (s.batchIds || []).includes(editingSchedule.batchId)).map(student => (
-                                            <div key={student.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--space-3) 0', borderBottom: '1px solid var(--color-border)' }}>
-                                                <div style={{ fontWeight: 500, fontSize: 'var(--font-size-sm)' }}>{student.name}</div>
-                                                <div style={{ display: 'flex', gap: 'var(--space-1)' }}>
-                                                    <button type="button" onClick={() => setAttendanceRecords({...attendanceRecords, [student.id]: 'present'})} className={`btn btn-sm ${attendanceRecords[student.id] === 'present' ? 'btn-primary' : 'btn-ghost'}`} style={{ padding: '4px 8px' }}>P</button>
-                                                    <button type="button" onClick={() => setAttendanceRecords({...attendanceRecords, [student.id]: 'absent'})} className={`btn btn-sm ${attendanceRecords[student.id] === 'absent' ? 'btn-danger' : 'btn-ghost'}`} style={{ padding: '4px 8px' }}>A</button>
-                                                    <button type="button" onClick={() => setAttendanceRecords({...attendanceRecords, [student.id]: 'late'})} className={`btn btn-sm ${attendanceRecords[student.id] === 'late' ? 'btn-secondary' : 'btn-ghost'}`} style={{ padding: '4px 8px' }}>L</button>
+                                <div className="glass-card" style={{ padding: '32px', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '24px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '24px', color: 'var(--color-accent)' }}>
+                                        <UserCheck size={20} />
+                                        <h3 style={{ fontSize: '16px', fontWeight: 800, margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Student Registry</h3>
+                                    </div>
+                                    <div style={{ maxHeight: '450px', overflowY: 'auto', paddingRight: '4px' }}>
+                                        {students.filter(s => (s.batchIds || []).includes(editingSchedule.batchId)).map((student, idx) => (
+                                            <div key={student.id} style={{ 
+                                                display: 'flex', 
+                                                alignItems: 'center', 
+                                                justifyContent: 'space-between', 
+                                                padding: '16px 0', 
+                                                borderBottom: idx === students.length - 1 ? 'none' : '1px solid rgba(255, 255, 255, 0.04)' 
+                                            }}>
+                                                <div>
+                                                    <div style={{ fontWeight: 800, fontSize: '14px' }}>{student.name}</div>
+                                                    <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 600 }}>{student.studentId}</div>
+                                                </div>
+                                                <div style={{ display: 'flex', gap: '6px' }}>
+                                                    {['present', 'absent', 'late'].map(status => (
+                                                        <button 
+                                                            key={status}
+                                                            type="button" 
+                                                            onClick={() => setAttendanceRecords({...attendanceRecords, [student.id]: status})} 
+                                                            style={{ 
+                                                                width: '32px', 
+                                                                height: '32px', 
+                                                                padding: 0, 
+                                                                fontSize: '11px', 
+                                                                fontWeight: 900,
+                                                                textTransform: 'uppercase',
+                                                                borderRadius: '10px',
+                                                                border: 'none',
+                                                                cursor: 'pointer',
+                                                                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                                                                background: attendanceRecords[student.id] === status 
+                                                                    ? (status === 'absent' ? 'var(--color-danger)' : status === 'late' ? 'var(--color-warning)' : 'var(--color-primary)')
+                                                                    : 'rgba(255, 255, 255, 0.04)',
+                                                                color: attendanceRecords[student.id] === status ? 'white' : 'var(--color-text-muted)',
+                                                                boxShadow: attendanceRecords[student.id] === status 
+                                                                    ? `0 5px 12px ${status === 'absent' ? 'rgba(239, 68, 68, 0.3)' : status === 'late' ? 'rgba(245, 158, 11, 0.3)' : 'rgba(59, 130, 246, 0.3)'}` 
+                                                                    : 'none'
+                                                            }}
+                                                        >
+                                                            {status.charAt(0)}
+                                                        </button>
+                                                    ))}
                                                 </div>
                                             </div>
                                         ))}
                                     </div>
                                 </div>
                             </div>
-                            <div className="modal-footer">
-                                <button type="button" className="btn btn-secondary" onClick={() => setShowCompleteModal(false)}>Cancel</button>
-                                <button type="submit" className="btn btn-primary">Save Session & Attendance</button>
+                            <div className="modal-footer" style={{ padding: '24px 32px 32px', border: 'none', background: 'rgba(255, 255, 255, 0.02)' }}>
+                                <button type="button" className="btn btn-ghost" onClick={() => setShowCompleteModal(false)} style={{ height: '52px', fontWeight: 800 }}>Abort Mission</button>
+                                <button type="submit" className="btn btn-primary" style={{ height: '52px', padding: '0 40px', borderRadius: '16px', fontWeight: 900, boxShadow: '0 10px 30px -5px rgba(20, 184, 166, 0.4)' }}>
+                                    Commit Mission Archive
+                                </button>
                             </div>
                         </form>
                     </div>
@@ -690,31 +785,44 @@ export default function Schedule() {
 
             {/* Quick View Modal */}
             {showQuickView && selectedEvent && (
-                <div className="modal-overlay" onClick={() => setShowQuickView(false)}>
-                    <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 400 }}>
-                        <div className="modal-header">
-                            <h2 className="modal-title">
-                                {selectedEvent.displayType === 'exam' ? 'Exam Details' : 
-                                 selectedEvent.displayType === 'homework' ? 'Homework Due' :
-                                 'Class Details'}
-                            </h2>
-                            <button className="btn btn-ghost btn-icon" onClick={() => setShowQuickView(false)}>
-                                <X size={20} />
-                            </button>
+                <div className="modal-overlay" onClick={() => setShowQuickView(false)} style={{ backdropFilter: 'blur(8px)' }}>
+                    <div className="modal glass-panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 440, borderRadius: '28px', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                        <div className="modal-header" style={{ padding: '28px 28px 12px', border: 'none' }}>
+                            <div style={{ 
+                                padding: '10px 14px', 
+                                borderRadius: '12px', 
+                                background: 'rgba(255, 255, 255, 0.05)', 
+                                border: '1px solid rgba(255, 255, 255, 0.08)',
+                                fontSize: '11px', 
+                                fontWeight: 900, 
+                                color: 'var(--color-primary)',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.1em',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px'
+                            }}>
+                                {selectedEvent.displayType === 'exam' ? '📋 Protocol: Exam' : 
+                                 selectedEvent.displayType === 'homework' ? '📚 Brief: Mission' :
+                                 '🕒 Segment: Class'}
+                            </div>
+                            <button className="btn btn-ghost btn-icon" onClick={() => setShowQuickView(false)} style={{ borderRadius: '12px' }}><X size={20} /></button>
                         </div>
-                        <div className="modal-body">
-                            <div style={{ marginBottom: 'var(--space-4)' }}>
-                                <h3 style={{ fontSize: '1.25rem', fontWeight: 600 }}>{selectedEvent.title}</h3>
+                        <div className="modal-body" style={{ padding: '12px 28px 28px' }}>
+                            <div style={{ marginBottom: '24px' }}>
+                                <h3 style={{ fontSize: '22px', fontWeight: 900, color: 'white', lineHeight: 1.3, letterSpacing: '-0.01em' }}>{selectedEvent.title}</h3>
                                 {(selectedEvent.batchName || selectedEvent.displayBatchName) && (
-                                    <p style={{ color: 'var(--color-text-secondary)', marginTop: 'var(--space-1)' }}>
-                                        Batch: {selectedEvent.batchName || selectedEvent.displayBatchName}
-                                    </p>
+                                    <div style={{ display: 'inline-flex', marginTop: '12px', padding: '4px 12px', borderRadius: '8px', background: 'rgba(59, 130, 246, 0.1)', color: 'var(--color-primary)', fontSize: '12px', fontWeight: 800 }}>
+                                        Stream: {selectedEvent.batchName || selectedEvent.displayBatchName}
+                                    </div>
                                 )}
                             </div>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                                    <CalIcon size={18} style={{ color: 'var(--color-text-secondary)' }} />
-                                    <span>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                                    <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'rgba(255, 255, 255, 0.03)', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                                        <CalIcon size={18} />
+                                    </div>
+                                    <span style={{ fontWeight: 700, fontSize: '15px' }}>
                                         {selectedEvent.displayType === 'homework' 
                                             ? (selectedEvent.dueDate?.toDate ? format(selectedEvent.dueDate.toDate(), 'PPP') : selectedEvent.dueDate)
                                             : (selectedEvent.date?.toDate ? format(selectedEvent.date.toDate(), 'PPP') : selectedEvent.date)
@@ -722,28 +830,26 @@ export default function Schedule() {
                                     </span>
                                 </div>
                                 {(selectedEvent.startTime || selectedEvent.endTime) && (
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                                        <Clock size={18} style={{ color: 'var(--color-text-secondary)' }} />
-                                        <span>{selectedEvent.startTime ? format(new Date(`2000-01-01T${selectedEvent.startTime}`), 'h:mm a') : 'Start'} - {selectedEvent.endTime ? format(new Date(`2000-01-01T${selectedEvent.endTime}`), 'h:mm a') : 'End'}</span>
-                                    </div>
-                                )}
-                                {selectedEvent.notes && (
-                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-2)' }}>
-                                        <Info size={18} style={{ color: 'var(--color-text-secondary)', marginTop: 2 }} />
-                                        <span>{selectedEvent.notes}</span>
-                                    </div>
-                                )}
-                                {selectedEvent.description && selectedEvent.displayType === 'homework' && (
-                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-2)' }}>
-                                        <Info size={18} style={{ color: 'var(--color-text-secondary)', marginTop: 2 }} />
-                                        <span>{selectedEvent.description}</span>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                                        <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'rgba(255, 255, 255, 0.03)', color: 'var(--color-teal)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                                            <Clock size={18} />
+                                        </div>
+                                        <span style={{ fontWeight: 700, fontSize: '15px' }}>{selectedEvent.startTime ? format(new Date(`2000-01-01T${selectedEvent.startTime}`), 'h:mm a') : 'Start'} <ChevronRight size={14} style={{ opacity: 0.3 }} /> {selectedEvent.endTime ? format(new Date(`2000-01-01T${selectedEvent.endTime}`), 'h:mm a') : 'End'}</span>
                                     </div>
                                 )}
                                 {selectedEvent.status && (
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                                        <AlertCircle size={18} style={{ color: 'var(--color-text-secondary)' }} />
-                                        <span style={{ textTransform: 'capitalize', fontWeight: 500, color: 
-                                            selectedEvent.status === 'completed' ? 'var(--color-success)' :
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                                        <div style={{ 
+                                            width: '40px', height: '40px', borderRadius: '12px', 
+                                            background: selectedEvent.status === 'completed' ? 'rgba(20, 184, 166, 0.1)' : 'rgba(251, 191, 36, 0.1)', 
+                                            color: selectedEvent.status === 'completed' ? 'var(--color-teal)' : 'var(--color-warning)', 
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center', 
+                                            border: '1px solid rgba(255, 255, 255, 0.05)' 
+                                        }}>
+                                            <AlertCircle size={18} />
+                                        </div>
+                                        <span style={{ textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '13px', fontWeight: 900, color: 
+                                            selectedEvent.status === 'completed' ? 'var(--color-teal)' :
                                             selectedEvent.status === 'cancelled' ? 'var(--color-danger)' :
                                             selectedEvent.status === 'rescheduled' ? 'var(--color-warning)' : 'var(--color-primary)'
                                         }}>
@@ -751,34 +857,31 @@ export default function Schedule() {
                                         </span>
                                     </div>
                                 )}
+                                {(selectedEvent.notes || selectedEvent.description) && (
+                                    <div className="glass-card" style={{ padding: '16px', background: 'rgba(255, 255, 255, 0.03)', marginTop: '8px', borderRadius: '16px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                                        <div style={{ fontSize: '10px', fontWeight: 900, color: 'var(--color-text-muted)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.1em' }}>INTELLIGENCE_REMARKS</div>
+                                        <div style={{ fontSize: '14px', lineHeight: 1.6, fontWeight: 600, color: 'rgba(255, 255, 255, 0.8)' }}>{selectedEvent.notes || selectedEvent.description}</div>
+                                    </div>
+                                )}
                             </div>
                         </div>
-                        <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-2)' }}>
+                        <div className="modal-footer" style={{ padding: '0 28px 28px', border: 'none', justifyContent: 'flex-end', gap: 'var(--space-3)' }}>
+                            <button type="button" className="btn btn-ghost" onClick={() => setShowQuickView(false)} style={{ height: '48px', fontWeight: 700 }}>Close</button>
                             {selectedEvent.displayType === 'homework' && (
-                                <button type="button" className="btn btn-primary" onClick={() => {
-                                    setShowQuickView(false);
-                                    navigate('/homework');
-                                }}>
-                                    Go to Homework
+                                <button type="button" className="btn btn-primary" style={{ height: '48px', padding: '0 24px', borderRadius: '12px', fontWeight: 800 }} onClick={() => { setShowQuickView(false); navigate('/homework'); }}>
+                                    View Tracker
                                 </button>
                             )}
                             {selectedEvent.displayType === 'class' && (
-                                <button type="button" className="btn btn-primary" onClick={() => {
-                                    setShowQuickView(false);
-                                    openEdit(selectedEvent);
-                                }}>
-                                    Edit Details
+                                <button type="button" className="btn btn-primary" style={{ height: '48px', padding: '0 24px', borderRadius: '12px', fontWeight: 800 }} onClick={() => { setShowQuickView(false); openEdit(selectedEvent); }}>
+                                    Edit Schedule
                                 </button>
                             )}
                             {selectedEvent.displayType === 'exam' && (
-                                <button type="button" className="btn btn-primary" onClick={() => {
-                                    setShowQuickView(false);
-                                    navigate('/exams');
-                                }}>
-                                    Go to Exams
+                                <button type="button" className="btn btn-primary" style={{ height: '48px', padding: '0 24px', borderRadius: '12px', fontWeight: 800 }} onClick={() => { setShowQuickView(false); navigate('/exams'); }}>
+                                    Open Exams
                                 </button>
                             )}
-                            <button type="button" className="btn btn-secondary" onClick={() => setShowQuickView(false)}>Close</button>
                         </div>
                     </div>
                 </div>

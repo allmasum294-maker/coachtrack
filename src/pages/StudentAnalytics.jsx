@@ -2,12 +2,13 @@ import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { User, TrendingUp, TrendingDown, Calendar, AlertCircle, Filter, BookOpen, ClipboardCheck } from 'lucide-react';
+import batchService from '../services/batchService';
+import { User, TrendingUp, TrendingDown, Calendar, AlertCircle, Filter, BookOpen, ClipboardCheck, ChevronDown, ChevronUp } from 'lucide-react';
 import {
     LineChart, Line, BarChart, Bar, AreaChart, Area,
     XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Cell
 } from 'recharts';
-import { format, isWithinInterval, startOfDay, endOfDay, parseISO } from 'date-fns';
+import { format, startOfDay, endOfDay } from 'date-fns';
 
 export default function StudentAnalytics() {
     const { currentUser } = useAuth();
@@ -30,15 +31,16 @@ export default function StudentAnalytics() {
     async function loadData() {
         try {
             const uid = currentUser.uid;
-            const [studentSnap, batchSnap, attSnap, examSnap, hwSnap] = await Promise.all([
-                getDocs(query(collection(db, 'students'), where('teacherId', '==', uid))),
-                getDocs(query(collection(db, 'batches'), where('teacherId', '==', uid))),
+            const [activeBatches, studentSnap, attSnap, examSnap, hwSnap] = await Promise.all([
+                batchService.getBatches(uid, true),
+                getDocs(query(collection(db, 'students'), where('teacherId', '==', uid), where('status', '==', 'enrolled'))),
                 getDocs(query(collection(db, 'attendance'), where('teacherId', '==', uid))),
                 getDocs(query(collection(db, 'exams'), where('teacherId', '==', uid))),
                 getDocs(query(collection(db, 'homeworks'), where('teacherId', '==', uid))),
             ]);
+
+            setBatches(activeBatches);
             setStudents(studentSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
-            setBatches(batchSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
             setAttendance(attSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
             setExams(examSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
             setHomeworks(hwSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
@@ -49,11 +51,13 @@ export default function StudentAnalytics() {
         }
     }
 
+    const memoizedDateRange = useMemo(() => ({ from: dateFrom, to: dateTo }), [dateFrom, dateTo]);
+
     function isInDateRange(dateVal) {
-        if (!dateFrom && !dateTo) return true;
+        if (!memoizedDateRange.from && !memoizedDateRange.to) return true;
         const d = dateVal instanceof Date ? dateVal : new Date(dateVal);
-        if (dateFrom && d < startOfDay(new Date(dateFrom))) return false;
-        if (dateTo && d > endOfDay(new Date(dateTo))) return false;
+        if (memoizedDateRange.from && d < startOfDay(new Date(memoizedDateRange.from))) return false;
+        if (memoizedDateRange.to && d > endOfDay(new Date(memoizedDateRange.to))) return false;
         return true;
     }
 
@@ -62,17 +66,19 @@ export default function StudentAnalytics() {
         return val.toDate ? val.toDate() : new Date(val);
     }
 
-    const filteredStudents = selectedBatchId
-        ? students.filter(s => s.batchIds?.includes(selectedBatchId))
-        : students;
+    const filteredStudents = useMemo(() => {
+        return selectedBatchId
+            ? students.filter(s => s.batchIds?.includes(selectedBatchId))
+            : students;
+    }, [selectedBatchId, students]);
 
     useEffect(() => {
         if (selectedStudentId && !filteredStudents.find(s => s.id === selectedStudentId)) {
             setSelectedStudentId('');
         }
-    }, [selectedBatchId, filteredStudents, selectedStudentId]);
+    }, [filteredStudents, selectedStudentId]);
 
-    const selectedStudent = students.find((s) => s.id === selectedStudentId);
+    const selectedStudent = useMemo(() => students.find((s) => s.id === selectedStudentId), [students, selectedStudentId]);
 
     // Compute detailed stats
     const stats = useMemo(() => {
@@ -117,7 +123,6 @@ export default function StudentAnalytics() {
             if (hwDate && !isInDateRange(hwDate)) return;
 
             totalHomeworks++;
-            // Check new submissions format first
             const sub = hw.submissions?.[selectedStudent.id];
             if (sub) {
                 if (sub.status === 'completed') completedHomeworks++;
@@ -138,7 +143,7 @@ export default function StudentAnalytics() {
             avgScore, examsTaken,
             hwCompletionRate, totalHomeworks, completedHomeworks, lateHomeworks, partialHomeworks, notSubmittedHomeworks,
         };
-    }, [selectedStudent, attendance, exams, homeworks, dateFrom, dateTo]);
+    }, [selectedStudent, attendance, exams, homeworks, memoizedDateRange]);
 
     // Chart Data
     const attData = useMemo(() => {
@@ -158,7 +163,7 @@ export default function StudentAnalytics() {
                 }
             });
         return history.slice(-15);
-    }, [selectedStudent, attendance, dateFrom, dateTo]);
+    }, [selectedStudent, attendance, memoizedDateRange]);
 
     const examData = useMemo(() => {
         if (!selectedStudent) return [];
@@ -181,7 +186,7 @@ export default function StudentAnalytics() {
                 }
             });
         return history.slice(-10);
-    }, [selectedStudent, exams, dateFrom, dateTo]);
+    }, [selectedStudent, exams, memoizedDateRange]);
 
     const hwData = useMemo(() => {
         if (!selectedStudent) return [];
@@ -197,11 +202,11 @@ export default function StudentAnalytics() {
                 const sub = hw.submissions?.[selectedStudent.id];
                 const isCompleted = sub?.status === 'completed' || (!sub && (hw.completedBy || []).includes(selectedStudent.id));
                 return {
-                    name: hw.title.substring(0, 15) + (hw.title.length > 15 ? '...' : ''),
+                    name: hw.title.length > 15 ? hw.title.substring(0, 15) + '...' : hw.title,
                     Status: isCompleted ? 1 : 0
                 };
             });
-    }, [selectedStudent, homeworks, dateFrom, dateTo]);
+    }, [selectedStudent, homeworks, memoizedDateRange]);
 
     // Per-Exam Score Table
     const examTableData = useMemo(() => {
@@ -225,7 +230,7 @@ export default function StudentAnalytics() {
                 };
             })
             .filter(Boolean);
-    }, [selectedStudent, exams, dateFrom, dateTo]);
+    }, [selectedStudent, exams, memoizedDateRange]);
 
     const topicStats = useMemo(() => {
         if (!selectedStudent) return { strengths: [], weaknesses: [] };
@@ -264,7 +269,7 @@ export default function StudentAnalytics() {
             strengths: analyzed.filter(t => t.avgDiff >= 0).slice(0, 3).map(t => t.topic),
             weaknesses: [...analyzed].reverse().filter(t => t.avgDiff < 0).slice(0, 3).map(t => t.topic)
         };
-    }, [selectedStudent, exams, dateFrom, dateTo]);
+    }, [selectedStudent, exams, memoizedDateRange]);
 
     if (loading) return <div className="loading-page"><div className="loading-spinner" /></div>;
 
@@ -277,29 +282,29 @@ export default function StudentAnalytics() {
                 </div>
             </div>
 
-            <div className="card" style={{ marginBottom: 'var(--space-6)' }}>
-                <div style={{ padding: 'var(--space-4)', display: 'flex', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
-                    <div style={{ flex: '1 1 200px' }}>
+            <div className="glass-panel" style={{ marginBottom: 'var(--space-6)', padding: 'var(--space-6)' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--space-4)' }}>
+                    <div>
                         <label className="form-label" style={{ marginBottom: 'var(--space-2)' }}>Filter by Batch</label>
                         <select className="form-select" value={selectedBatchId} onChange={(e) => setSelectedBatchId(e.target.value)}>
                             <option value="">-- All Batches --</option>
                             {batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                         </select>
                     </div>
-                    <div style={{ flex: '1 1 200px' }}>
+                    <div>
                         <label className="form-label" style={{ marginBottom: 'var(--space-2)' }}>Select Student</label>
                         <select className="form-select" value={selectedStudentId} onChange={(e) => setSelectedStudentId(e.target.value)}>
                             <option value="">-- Choose a Student --</option>
                             {filteredStudents.map(s => <option key={s.id} value={s.id}>{s.name} (Class {s.grade})</option>)}
                         </select>
                     </div>
-                    <div style={{ flex: '1 1 140px' }}>
+                    <div>
                         <label className="form-label" style={{ marginBottom: 'var(--space-2)', display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
                             <Filter size={12} /> From Date
                         </label>
                         <input type="date" className="form-input" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
                     </div>
-                    <div style={{ flex: '1 1 140px' }}>
+                    <div>
                         <label className="form-label" style={{ marginBottom: 'var(--space-2)', display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
                             <Filter size={12} /> To Date
                         </label>
@@ -307,7 +312,7 @@ export default function StudentAnalytics() {
                     </div>
                 </div>
                 {(dateFrom || dateTo) && (
-                    <div style={{ padding: '0 var(--space-4) var(--space-3)', display: 'flex', justifyContent: 'flex-end' }}>
+                    <div style={{ marginTop: 'var(--space-4)', display: 'flex', justifyContent: 'flex-end' }}>
                         <button className="btn btn-ghost" style={{ fontSize: 'var(--font-size-xs)' }} onClick={() => { setDateFrom(''); setDateTo(''); }}>
                             Clear Date Filter
                         </button>
@@ -317,30 +322,30 @@ export default function StudentAnalytics() {
 
             {selectedStudent && stats ? (
                 <>
-                    {/* Detailed Attendance Breakdown */}
+                    {/* Primary Stats */}
                     <div className="dashboard-stats" style={{ marginBottom: 'var(--space-6)' }}>
-                        <div className="stat-card">
+                        <div className="stat-card glass-card">
                             <div className="stat-card-icon teal"><Calendar size={24} /></div>
                             <div>
                                 <div className="stat-card-value">{stats.studentAttRate}%</div>
                                 <div className="stat-card-label">Attendance Rate</div>
                             </div>
                         </div>
-                        <div className="stat-card">
+                        <div className="stat-card glass-card">
                             <div className="stat-card-icon blue"><TrendingUp size={24} /></div>
                             <div>
                                 <div className="stat-card-value">{stats.avgScore}%</div>
                                 <div className="stat-card-label">Average Score</div>
                             </div>
                         </div>
-                        <div className="stat-card">
+                        <div className="stat-card glass-card">
                             <div className="stat-card-icon gold"><AlertCircle size={24} /></div>
                             <div>
                                 <div className="stat-card-value">{stats.examsTaken}</div>
                                 <div className="stat-card-label">Exams Taken</div>
                             </div>
                         </div>
-                        <div className="stat-card">
+                        <div className="stat-card glass-card">
                             <div className="stat-card-icon" style={{ background: 'var(--color-primary-soft)', color: 'var(--color-primary)' }}>
                                 <BookOpen size={24} />
                             </div>
@@ -351,14 +356,13 @@ export default function StudentAnalytics() {
                         </div>
                     </div>
 
-                    {/* Detailed Breakdowns - Attendance & Homework */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 'var(--space-4)', marginBottom: 'var(--space-6)' }}>
-                        {/* Attendance Breakdown Card */}
-                        <div className="card" style={{ padding: 'var(--space-4)' }}>
-                            <h3 style={{ fontSize: 'var(--font-size-md)', fontWeight: 600, marginBottom: 'var(--space-4)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                                <ClipboardCheck size={18} style={{ color: 'var(--color-accent)' }} /> Attendance Details
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 'var(--space-6)', marginBottom: 'var(--space-6)' }}>
+                        {/* Attendance Breakdown */}
+                        <div className="glass-card" style={{ padding: 'var(--space-6)' }}>
+                            <h3 style={{ fontSize: 'var(--font-size-md)', fontWeight: 600, marginBottom: 'var(--space-6)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                                <ClipboardCheck size={20} className="text-accent" /> Attendance Details
                             </h3>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
                                 {[
                                     { label: 'Total Classes', value: stats.totalClasses, color: 'var(--color-text-primary)' },
                                     { label: 'Attended', value: stats.presentClasses, color: 'var(--color-success)', perc: stats.totalClasses > 0 ? Math.round((stats.presentClasses / stats.totalClasses) * 100) : 0 },
@@ -366,14 +370,14 @@ export default function StudentAnalytics() {
                                     { label: 'Late', value: stats.lateClasses, color: 'var(--color-warning)', perc: stats.totalClasses > 0 ? Math.round((stats.lateClasses / stats.totalClasses) * 100) : 0 },
                                 ].map((item, i) => (
                                     <div key={i}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--font-size-sm)', marginBottom: '4px' }}>
-                                            <span>{item.label}</span>
-                                            <span style={{ fontWeight: 700, color: item.color }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--font-size-sm)', marginBottom: 'var(--space-2)' }}>
+                                            <span className="text-muted">{item.label}</span>
+                                            <span style={{ fontWeight: 600, color: item.color }}>
                                                 {item.value}{item.perc !== undefined ? ` (${item.perc}%)` : ''}
                                             </span>
                                         </div>
                                         {item.perc !== undefined && (
-                                            <div className="progress-bar" style={{ height: 6 }}>
+                                            <div className="progress-bar" style={{ height: 8 }}>
                                                 <div className="progress-bar-fill" style={{ width: `${item.perc}%`, background: item.color }} />
                                             </div>
                                         )}
@@ -382,12 +386,12 @@ export default function StudentAnalytics() {
                             </div>
                         </div>
 
-                        {/* Homework Breakdown Card */}
-                        <div className="card" style={{ padding: 'var(--space-4)' }}>
-                            <h3 style={{ fontSize: 'var(--font-size-md)', fontWeight: 600, marginBottom: 'var(--space-4)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                                <BookOpen size={18} style={{ color: 'var(--color-primary)' }} /> Homework Details
+                        {/* Homework Breakdown */}
+                        <div className="glass-card" style={{ padding: 'var(--space-6)' }}>
+                            <h3 style={{ fontSize: 'var(--font-size-md)', fontWeight: 600, marginBottom: 'var(--space-6)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                                <BookOpen size={20} className="text-primary" /> Homework Details
                             </h3>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
                                 {[
                                     { label: 'Total Assigned', value: stats.totalHomeworks, color: 'var(--color-text-primary)' },
                                     { label: 'Completed', value: stats.completedHomeworks, color: 'var(--color-success)', perc: stats.totalHomeworks > 0 ? Math.round((stats.completedHomeworks / stats.totalHomeworks) * 100) : 0 },
@@ -396,14 +400,14 @@ export default function StudentAnalytics() {
                                     { label: 'Not Submitted', value: stats.notSubmittedHomeworks, color: 'var(--color-danger)', perc: stats.totalHomeworks > 0 ? Math.round((stats.notSubmittedHomeworks / stats.totalHomeworks) * 100) : 0 },
                                 ].map((item, i) => (
                                     <div key={i}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--font-size-sm)', marginBottom: '4px' }}>
-                                            <span>{item.label}</span>
-                                            <span style={{ fontWeight: 700, color: item.color }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--font-size-sm)', marginBottom: 'var(--space-2)' }}>
+                                            <span className="text-muted">{item.label}</span>
+                                            <span style={{ fontWeight: 600, color: item.color }}>
                                                 {item.value}{item.perc !== undefined ? ` (${item.perc}%)` : ''}
                                             </span>
                                         </div>
                                         {item.perc !== undefined && (
-                                            <div className="progress-bar" style={{ height: 6 }}>
+                                            <div className="progress-bar" style={{ height: 8 }}>
                                                 <div className="progress-bar-fill" style={{ width: `${item.perc}%`, background: item.color }} />
                                             </div>
                                         )}
@@ -415,73 +419,75 @@ export default function StudentAnalytics() {
 
                     {/* Topic Strengths & Weaknesses */}
                     {(topicStats.strengths.length > 0 || topicStats.weaknesses.length > 0) && (
-                        <div className="card" style={{ padding: 'var(--space-4)', marginBottom: 'var(--space-6)' }}>
-                            <div style={{ display: 'flex', gap: 'var(--space-6)', flexWrap: 'wrap' }}>
-                                <div style={{ flex: 1, minWidth: '250px' }}>
-                                    <h3 style={{ fontSize: 'var(--font-size-md)', fontWeight: 600, color: 'var(--color-success)', marginBottom: 'var(--space-3)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                                        <TrendingUp size={18} /> Top Strengths
+                        <div className="glass-card" style={{ padding: 'var(--space-6)', marginBottom: 'var(--space-6)' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 'var(--space-8)' }}>
+                                <div>
+                                    <h3 style={{ fontSize: 'var(--font-size-md)', fontWeight: 600, color: 'var(--color-success)', marginBottom: 'var(--space-4)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                                        <TrendingUp size={20} /> Top Strengths
                                     </h3>
                                     <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
                                         {topicStats.strengths.map(t => (
-                                            <span key={t} className="badge" style={{ background: 'var(--color-success-soft)', color: 'var(--color-success)', padding: 'var(--space-2) var(--space-3)', fontSize: 'var(--font-size-sm)' }}>{t}</span>
+                                            <span key={t} className="badge" style={{ background: 'var(--color-success-soft)', color: 'var(--color-success)', border: '1px solid var(--color-success)', padding: 'var(--space-2) var(--space-4)', borderRadius: '20px', fontSize: 'var(--font-size-sm)' }}>{t}</span>
                                         ))}
-                                        {topicStats.strengths.length === 0 && <span style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)' }}>Not enough data.</span>}
+                                        {topicStats.strengths.length === 0 && <span className="text-muted small">Not enough data.</span>}
                                     </div>
                                 </div>
-                                <div style={{ flex: 1, minWidth: '250px' }}>
-                                    <h3 style={{ fontSize: 'var(--font-size-md)', fontWeight: 600, color: 'var(--color-danger)', marginBottom: 'var(--space-3)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                                        <TrendingDown size={18} /> Areas for Improvement
+                                <div>
+                                    <h3 style={{ fontSize: 'var(--font-size-md)', fontWeight: 600, color: 'var(--color-danger)', marginBottom: 'var(--space-4)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                                        <TrendingDown size={20} /> Areas for Improvement
                                     </h3>
                                     <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
                                         {topicStats.weaknesses.map(t => (
-                                            <span key={t} className="badge" style={{ background: 'var(--color-danger-soft)', color: 'var(--color-danger)', padding: 'var(--space-2) var(--space-3)', fontSize: 'var(--font-size-sm)' }}>{t}</span>
+                                            <span key={t} className="badge" style={{ background: 'var(--color-danger-soft)', color: 'var(--color-danger)', border: '1px solid var(--color-danger)', padding: 'var(--space-2) var(--space-4)', borderRadius: '20px', fontSize: 'var(--font-size-sm)' }}>{t}</span>
                                         ))}
-                                        {topicStats.weaknesses.length === 0 && <span style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)' }}>No critical weaknesses detected.</span>}
+                                        {topicStats.weaknesses.length === 0 && <span className="text-muted small">No critical weaknesses detected.</span>}
                                     </div>
                                 </div>
                             </div>
                         </div>
                     )}
 
-                    {/* Per-Exam Score Table */}
+                    {/* Per-Exam Score Details */}
                     {examTableData.length > 0 && (
-                        <div className="card" style={{ marginBottom: 'var(--space-6)' }}>
-                            <div style={{ padding: 'var(--space-4)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-border)' }}>
-                                <h3 style={{ fontSize: 'var(--font-size-md)', fontWeight: 600 }}>📊 Per-Exam Score Details</h3>
-                                <button className="btn btn-ghost" onClick={() => setShowExamTable(!showExamTable)} style={{ fontSize: 'var(--font-size-sm)' }}>
-                                    {showExamTable ? 'Hide' : 'Show'} Table
-                                </button>
-                            </div>
+                        <div className="glass-card" style={{ marginBottom: 'var(--space-6)', overflow: 'hidden' }}>
+                            <button
+                                className="w-full text-left"
+                                onClick={() => setShowExamTable(!showExamTable)}
+                                style={{ padding: 'var(--space-4) var(--space-6)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'transparent', border: 'none', borderBottom: showExamTable ? '1px solid var(--color-border)' : 'none' }}
+                            >
+                                <h3 style={{ fontSize: 'var(--font-size-md)', fontWeight: 600, margin: 0 }}>📊 Per-Exam Score Details</h3>
+                                {showExamTable ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                            </button>
                             {showExamTable && (
                                 <div style={{ overflowX: 'auto' }}>
-                                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--font-size-sm)' }}>
+                                    <table className="w-full" style={{ borderCollapse: 'collapse', fontSize: 'var(--font-size-sm)' }}>
                                         <thead>
-                                            <tr style={{ background: 'var(--color-bg-elevated)' }}>
-                                                <th style={{ padding: 'var(--space-3)', textAlign: 'left', fontWeight: 600, borderBottom: '2px solid var(--color-border)' }}>Exam</th>
-                                                <th style={{ padding: 'var(--space-3)', textAlign: 'left', fontWeight: 600, borderBottom: '2px solid var(--color-border)' }}>Date</th>
+                                            <tr style={{ background: 'rgba(255,255,255,0.05)' }}>
+                                                <th style={{ padding: 'var(--space-4) var(--space-6)', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid var(--color-border)' }}>Exam</th>
+                                                <th style={{ padding: 'var(--space-4) var(--space-6)', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid var(--color-border)' }}>Date</th>
                                                 {examTableData[0]?.topics?.map(t => (
-                                                    <th key={t.name} style={{ padding: 'var(--space-3)', textAlign: 'center', fontWeight: 600, borderBottom: '2px solid var(--color-border)' }}>
-                                                        {t.name}{t.maxMarks != null ? <div style={{ fontSize: '10px', fontWeight: 400, color: 'var(--color-text-muted)' }}>/{t.maxMarks}</div> : ''}
+                                                    <th key={t.name} style={{ padding: 'var(--space-4) var(--space-6)', textAlign: 'center', fontWeight: 600, borderBottom: '1px solid var(--color-border)' }}>
+                                                        {t.name}{t.maxMarks != null ? <div style={{ fontSize: '10px', fontWeight: 400, opacity: 0.6 }}>/{t.maxMarks}</div> : ''}
                                                     </th>
                                                 ))}
-                                                <th style={{ padding: 'var(--space-3)', textAlign: 'center', fontWeight: 600, borderBottom: '2px solid var(--color-border)' }}>Total</th>
-                                                <th style={{ padding: 'var(--space-3)', textAlign: 'center', fontWeight: 600, borderBottom: '2px solid var(--color-border)' }}>%</th>
+                                                <th style={{ padding: 'var(--space-4) var(--space-6)', textAlign: 'center', fontWeight: 600, borderBottom: '1px solid var(--color-border)' }}>Total</th>
+                                                <th style={{ padding: 'var(--space-4) var(--space-6)', textAlign: 'center', fontWeight: 600, borderBottom: '1px solid var(--color-border)' }}>%</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {examTableData.map((row, i) => (
-                                                <tr key={i} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                                                    <td style={{ padding: 'var(--space-3)', fontWeight: 500 }}>{row.title}</td>
-                                                    <td style={{ padding: 'var(--space-3)', color: 'var(--color-text-secondary)' }}>{row.date}</td>
+                                                <tr key={i} className="hover-bg" style={{ borderBottom: '1px solid var(--color-border)' }}>
+                                                    <td style={{ padding: 'var(--space-4) var(--space-6)', fontWeight: 500 }}>{row.title}</td>
+                                                    <td style={{ padding: 'var(--space-4) var(--space-6)', color: 'var(--color-text-secondary)' }}>{row.date}</td>
                                                     {row.topics.map(t => (
-                                                        <td key={t.name} style={{ padding: 'var(--space-3)', textAlign: 'center' }}>
+                                                        <td key={t.name} style={{ padding: 'var(--space-4) var(--space-6)', textAlign: 'center' }}>
                                                             {row.topicMarks[t.name] !== undefined ? row.topicMarks[t.name] : '—'}
                                                         </td>
                                                     ))}
-                                                    <td style={{ padding: 'var(--space-3)', textAlign: 'center', fontWeight: 700 }}>
+                                                    <td style={{ padding: 'var(--space-4) var(--space-6)', textAlign: 'center', fontWeight: 600 }}>
                                                         {row.marksObtained}/{row.totalMarks}
                                                     </td>
-                                                    <td style={{ padding: 'var(--space-3)', textAlign: 'center', fontWeight: 700, color: row.percentage >= 70 ? 'var(--color-success)' : row.percentage >= 40 ? 'var(--color-warning)' : 'var(--color-danger)' }}>
+                                                    <td style={{ padding: 'var(--space-4) var(--space-6)', textAlign: 'center', fontWeight: 700, color: row.percentage >= 70 ? 'var(--color-success)' : row.percentage >= 40 ? 'var(--color-warning)' : 'var(--color-danger)' }}>
                                                         {row.percentage}%
                                                     </td>
                                                 </tr>
@@ -493,16 +499,14 @@ export default function StudentAnalytics() {
                         </div>
                     )}
 
-                    <div className="analytics-charts" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: 'var(--space-6)' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: 'var(--space-6)' }}>
                         {/* Attendance Trend */}
-                        <div className="chart-card card">
-                            <div className="chart-card-header">
-                                <div>
-                                    <div className="chart-card-title">Recent Attendance</div>
-                                    <div className="chart-card-subtitle">Last 15 classes (100 = Present, 0 = Absent)</div>
-                                </div>
+                        <div className="glass-card" style={{ padding: 'var(--space-6)' }}>
+                            <div style={{ marginBottom: 'var(--space-6)' }}>
+                                <div style={{ fontSize: 'var(--font-size-md)', fontWeight: 600 }}>Recent Attendance</div>
+                                <div className="text-muted small">Last 15 classes (100 = Present, 0 = Absent)</div>
                             </div>
-                            <ResponsiveContainer width="100%" height={250}>
+                            <ResponsiveContainer width="100%" height={260}>
                                 <AreaChart data={attData}>
                                     <defs>
                                         <linearGradient id="colorAtt" x1="0" y1="0" x2="0" y2="1">
@@ -510,72 +514,70 @@ export default function StudentAnalytics() {
                                             <stop offset="95%" stopColor="#14b8a6" stopOpacity={0} />
                                         </linearGradient>
                                     </defs>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#2a3654" />
-                                    <XAxis dataKey="date" stroke="#64748b" fontSize={12} />
-                                    <YAxis stroke="#64748b" fontSize={12} domain={[0, 100]} ticks={[0, 100]} />
-                                    <Tooltip contentStyle={{ background: '#1a2235', border: '1px solid #2a3654', borderRadius: 8, color: '#f1f5f9' }} />
-                                    <Area type="step" dataKey="status" stroke="#14b8a6" fill="url(#colorAtt)" strokeWidth={2} activeDot={{ r: 6 }} />
+                                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                                    <XAxis dataKey="date" stroke="rgba(255,255,255,0.4)" fontSize={11} tickLine={false} axisLine={false} />
+                                    <YAxis stroke="rgba(255,255,255,0.4)" fontSize={11} domain={[0, 100]} ticks={[0, 100]} tickLine={false} axisLine={false} />
+                                    <Tooltip contentStyle={{ background: 'rgba(23, 23, 23, 0.95)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, color: '#f1f5f9' }} />
+                                    <Area type="step" dataKey="status" stroke="#14b8a6" fill="url(#colorAtt)" strokeWidth={2} activeDot={{ r: 6, strokeWidth: 0 }} />
                                 </AreaChart>
                             </ResponsiveContainer>
                         </div>
 
                         {/* Exam History */}
-                        <div className="chart-card">
-                            <div className="chart-card-header">
-                                <div>
-                                    <div className="chart-card-title">Exam Performance</div>
-                                    <div className="chart-card-subtitle">Student scores vs Batch average</div>
-                                </div>
+                        <div className="glass-card" style={{ padding: 'var(--space-6)' }}>
+                            <div style={{ marginBottom: 'var(--space-6)' }}>
+                                <div style={{ fontSize: 'var(--font-size-md)', fontWeight: 600 }}>Exam Performance</div>
+                                <div className="text-muted small">Student scores vs Batch average</div>
                             </div>
-                            <ResponsiveContainer width="100%" height={250}>
+                            <ResponsiveContainer width="100%" height={260}>
                                 <BarChart data={examData}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#2a3654" />
-                                    <XAxis dataKey="name" stroke="#64748b" fontSize={12} />
-                                    <YAxis stroke="#64748b" fontSize={12} domain={[0, 100]} />
-                                    <Tooltip contentStyle={{ background: '#1a2235', border: '1px solid #2a3654', borderRadius: 8, color: '#f1f5f9' }} />
-                                    <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
-                                    <Bar dataKey="Student" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                                    <Bar dataKey="BatchAvg" fill="#64748b" fillOpacity={0.6} radius={[4, 4, 0, 0]} />
+                                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                                    <XAxis dataKey="name" stroke="rgba(255,255,255,0.4)" fontSize={11} tickLine={false} axisLine={false} />
+                                    <YAxis stroke="rgba(255,255,255,0.4)" fontSize={11} domain={[0, 100]} tickLine={false} axisLine={false} />
+                                    <Tooltip contentStyle={{ background: 'rgba(23, 23, 23, 0.95)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, color: '#f1f5f9' }} />
+                                    <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '15px' }} />
+                                    <Bar dataKey="Student" fill="var(--color-primary)" radius={[4, 4, 0, 0]} barSize={20} />
+                                    <Bar dataKey="BatchAvg" fill="rgba(255,255,255,0.2)" radius={[4, 4, 0, 0]} barSize={20} />
                                 </BarChart>
                             </ResponsiveContainer>
                         </div>
 
                         {/* Homework Status */}
-                        <div className="chart-card card">
-                            <div className="chart-card-header" style={{ padding: 'var(--space-4)', borderBottom: '1px solid var(--color-border)' }}>
-                                <div>
-                                    <div className="chart-card-title">Recent Homework</div>
-                                    <div className="chart-card-subtitle">Last 10 assignments (1 = Done, 0 = Pending)</div>
-                                </div>
+                        <div className="glass-card" style={{ padding: 'var(--space-6)' }}>
+                            <div style={{ marginBottom: 'var(--space-6)' }}>
+                                <div style={{ fontSize: 'var(--font-size-md)', fontWeight: 600 }}>Recent Homework</div>
+                                <div className="text-muted small">Last 10 assignments (1 = Done, 0 = Pending)</div>
                             </div>
-                            <div style={{ padding: 'var(--space-4)' }}>
-                                <ResponsiveContainer width="100%" height={250}>
-                                    <BarChart data={hwData}>
-                                        <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                                        <XAxis dataKey="name" stroke="var(--color-text-muted)" fontSize={11} tick={{ fill: 'var(--color-text-muted)' }} />
-                                        <YAxis stroke="var(--color-text-muted)" fontSize={11} domain={[0, 1]} ticks={[0, 1]} tick={{ fill: 'var(--color-text-muted)' }} />
-                                        <Tooltip
-                                            contentStyle={{ background: 'var(--color-bg-card)', border: '1px solid var(--color-border)', borderRadius: 8, color: 'var(--color-text-primary)' }}
-                                            formatter={(value) => [value === 1 ? 'Completed' : 'Pending', 'Status']}
-                                        />
-                                        <Bar dataKey="Status" radius={[4, 4, 0, 0]}>
-                                            {hwData.map((entry, index) => (
-                                                <Cell key={`cell-${index}`} fill={entry.Status === 1 ? 'var(--color-success)' : 'var(--color-danger)'} />
-                                            ))}
-                                        </Bar>
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            </div>
+                            <ResponsiveContainer width="100%" height={260}>
+                                <BarChart data={hwData}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                                    <XAxis dataKey="name" stroke="rgba(255,255,255,0.4)" fontSize={10} tickLine={false} axisLine={false} />
+                                    <YAxis stroke="rgba(255,255,255,0.4)" fontSize={11} domain={[0, 1]} ticks={[0, 1]} tickLine={false} axisLine={false} />
+                                    <Tooltip
+                                        contentStyle={{ background: 'rgba(23, 23, 23, 0.95)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, color: '#f1f5f9' }}
+                                        formatter={(value) => [value === 1 ? 'Completed' : 'Pending', 'Status']}
+                                    />
+                                    <Bar dataKey="Status" radius={[4, 4, 0, 0]} barSize={25}>
+                                        {hwData.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={entry.Status === 1 ? 'var(--color-success)' : 'var(--color-danger-soft)'} />
+                                        ))}
+                                    </Bar>
+                                </BarChart>
+                            </ResponsiveContainer>
                         </div>
                     </div>
                 </>
             ) : (
-                <div className="empty-state card">
-                    <User size={48} className="empty-state-icon" style={{ color: 'var(--color-text-muted)', marginBottom: 'var(--space-4)' }} />
-                    <div className="empty-state-title">No Student Selected</div>
-                    <div className="empty-state-text">Select a student from the dropdown above to view their analytics.</div>
+                <div className="empty-state glass-card" style={{ padding: 'var(--space-12)' }}>
+                    <div className="empty-state-icon" style={{ background: 'var(--color-bg-elevated)', width: 80, height: 80, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto var(--space-6)' }}>
+                        <User size={40} className="text-muted" />
+                    </div>
+                    <h2 className="empty-state-title" style={{ fontSize: 'var(--font-size-xl)', fontWeight: 700, marginBottom: 'var(--space-2)' }}>No Student Selected</h2>
+                    <p className="empty-state-text" style={{ color: 'var(--color-text-muted)', maxWidth: '400px', margin: '0 auto' }}>Select a student from the dropdown above to view their detailed performance analytics and trends.</p>
                 </div>
             )}
         </div>
     );
 }
+
+

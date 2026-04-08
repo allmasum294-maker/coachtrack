@@ -2,7 +2,11 @@ import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { Award, Trophy, Star, Medal, ArrowUp, ArrowDown, Minus } from 'lucide-react';
+import { 
+    Award, Trophy, Star, Medal, ArrowUp, ArrowDown, 
+    Minus, Filter, Info, TrendingUp, Zap, Sparkles 
+} from 'lucide-react';
+import { batchService } from '../services/batchService';
 
 export default function Leaderboard() {
     const { currentUser } = useAuth();
@@ -21,26 +25,31 @@ export default function Leaderboard() {
     async function loadData() {
         try {
             const uid = currentUser.uid;
-            const [studentSnap, batchSnap, attSnap, examSnap, hwSnap] = await Promise.all([
-                getDocs(query(collection(db, 'students'), where('teacherId', '==', uid))),
-                getDocs(query(collection(db, 'batches'), where('teacherId', '==', uid))),
+            const [activeBatches, studentSnap, attSnap, examSnap, hwSnap] = await Promise.all([
+                batchService.getBatches(uid, true),
+                getDocs(query(
+                    collection(db, 'students'), 
+                    where('teacherId', '==', uid),
+                    where('status', '==', 'enrolled')
+                )),
                 getDocs(query(collection(db, 'attendance'), where('teacherId', '==', uid))),
                 getDocs(query(collection(db, 'exams'), where('teacherId', '==', uid))),
                 getDocs(query(collection(db, 'homeworks'), where('teacherId', '==', uid))),
             ]);
-            setStudents(studentSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
             
-            const fetchedBatches = batchSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
-            setBatches(fetchedBatches);
-            if (fetchedBatches.length > 0) {
-                setSelectedBatchId(fetchedBatches[0].id);
+            const enrolledStudents = studentSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+            setStudents(enrolledStudents);
+            setBatches(activeBatches);
+            
+            if (activeBatches.length > 0 && !selectedBatchId) {
+                setSelectedBatchId(activeBatches[0].id);
             }
 
             setAttendance(attSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
             setExams(examSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
             setHomeworks(hwSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
         } catch (err) {
-            console.error('Error loading leaderboard data:', err);
+            console.error('Error loading leaderboard foundation:', err);
         } finally {
             setLoading(false);
         }
@@ -61,18 +70,14 @@ export default function Leaderboard() {
             attendance.forEach(a => {
                 if (a.batchId === selectedBatchId) {
                     const record = (a.records || []).find(r => r.studentId === student.id);
-                    if (record && record.status === 'present') {
-                        attPoints += 10;
-                    }
+                    if (record && record.status === 'present') attPoints += 10;
                 }
             });
 
             // Homework Points (20 pts per completed HW)
             homeworks.forEach(hw => {
                 if (hw.batchId === selectedBatchId) {
-                    if ((hw.completedBy || []).includes(student.id)) {
-                        hwPoints += 20;
-                    }
+                    if ((hw.completedBy || []).includes(student.id)) hwPoints += 20;
                 }
             });
 
@@ -99,16 +104,15 @@ export default function Leaderboard() {
             };
         });
 
-        // Sort descending
         return scores.sort((a, b) => b.points - a.points);
     }, [students, selectedBatchId, attendance, homeworks, exams]);
 
-    const getRankIcon = (index) => {
+    const getRankUI = (index) => {
         switch (index) {
-            case 0: return <Trophy size={24} style={{ color: '#fbbf24' }} />; // Gold
-            case 1: return <Medal size={24} style={{ color: '#94a3b8' }} />; // Silver
-            case 2: return <Medal size={24} style={{ color: '#b45309' }} />; // Bronze
-            default: return <div style={{ width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, color: 'var(--color-text-muted)' }}>{index + 1}</div>;
+            case 0: return { icon: <Trophy size={24} />, color: '#fbbf24', label: '1st', bg: 'rgba(251, 191, 36, 0.1)' };
+            case 1: return { icon: <Medal size={24} />, color: '#94a3b8', label: '2nd', bg: 'rgba(148, 163, 184, 0.1)' };
+            case 2: return { icon: <Medal size={24} />, color: '#b45309', label: '3rd', bg: 'rgba(180, 83, 9, 0.1)' };
+            default: return { icon: null, color: 'var(--color-text-muted)', label: `${index + 1}th`, bg: 'transparent' };
         }
     };
 
@@ -118,129 +122,223 @@ export default function Leaderboard() {
         <div className="animate-fade-in">
             <div className="page-header">
                 <div>
-                    <h1 className="page-title">Top Achievers</h1>
-                    <p className="page-subtitle">Gamified leaderboard based on performance, attendance, and homework</p>
+                    <h1 className="page-title">Hall of Fame</h1>
+                    <p className="page-subtitle">Recognizing excellence and consistent engagement</p>
                 </div>
-                <div>
-                    <select 
-                        className="form-select" 
-                        value={selectedBatchId} 
-                        onChange={(e) => setSelectedBatchId(e.target.value)}
-                        style={{ minWidth: '200px' }}
-                    >
-                        {batches.map(b => (
-                            <option key={b.id} value={b.id}>{b.name}</option>
-                        ))}
-                    </select>
+                <div className="glass-card" style={{ padding: '10px 20px', display: 'flex', alignItems: 'center', gap: '15px', border: '1px solid var(--color-primary)' }}>
+                    <div style={{ color: 'var(--color-primary)' }}><Filter size={20} /></div>
+                    <div>
+                        <div style={{ fontSize: '10px', fontWeight: 900, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Competitive Batch</div>
+                        <select 
+                            className="form-select" 
+                            value={selectedBatchId} 
+                            onChange={(e) => setSelectedBatchId(e.target.value)}
+                            style={{ minWidth: '180px', height: '32px', border: 'none', background: 'transparent', padding: 0, fontWeight: 700, fontSize: '15px' }}
+                        >
+                            {batches.map(b => (
+                                <option key={b.id} value={b.id}>{b.name}</option>
+                            ))}
+                        </select>
+                    </div>
                 </div>
             </div>
 
-            {leaderboardData.length === 0 ? (
-                <div className="empty-state card">
-                    <Award size={48} className="empty-state-icon" style={{ color: 'var(--color-text-muted)', marginBottom: 'var(--space-4)' }} />
-                    <div className="empty-state-title">No Data Available</div>
-                    <div className="empty-state-text">No students found in this batch or no activities recorded yet.</div>
+            {!selectedBatchId || leaderboardData.length === 0 ? (
+                <div className="glass-panel" style={{ padding: 'var(--space-12)', textAlign: 'center' }}>
+                    <div style={{ width: '100px', height: '100px', borderRadius: '30px', background: 'rgba(255,255,255,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto var(--space-8)' }}>
+                        <Trophy size={48} style={{ color: 'var(--color-border)', opacity: 0.5 }} />
+                    </div>
+                    <h2 style={{ fontSize: '26px', fontWeight: 900, marginBottom: '12px' }}>Arena Waiting...</h2>
+                    <p style={{ color: 'var(--color-text-muted)', maxWidth: '400px', margin: '0 auto' }}>Select an active batch to reveal the current standing of our top performers.</p>
                 </div>
             ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-10)' }}>
                     
-                    {/* Top 3 Podium Cards */}
-                    {leaderboardData.length >= 3 && (
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-4)', alignItems: 'end', marginBottom: 'var(--space-4)' }}>
-                            {/* Rank 2 */}
-                            <div className="card" style={{ padding: 'var(--space-6) var(--space-4)', textAlign: 'center', background: 'linear-gradient(to bottom, var(--color-bg-card), var(--color-bg-elevated))', borderTop: '4px solid #94a3b8', transform: 'translateY(20px)' }}>
-                                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-2)' }}>
-                                    <Medal size={32} style={{ color: '#94a3b8' }} />
+                    {/* Elite Podium Display */}
+                    <div className="podium-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-end', gap: 'var(--space-4)', padding: 'var(--space-6) 0', marginTop: 'var(--space-8)' }}>
+                        {/* 2nd Place */}
+                        {leaderboardData[1] && (
+                            <div className="podium-item" style={{ width: '240px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                <div style={{ position: 'relative', marginBottom: 'var(--space-4)' }}>
+                                    <div style={{ width: '90px', height: '90px', borderRadius: '28px', background: 'linear-gradient(135deg, #94a3b8 0%, #475569 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px', fontWeight: 900, color: 'white', border: '4px solid rgba(148, 163, 184, 0.3)', boxShadow: '0 10px 25px -5px rgba(148, 163, 184, 0.4)' }}>
+                                        {leaderboardData[1].name.charAt(0)}
+                                    </div>
+                                    <div style={{ position: 'absolute', top: -15, right: -15, width: '40px', height: '40px', borderRadius: '50%', background: '#94a3b8', border: '3px solid var(--color-bg-main)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        <Medal size={20} color="white" />
+                                    </div>
                                 </div>
-                                <div style={{ width: 64, height: 64, margin: '0 auto var(--space-3)', borderRadius: 'var(--radius-full)', background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', fontWeight: 800 }}>
-                                    {leaderboardData[1].name.charAt(0)}
+                                <div className="glass-panel" style={{ width: '100%', height: '160px', borderTopLeftRadius: '24px', borderTopRightRadius: '24px', borderBottomLeftRadius: 0, borderBottomRightRadius: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(148, 163, 184, 0.05)', border: '1px solid rgba(148, 163, 184, 0.2)', borderBottom: 'none' }}>
+                                    <div style={{ fontWeight: 800, fontSize: '18px', textAlign: 'center', marginBottom: '4px' }}>{leaderboardData[1].name}</div>
+                                    <div style={{ fontSize: '28px', fontWeight: 900, color: '#94a3b8' }}>{leaderboardData[1].points}<span style={{ fontSize: '12px', opacity: 0.6, marginLeft: '4px' }}>pts</span></div>
+                                    <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--color-text-muted)', marginTop: '8px' }}>SILVER MEDALIST</div>
                                 </div>
-                                <h3 style={{ fontSize: '18px', fontWeight: 700, margin: '0 0 4px 0' }}>{leaderboardData[1].name}</h3>
-                                <div style={{ fontSize: '24px', fontWeight: 800, color: 'var(--color-accent)' }}>{leaderboardData[1].points} <span style={{fontSize: '12px', color: 'var(--color-text-muted)', fontWeight: 500}}>pts</span></div>
                             </div>
-                            
-                            {/* Rank 1 */}
-                            <div className="card" style={{ padding: 'var(--space-8) var(--space-4)', textAlign: 'center', background: 'linear-gradient(to bottom, var(--color-primary-soft), var(--color-primary))', borderTop: '4px solid #fbbf24', boxShadow: '0 10px 25px -5px rgba(251, 191, 36, 0.2)' }}>
-                                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-3)' }}>
-                                    <Trophy size={48} style={{ color: '#fbbf24', filter: 'drop-shadow(0 0 8px rgba(251, 191, 36, 0.4))' }} />
+                        )}
+                        
+                        {/* 1st Place */}
+                        <div className="podium-item" style={{ width: '280px', display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 10 }}>
+                            <div style={{ position: 'relative', marginBottom: 'var(--space-6)' }}>
+                                <div style={{ position: 'absolute', top: -45, left: '50%', transform: 'translateX(-50%)', color: '#fbbf24' }}>
+                                    <Sparkles size={40} className="animate-pulse" />
                                 </div>
-                                <div style={{ width: 80, height: 80, margin: '0 auto var(--space-3)', borderRadius: 'var(--radius-full)', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px', fontWeight: 800, color: 'white', border: '3px solid rgba(255,255,255,0.5)' }}>
+                                <div style={{ width: '120px', height: '120px', borderRadius: '36px', background: 'linear-gradient(135deg, #fbbf24 0%, #d97706 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '48px', fontWeight: 900, color: 'white', border: '5px solid rgba(251, 191, 36, 0.4)', boxShadow: '0 20px 50px -10px rgba(251, 191, 36, 0.6)' }}>
                                     {leaderboardData[0].name.charAt(0)}
                                 </div>
-                                <h3 style={{ fontSize: '22px', fontWeight: 800, margin: '0 0 4px 0', color: 'white' }}>{leaderboardData[0].name}</h3>
-                                <div style={{ fontSize: '32px', fontWeight: 800, color: '#fbbf24' }}>{leaderboardData[0].points} <span style={{fontSize: '14px', color: 'rgba(255,255,255,0.7)', fontWeight: 500}}>pts</span></div>
+                                <div style={{ position: 'absolute', top: -20, right: -20, width: '56px', height: '56px', borderRadius: '50%', background: '#fbbf24', border: '4px solid var(--color-bg-main)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 5px 15px rgba(251, 191, 36, 0.4)' }}>
+                                    <Trophy size={32} color="white" />
+                                </div>
                             </div>
-
-                            {/* Rank 3 */}
-                            <div className="card" style={{ padding: 'var(--space-6) var(--space-4)', textAlign: 'center', background: 'linear-gradient(to bottom, var(--color-bg-card), var(--color-bg-elevated))', borderTop: '4px solid #b45309', transform: 'translateY(30px)' }}>
-                                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-2)' }}>
-                                    <Medal size={32} style={{ color: '#b45309' }} />
-                                </div>
-                                <div style={{ width: 64, height: 64, margin: '0 auto var(--space-3)', borderRadius: 'var(--radius-full)', background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', fontWeight: 800 }}>
-                                    {leaderboardData[2].name.charAt(0)}
-                                </div>
-                                <h3 style={{ fontSize: '18px', fontWeight: 700, margin: '0 0 4px 0' }}>{leaderboardData[2].name}</h3>
-                                <div style={{ fontSize: '24px', fontWeight: 800, color: 'var(--color-accent)' }}>{leaderboardData[2].points} <span style={{fontSize: '12px', color: 'var(--color-text-muted)', fontWeight: 500}}>pts</span></div>
+                            <div className="glass-panel" style={{ width: '100%', height: '220px', borderTopLeftRadius: '32px', borderTopRightRadius: '32px', borderBottomLeftRadius: 0, borderBottomRightRadius: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(251, 191, 36, 0.08)', border: '1px solid rgba(251, 191, 36, 0.3)', borderBottom: 'none', boxShadow: '0 -20px 40px -20px rgba(251, 191, 36, 0.2)' }}>
+                                <div style={{ fontWeight: 900, fontSize: '22px', textAlign: 'center', marginBottom: '6px' }}>{leaderboardData[0].name}</div>
+                                <div style={{ fontSize: '42px', fontWeight: 900, color: '#fbbf24', textShadow: '0 0 20px rgba(251, 191, 36, 0.4)' }}>{leaderboardData[0].points}</div>
+                                <div style={{ fontSize: '13px', fontWeight: 900, color: '#fbbf24', letterSpacing: '0.1em', marginTop: '10px' }}>GRAND CHAMPION</div>
                             </div>
                         </div>
-                    )}
 
-                    {/* Full List */}
-                    <div className="card">
+                        {/* 3rd Place */}
+                        {leaderboardData[2] && (
+                            <div className="podium-item" style={{ width: '240px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                <div style={{ position: 'relative', marginBottom: 'var(--space-4)' }}>
+                                    <div style={{ width: '90px', height: '90px', borderRadius: '28px', background: 'linear-gradient(135deg, #b45309 0%, #78350f 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px', fontWeight: 900, color: 'white', border: '4px solid rgba(180, 83, 9, 0.3)', boxShadow: '0 10px 25px -5px rgba(180, 83, 9, 0.4)' }}>
+                                        {leaderboardData[2].name.charAt(0)}
+                                    </div>
+                                    <div style={{ position: 'absolute', top: -15, right: -15, width: '40px', height: '40px', borderRadius: '50%', background: '#b45309', border: '3px solid var(--color-bg-main)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        <Medal size={20} color="white" />
+                                    </div>
+                                </div>
+                                <div className="glass-panel" style={{ width: '100%', height: '140px', borderTopLeftRadius: '24px', borderTopRightRadius: '24px', borderBottomLeftRadius: 0, borderBottomRightRadius: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(180, 83, 9, 0.05)', border: '1px solid rgba(180, 83, 9, 0.2)', borderBottom: 'none' }}>
+                                    <div style={{ fontWeight: 800, fontSize: '17px', textAlign: 'center', marginBottom: '4px' }}>{leaderboardData[2].name}</div>
+                                    <div style={{ fontSize: '26px', fontWeight: 900, color: '#b45309' }}>{leaderboardData[2].points}<span style={{ fontSize: '12px', opacity: 0.6, marginLeft: '4px' }}>pts</span></div>
+                                    <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--color-text-muted)', marginTop: '8px' }}>BRONZE MEDALIST</div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Overall Leaderboard Ranking */}
+                    <div className="glass-panel" style={{ padding: 0, overflow: 'hidden' }}>
+                        <div style={{ padding: '24px 32px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.01)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                <TrendingUp size={22} color="var(--color-primary)" />
+                                <h3 style={{ fontSize: '18px', fontWeight: 900 }}>Power Standings</h3>
+                            </div>
+                            <div style={{ fontSize: '13px', color: 'var(--color-text-muted)', fontWeight: 600 }}>Ranking for {batches.find(b => b.id === selectedBatchId)?.name}</div>
+                        </div>
                         <div className="table-container">
                             <table className="table">
                                 <thead>
                                     <tr>
-                                        <th style={{ width: '80px', textAlign: 'center' }}>Rank</th>
-                                        <th>Student</th>
-                                        <th style={{ textAlign: 'right' }}>Attendance Points</th>
-                                        <th style={{ textAlign: 'right' }}>Homework Points</th>
-                                        <th style={{ textAlign: 'right' }}>Exam Points</th>
-                                        <th style={{ textAlign: 'right', fontSize: '15px', fontWeight: 800 }}>Total Score</th>
+                                        <th style={{ width: '100px', textAlign: 'center' }}>RANK</th>
+                                        <th>STUDENT ARCHETYPE</th>
+                                        <th style={{ textAlign: 'center' }}>ATTENDANCE</th>
+                                        <th style={{ textAlign: 'center' }}>SYLLABUS</th>
+                                        <th style={{ textAlign: 'center' }}>MASTERY</th>
+                                        <th style={{ textAlign: 'right', paddingRight: '32px' }}>TOTAL SCORE</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {leaderboardData.map((student, index) => (
-                                        <tr key={student.id} style={{ transition: 'all 0.2s', background: index < 3 ? 'var(--color-bg-elevated)' : 'transparent' }}>
-                                            <td style={{ textAlign: 'center' }}>
-                                                {getRankIcon(index)}
-                                            </td>
-                                            <td>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-                                                    <div className="attendance-student-avatar" style={{ background: index === 0 ? '#fbbf24' : index === 1 ? '#94a3b8' : index === 2 ? '#b45309' : 'var(--color-bg-elevated)', color: index < 3 ? '#fff' : 'var(--color-accent)' }}>
-                                                        {student.name.charAt(0)}
+                                    {leaderboardData.map((student, index) => {
+                                        const rankUI = getRankUI(index);
+                                        return (
+                                            <tr key={student.id} 
+                                                style={{ 
+                                                    background: index < 3 ? 'rgba(255,255,255,0.02)' : 'transparent',
+                                                    transition: 'all 0.2s'
+                                                }}
+                                            >
+                                                <td style={{ textAlign: 'center' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                        {index < 3 ? (
+                                                            <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: rankUI.bg, color: rankUI.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: '15px' }}>
+                                                                {rankUI.label}
+                                                            </div>
+                                                        ) : (
+                                                            <span style={{ fontWeight: 800, fontSize: '16px', opacity: 0.5 }}>{index + 1}</span>
+                                                        )}
                                                     </div>
-                                                    <div style={{ fontWeight: 600 }}>{student.name}</div>
-                                                </div>
-                                            </td>
-                                            <td style={{ textAlign: 'right', color: 'var(--color-text-secondary)' }}>{student.breakdown.attendance}</td>
-                                            <td style={{ textAlign: 'right', color: 'var(--color-text-secondary)' }}>{student.breakdown.homework}</td>
-                                            <td style={{ textAlign: 'right', color: 'var(--color-text-secondary)' }}>{student.breakdown.exams}</td>
-                                            <td style={{ textAlign: 'right', fontWeight: 800, fontSize: '16px', color: 'var(--color-accent)' }}>
-                                                {student.points}
-                                            </td>
-                                        </tr>
-                                    ))}
+                                                </td>
+                                                <td>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '12px 0' }}>
+                                                        <div style={{ 
+                                                            width: '44px', height: '44px', borderRadius: '14px', 
+                                                            background: index < 3 ? rankUI.color : 'rgba(255,255,255,0.05)', 
+                                                            color: index < 3 ? 'white' : 'var(--color-text-secondary)',
+                                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                            fontSize: '18px', fontWeight: 900,
+                                                            boxShadow: index < 3 ? `0 8px 15px -4px ${rankUI.color}60` : 'none'
+                                                        }}>
+                                                            {student.name.charAt(0)}
+                                                        </div>
+                                                        <div>
+                                                            <div style={{ fontWeight: 800, fontSize: '15px' }}>{student.name}</div>
+                                                            <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                                                <span>ID: {student.studentId || 'N/A'}</span>
+                                                                <span style={{ opacity: 0.3 }}>•</span>
+                                                                <span className="badge" style={{ background: 'rgba(255,255,255,0.05)', padding: '1px 6px', fontSize: '10px' }}>GRADE {student.grade}</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td style={{ textAlign: 'center' }}>
+                                                    <div style={{ fontSize: '14px', fontWeight: 700 }}>{student.breakdown.attendance}</div>
+                                                    <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', fontWeight: 800 }}>POINTS</div>
+                                                </td>
+                                                <td style={{ textAlign: 'center' }}>
+                                                    <div style={{ fontSize: '14px', fontWeight: 700 }}>{student.breakdown.homework}</div>
+                                                    <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', fontWeight: 800 }}>POINTS</div>
+                                                </td>
+                                                <td style={{ textAlign: 'center' }}>
+                                                    <div style={{ fontSize: '14px', fontWeight: 700 }}>{student.breakdown.exams}</div>
+                                                    <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', fontWeight: 800 }}>POINTS</div>
+                                                </td>
+                                                <td style={{ textAlign: 'right', paddingRight: '32px' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '10px' }}>
+                                                        <div style={{ fontSize: '20px', fontWeight: 900, color: index === 0 ? '#fbbf24' : 'var(--color-primary)' }}>
+                                                            {student.points}
+                                                        </div>
+                                                        {index < 3 && <Zap size={16} fill={rankUI.color} color={rankUI.color} />}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
                                 </tbody>
                             </table>
                         </div>
                     </div>
 
-                    {/* Points Legend */}
-                    <div style={{ background: 'var(--color-bg-elevated)', padding: 'var(--space-4)', borderRadius: 'var(--radius-md)', display: 'flex', gap: 'var(--space-6)', justifyContent: 'center', flexWrap: 'wrap' }}>
-                        <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <Star size={14} style={{ color: 'var(--color-gold)' }} /> <strong>+10 pts</strong> per attended class
-                        </div>
-                        <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <Star size={14} style={{ color: 'var(--color-gold)' }} /> <strong>+20 pts</strong> per completed homework
-                        </div>
-                        <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <Star size={14} style={{ color: 'var(--color-gold)' }} /> <strong>+0.5 pts</strong> per exam mark obtained
-                        </div>
+                    {/* Point Scoring Mechanics */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-6)' }}>
+                        {[
+                            { title: 'Consistency', subtitle: 'Attendance Discipline', value: '+10 pts / session', icon: UserCheck, color: 'var(--color-teal)' },
+                            { title: 'Diligence', subtitle: 'Homework Submission', value: '+20 pts / completion', icon: Star, color: 'var(--color-warning)' },
+                            { title: 'Aptitude', subtitle: 'Examination Performance', value: '50% of marks secured', icon: Trophy, color: 'var(--color-primary)' }
+                        ].map((card, i) => (
+                            <div key={i} className="glass-card" style={{ padding: '24px', position: 'relative', overflow: 'hidden' }}>
+                                <div style={{ position: 'absolute', top: '-10px', right: '-10px', opacity: 0.05 }}>
+                                    <card.icon size={80} />
+                                </div>
+                                <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                                    <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: `${card.color}15`, color: card.color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        <card.icon size={24} />
+                                    </div>
+                                    <div>
+                                        <div style={{ fontSize: '15px', fontWeight: 900 }}>{card.title}</div>
+                                        <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 700 }}>{card.subtitle}</div>
+                                    </div>
+                                </div>
+                                <div style={{ marginTop: '20px', fontSize: '18px', fontWeight: 900, color: card.color }}>{card.value}</div>
+                            </div>
+                        ))}
                     </div>
 
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', padding: '20px', background: 'rgba(255,255,255,0.02)', borderRadius: '20px', color: 'var(--color-text-muted)', fontSize: '13px', fontWeight: 600 }}>
+                        <Info size={16} />
+                        Only showing currently enrolled students. Data is synchronized across all active batch metrics.
+                    </div>
                 </div>
             )}
         </div>
     );
 }
+import { UserCheck } from 'lucide-react';

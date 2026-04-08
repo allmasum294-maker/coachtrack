@@ -342,8 +342,6 @@ export default function Exams() {
 
     return (
         <div className="animate-fade-in">
-    return (
-        <div className="animate-fade-in">
             <div className="page-header" style={{ marginBottom: 'var(--space-8)' }}>
                 <div>
                     <h1 className="page-title">Exams & Assessments</h1>

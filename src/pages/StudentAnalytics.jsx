@@ -8,7 +8,15 @@ import {
     LineChart, Line, BarChart, Bar, AreaChart, Area,
     XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Cell
 } from 'recharts';
-import { format, startOfDay, endOfDay } from 'date-fns';
+import { format, startOfDay, endOfDay, isValid } from 'date-fns';
+
+// Helper for safe date conversion from Firestore or String
+const safeToDate = (dateVal) => {
+    if (!dateVal) return null;
+    if (typeof dateVal.toDate === 'function') return dateVal.toDate();
+    const d = new Date(dateVal);
+    return isValid(d) ? d : null;
+};
 
 export default function StudentAnalytics() {
     const { currentUser } = useAuth();

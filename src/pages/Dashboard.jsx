@@ -10,8 +10,16 @@ import {
     ArrowRight, Clock, AlertTriangle, PlayCircle, 
     Crown, Activity, Zap, ChevronRight, ShieldAlert
 } from 'lucide-react';
-import { format, isToday, isTomorrow, startOfWeek, endOfWeek, differenceInDays } from 'date-fns';
+import { format, isToday, isTomorrow, startOfWeek, endOfWeek, differenceInDays, parseISO, isValid } from 'date-fns';
 import { batchService } from '../services/batchService';
+
+// Helper for safe date conversion from Firestore or String
+const safeToDate = (dateVal) => {
+    if (!dateVal) return null;
+    if (typeof dateVal.toDate === 'function') return dateVal.toDate();
+    const d = new Date(dateVal);
+    return isValid(d) ? d : null;
+};
 
 export default function Dashboard() {
     const { currentUser, userProfile } = useAuth();
@@ -65,13 +73,14 @@ export default function Dashboard() {
             const upcoming = schedules
                 .filter((s) => {
                     if (!s.date || s.status === 'cancelled') return false;
-                    const d = s.date.toDate ? s.date.toDate() : new Date(s.date);
+                    const d = safeToDate(s.date);
+                    if (!d) return false;
                     if (isToday(d)) classesToday++;
                     return d >= now;
                 })
                 .sort((a, b) => {
-                    const da = a.date.toDate ? a.date.toDate() : new Date(a.date);
-                    const db2 = b.date.toDate ? b.date.toDate() : new Date(b.date);
+                    const da = safeToDate(a.date) || new Date(0);
+                    const db2 = safeToDate(b.date) || new Date(0);
                     return da - db2;
                 })
                 .slice(0, 5);
@@ -87,9 +96,10 @@ export default function Dashboard() {
                 studentAttendance[id] = { studentId: id, total: 0, present: 0 };
             });
 
-            attendanceSnap.docs.forEach((d) => {
-                const data = d.data();
-                const recordDate = data.date.toDate ? data.date.toDate() : new Date(data.date);
+            attendanceSnap.docs.forEach((dSnapshot) => {
+                const data = dSnapshot.data();
+                const recordDate = safeToDate(data.date);
+                if (!recordDate) return;
                 const isThisWeek = recordDate >= weekStart && recordDate <= weekEnd;
                 
                 if (data.records) {
@@ -155,30 +165,32 @@ export default function Dashboard() {
 
             const upcomingExams = examsData
                 .filter(e => {
-                    if (!e.date) return false;
-                    const ed = e.date.toDate ? e.date.toDate() : new Date(e.date);
+                    const ed = safeToDate(e.date);
+                    if (!ed) return false;
                     ed.setHours(0,0,0,0);
                     const today = new Date();
                     today.setHours(0,0,0,0);
                     return ed >= today;
                 })
                 .sort((a, b) => {
-                    const da = a.date.toDate ? a.date.toDate() : new Date(a.date);
-                    const db2 = b.date.toDate ? b.date.toDate() : new Date(b.date);
+                    const da = safeToDate(a.date) || new Date(0);
+                    const db2 = safeToDate(b.date) || new Date(0);
                     return da - db2;
                 });
 
             if (upcomingExams.length > 0) {
-                const earliestExamDate = upcomingExams[0].date.toDate ? upcomingExams[0].date.toDate() : new Date(upcomingExams[0].date);
-                nextExamDays = differenceInDays(earliestExamDate, new Date());
-                if (nextExamDays < 0) nextExamDays = 0;
+                const earliestExamDate = safeToDate(upcomingExams[0].date);
+                if (earliestExamDate) {
+                    nextExamDays = differenceInDays(earliestExamDate, new Date());
+                    if (nextExamDays < 0) nextExamDays = 0;
+                }
             }
 
             const pastExams = examsData
                 .filter(e => e.date && !upcomingExams.find(ue => ue.id === e.id))
                 .sort((a, b) => {
-                    const da = a.date.toDate ? a.date.toDate() : new Date(a.date);
-                    const db2 = b.date.toDate ? b.date.toDate() : new Date(b.date);
+                    const da = safeToDate(a.date) || new Date(0);
+                    const db2 = safeToDate(b.date) || new Date(0);
                     return da - db2;
                 });
 
@@ -379,7 +391,10 @@ export default function Dashboard() {
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                                 <div>
                                                     <div style={{ fontSize: '11px', fontWeight: 900, color: 'var(--color-primary)', textTransform: 'uppercase', marginBottom: '4px', letterSpacing: '0.05em' }}>
-                                                        {format(cls.date.toDate ? cls.date.toDate() : new Date(cls.date), 'HH:mm')} • {format(cls.date.toDate ? cls.date.toDate() : new Date(cls.date), 'EEE')}
+                                                     {(() => {
+                                                        const d = safeToDate(cls.date);
+                                                        return d ? `${format(d, 'HH:mm')} • ${format(d, 'EEE')}` : 'TBA';
+                                                     })()}
                                                     </div>
                                                     <div style={{ fontWeight: 800, fontSize: '15px', color: 'var(--color-text-primary)' }}>{cls.title}</div>
                                                     <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', fontWeight: 600 }}>{cls.batchName}</div>

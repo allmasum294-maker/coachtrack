@@ -245,6 +245,7 @@ export default function AdminPanel() {
                             </div>
 
                             <div className="glass-panel" style={{ padding: '32px', background: 'rgba(255, 255, 255, 0.02)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                                         <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--color-primary)' }} />
                                         <div style={{ fontWeight: 800, fontSize: '16px' }}>Update Old Records</div>

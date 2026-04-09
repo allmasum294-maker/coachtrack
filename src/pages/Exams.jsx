@@ -44,7 +44,7 @@ export default function Exams() {
             const uid = currentUser.uid;
             const [examSnap, activeBatches, studentSnap] = await Promise.all([
                 getDocs(query(collection(db, 'exams'), where('teacherId', '==', uid))),
-                batchService.getBatches(uid, true),
+                batchService.getBatches(uid, false),
                 getDocs(query(collection(db, 'students'), where('teacherId', '==', uid), where('status', '==', 'enrolled'))),
             ]);
             setExams(examSnap.docs.map((d) => ({ id: d.id, ...d.data() })));

@@ -12,6 +12,8 @@ import {
 } from 'lucide-react';
 import { format, isToday, isTomorrow, startOfWeek, endOfWeek, differenceInDays, parseISO, isValid } from 'date-fns';
 import { batchService } from '../services/batchService';
+import { migrateBatchesIsClosed } from '../migrations/addIsClosedToBatches';
+import toast from 'react-hot-toast';
 
 // Helper for safe date conversion from Firestore or String
 const safeToDate = (dateVal) => {
@@ -58,7 +60,7 @@ export default function Dashboard() {
             });
 
             // 2. Fetch ACTIVE Batches
-            const activeBatches = await batchService.getBatches(uid, true);
+            const activeBatches = await batchService.getBatches(uid, false);
             const activeBatchIds = activeBatches.map(b => b.id);
             const activeBatchMap = {};
             activeBatches.forEach(b => { activeBatchMap[b.id] = b; });
@@ -267,6 +269,18 @@ export default function Dashboard() {
                     </div>
                     
                     <div style={{ display: 'flex', gap: '16px' }}>
+                        <button 
+                            className="btn btn-ghost" 
+                            onClick={async () => {
+                                const res = await migrateBatchesIsClosed();
+                                if (res.count > 0) toast.success(`Migrated ${res.count} batches`);
+                                else toast.success('Schema up to date');
+                                loadDashboardData();
+                            }}
+                            style={{ fontSize: '10px', height: '32px', opacity: 0.5 }}
+                        >
+                            SYNC SCHEMA
+                        </button>
                         <Link to="/attendance" className="btn btn-primary" style={{ padding: '0 28px', height: '48px', borderRadius: '14px', fontWeight: 900, boxShadow: '0 10px 30px -5px rgba(59, 130, 246, 0.4)', gap: '10px' }}>
                             <ClipboardCheck size={20} /> SYNC ATTENDANCE
                         </Link>

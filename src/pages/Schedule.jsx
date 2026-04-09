@@ -12,7 +12,7 @@ import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import { 
     Plus, X, Calendar as CalIcon, Clock, AlertCircle, 
-    RefreshCw, Info, CheckCircle2, CalendarDays, 
+    RefreshCw, Info, CheckCircle2, UserCheck, CalendarDays, 
     Calendar as CalendarIcon, Filter, Layers, ChevronRight
 } from 'lucide-react';
 import { format, eachDayOfInterval, getDay } from 'date-fns';
@@ -56,7 +56,7 @@ export default function Schedule() {
     async function loadData() {
         try {
             // Only load active batches for the calendar view
-            const activeBatches = await batchService.getBatches(currentUser.uid, true);
+            const activeBatches = await batchService.getBatches(currentUser.uid, false);
             setBatches(activeBatches);
 
             const [schedSnap, studentSnap, examSnap, sessionLogSnap, hwSnap] = await Promise.all([

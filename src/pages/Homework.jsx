@@ -45,7 +45,7 @@ export default function Homework() {
             const uid = currentUser.uid;
             const [hwSnap, activeBatches, studentSnap, sessionSnap] = await Promise.all([
                 getDocs(query(collection(db, 'homeworks'), where('teacherId', '==', uid))),
-                batchService.getBatches(uid, true),
+                batchService.getBatches(uid, false),
                 getDocs(query(collection(db, 'students'), where('teacherId', '==', uid), where('status', '==', 'enrolled'))),
                 getDocs(query(collection(db, 'sessionLogs'), where('teacherId', '==', uid))),
             ]);

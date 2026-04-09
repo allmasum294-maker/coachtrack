@@ -50,7 +50,7 @@ export default function Analytics() {
         try {
             const uid = currentUser.uid;
             const [activeBatches, studentSnap, attSnap, lessonSnap, examSnap, schedSnap] = await Promise.all([
-                batchService.getBatches(uid, true),
+                batchService.getBatches(uid, false),
                 getDocs(query(
                     collection(db, 'students'), 
                     where('teacherId', '==', uid),

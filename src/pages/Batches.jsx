@@ -203,16 +203,9 @@ export default function Batches() {
                                         className="btn btn-ghost btn-icon" 
                                         onClick={async () => {
                                             const newStatus = !batch.isClosed;
-                                            if (confirm(`Are you sure you want to ${newStatus ? 'archive' : 'reactivate'} this cluster?`)) {
-                                                try {
-                                                    if (newStatus) await closeBatch(batch.id);
-                                                    else await reactivateBatch(batch.id);
-                                                    toast.success(`Cluster ${newStatus ? 'Archived' : 'Reactivated'}`);
-                                                    loadBatches();
-                                                } catch (err) {
-                                                    toast.error('Telemetery Update Failed');
-                                                }
-                                            }
+                                            setEditingBatch(batch);
+                                            setForm(prev => ({ ...prev, isClosed: newStatus }));
+                                            setShowModal(true);
                                         }}
                                         style={{ width: '36px', height: '36px', borderRadius: '10px' }}
                                     >
@@ -299,6 +292,19 @@ export default function Batches() {
                             />
                         </div>
                     </div>
+                    {editingBatch && (
+                        <div className="form-group" style={{ padding: '16px', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                             <label className="checkbox-container" style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+                                <input 
+                                    type="checkbox" 
+                                    checked={form.isClosed} 
+                                    onChange={(e) => setForm({ ...form, isClosed: e.target.checked })}
+                                    style={{ width: '18px', height: '18px' }}
+                                />
+                                <span style={{ fontSize: '13px', fontWeight: 700 }}>Archive this cluster (stops data collection)</span>
+                            </label>
+                        </div>
+                    )}
                     <div className="modal-footer" style={{ padding: '0', marginTop: '12px', border: 'none', display: 'flex', gap: '12px' }}>
                         <button type="button" className="btn btn-ghost" onClick={() => setShowModal(false)} style={{ flex: 1, height: '48px', fontWeight: 800, borderRadius: '12px' }}>ABORT</button>
                         <button type="submit" className="btn btn-primary" style={{ flex: 2, height: '48px', fontWeight: 900, borderRadius: '12px' }}>{editingBatch ? 'SAVE PROTOCOL' : 'INITIALIZE'}</button>

@@ -105,16 +105,27 @@ export default function Sidebar() {
         <>
             {/* Mobile toggle */}
             <button
-                className="sidebar-toggle"
+                className="sidebar-toggle glass-panel"
                 onClick={() => setMobileOpen(true)}
                 style={{
                     position: 'fixed',
-                    top: '16px',
-                    left: '16px',
-                    zIndex: 101,
+                    top: '20px',
+                    left: '20px',
+                    zIndex: 1000,
+                    width: '44px',
+                    height: '44px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: '12px',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    background: 'rgba(15, 23, 42, 0.6)',
+                    backdropFilter: 'blur(12px)',
+                    color: 'var(--color-text-primary)',
+                    boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
                 }}
             >
-                <Menu size={24} />
+                <Menu size={22} />
             </button>
 
             {/* Mobile overlay */}

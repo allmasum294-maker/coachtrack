@@ -40,7 +40,7 @@ export default function Attendance() {
         try {
             const uid = currentUser.uid;
             const [activeBatches, studentSnap] = await Promise.all([
-                batchService.getBatches(uid, true),
+                batchService.getBatches(uid, false),
                 getDocs(query(
                     collection(db, 'students'), 
                     where('teacherId', '==', uid),

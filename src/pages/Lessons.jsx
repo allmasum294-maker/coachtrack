@@ -30,7 +30,7 @@ export default function Lessons() {
     async function loadBatches() {
         try {
             // Only load active batches for curriculum tracking
-            const data = await batchService.getBatches(currentUser.uid, true);
+            const data = await batchService.getBatches(currentUser.uid, false);
             setBatches(data);
             if (data.length > 0 && !selectedBatch) setSelectedBatch(data[0].id);
         } catch (err) {

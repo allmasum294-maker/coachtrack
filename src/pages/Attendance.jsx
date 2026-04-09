@@ -50,7 +50,7 @@ export default function Attendance() {
             setBatches(activeBatches);
             setStudents(studentSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
         } catch (err) {
-            console.error('Error loading foundation data:', err);
+            console.error('Error loading students:', err);
             toast.error('Failed to load students');
         } finally {
             setLoading(false);
@@ -93,7 +93,7 @@ export default function Attendance() {
                 return db2 - da;
             }));
         } catch (err) {
-            console.error('Error loading attendance logs:', err);
+            console.error('Error loading attendance history:', err);
         }
     }
 
@@ -152,8 +152,7 @@ export default function Attendance() {
                 }
             });
             await Promise.all(updatePromises);
-
-            toast.success('Attendance records secured!', { id: toastId });
+            toast.success('Attendance saved!', { id: toastId });
             loadAttendanceForDate();
         } catch (err) {
             console.error('Save error:', err);
@@ -164,14 +163,14 @@ export default function Attendance() {
     }
 
     async function handleDelete(id) {
-        if (!confirm('This will permanently delete this daily record. Proceed?')) return;
+        if (!confirm('This will permanently delete this record. Proceed?')) return;
         try {
             await deleteDoc(doc(db, 'attendance', id));
-            toast.success('Record purged');
+            toast.success('Record deleted');
             loadAttendanceForDate();
         } catch (err) {
             console.error('Delete error:', err);
-            toast.error('Operation failed');
+            toast.error('Failed to delete');
         }
     }
 
@@ -200,9 +199,9 @@ export default function Attendance() {
                         <div style={{ padding: '8px', background: 'rgba(59, 130, 246, 0.1)', color: 'var(--color-primary)', borderRadius: '12px' }}>
                             <Activity size={24} />
                         </div>
-                        <h1 className="page-title" style={{ margin: 0 }}>Attendance Registry</h1>
+                        <h1 className="page-title" style={{ margin: 0 }}>Attendance Records</h1>
                     </div>
-                    <p className="page-subtitle">Precision tracking for student engagement and batch presence</p>
+                    <p className="page-subtitle">Track student attendance for your classes</p>
                 </div>
             </div>
 
@@ -237,7 +236,7 @@ export default function Attendance() {
                         boxShadow: tab === 'mark' ? '0 8px 15px -3px rgba(59, 130, 246, 0.4)' : 'none'
                     }}
                 >
-                    <LayoutGrid size={18} /> Roll Call
+                    <LayoutGrid size={18} /> Mark Attendance
                 </button>
                 <button 
                     className={`nav-tab ${tab === 'history' ? 'active' : ''}`} 
@@ -258,7 +257,7 @@ export default function Attendance() {
                         boxShadow: tab === 'history' ? '0 8px 15px -3px rgba(59, 130, 246, 0.4)' : 'none'
                     }}
                 >
-                    <History size={18} /> Timeline Archive
+                    <History size={18} /> Past Attendance
                 </button>
             </div>
 
@@ -274,10 +273,10 @@ export default function Attendance() {
             }}>
                 <div className="form-group" style={{ marginBottom: 0 }}>
                     <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', fontWeight: 900, color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-                        <UserCheck size={16} /> Select Operational Batch
+                        <UserCheck size={16} /> Select Batch
                     </label>
                     <select className="form-select" value={selectedBatch} onChange={(e) => setSelectedBatch(e.target.value)} style={{ height: '56px', fontSize: '16px', fontWeight: 700, borderRadius: '14px', background: 'rgba(255, 255, 255, 0.04)' }}>
-                        <option value="">Choose Target...</option>
+                        <option value="">Choose a Batch...</option>
                         {batches.map((b) => (
                             <option key={b.id} value={b.id}>{b.name}</option>
                         ))}
@@ -285,7 +284,7 @@ export default function Attendance() {
                 </div>
                 <div className="form-group" style={{ marginBottom: 0 }}>
                     <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', fontWeight: 900, color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-                        <CalendarDays size={16} /> Registry Date
+                        <CalendarDays size={16} /> Class Date
                     </label>
                     <input className="form-input" type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} style={{ height: '56px', fontSize: '16px', fontWeight: 700, borderRadius: '14px', background: 'rgba(255, 255, 255, 0.04)' }} />
                 </div>
@@ -304,14 +303,14 @@ export default function Attendance() {
                             }}>
                                 <Info size={48} />
                             </div>
-                            <h2 style={{ fontSize: '28px', fontWeight: 900, marginBottom: '12px', letterSpacing: '-0.02em' }}>Batch Required</h2>
-                            <p style={{ color: 'var(--color-text-muted)', maxWidth: '450px', margin: '0 auto', fontSize: '16px', lineHeight: 1.6 }}>Select a target batch from the system console above to begin student roll call and attendance tracking.</p>
+                            <h2 style={{ fontSize: '28px', fontWeight: 900, marginBottom: '12px', letterSpacing: '-0.02em' }}>Select a Batch</h2>
+                            <p style={{ color: 'var(--color-text-muted)', maxWidth: '450px', margin: '0 auto', fontSize: '16px', lineHeight: 1.6 }}>Please select a batch from the menu above to start marking student attendance.</p>
                         </div>
                     ) : batchStudents.length === 0 ? (
                         <div className="glass-panel" style={{ padding: 'var(--space-20)', textAlign: 'center' }}>
                             <ClipboardCheck size={80} style={{ color: 'rgba(255, 255, 255, 0.05)', marginBottom: 'var(--space-8)' }} />
                             <h2 style={{ fontSize: '28px', fontWeight: 900, marginBottom: '12px', letterSpacing: '-0.02em' }}>No Enrolled Students</h2>
-                            <p style={{ color: 'var(--color-text-muted)', fontSize: '16px' }}>There are no active students matched to this operational batch.</p>
+                            <p style={{ color: 'var(--color-text-muted)', fontSize: '16px' }}>There are no active students in this batch.</p>
                         </div>
                     ) : (
                         <>
@@ -332,7 +331,7 @@ export default function Attendance() {
                                 {existingAttendance && (
                                     <div className="glass-card" style={{ padding: 'var(--space-6)', display: 'flex', alignItems: 'center', gap: 'var(--space-4)', border: '1px solid var(--color-primary)', background: 'rgba(59, 130, 246, 0.05)' }}>
                                         <div style={{ padding: '12px', background: 'rgba(59, 130, 246, 0.2)', color: 'var(--color-primary)', borderRadius: '14px', boxShadow: '0 0 20px rgba(59, 130, 246, 0.3)' }}><Save size={24} /></div>
-                                        <div><div style={{ fontSize: '12px', fontWeight: 900, color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>STATUS</div><div style={{ fontSize: '20px', fontWeight: 900, color: 'white' }}>ARCHIVED</div></div>
+                                        <div><div style={{ fontSize: '12px', fontWeight: 900, color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>STATUS</div><div style={{ fontSize: '20px', fontWeight: 900, color: 'white' }}>SAVED</div></div>
                                     </div>
                                 )}
                             </div>
@@ -417,11 +416,11 @@ export default function Attendance() {
                                     display: 'flex', alignItems: 'center', gap: '12px'
                                 }}>
                                     {saving ? (
-                                        <>Syncing Registry...</>
+                                        <>Saving Records...</>
                                     ) : (
                                         <>
                                             <Save size={22} />
-                                            Confirm Roll Call
+                                            Save Attendance
                                         </>
                                     )}
                                 </button>
@@ -436,8 +435,8 @@ export default function Attendance() {
                     {history.length === 0 ? (
                         <div className="glass-panel" style={{ padding: 'var(--space-20)', textAlign: 'center' }}>
                             <History size={80} style={{ color: 'rgba(255, 255, 255, 0.05)', marginBottom: 'var(--space-8)' }} />
-                            <h2 style={{ fontSize: '28px', fontWeight: 900, marginBottom: '12px', letterSpacing: '-0.02em' }}>Logbook Empty</h2>
-                            <p style={{ color: 'var(--color-text-muted)', fontSize: '16px' }}>Historical records for this operational batch will be archived here.</p>
+                            <h2 style={{ fontSize: '28px', fontWeight: 900, marginBottom: '12px', letterSpacing: '-0.02em' }}>No History Found</h2>
+                            <p style={{ color: 'var(--color-text-muted)', fontSize: '16px' }}>Attendance history for this batch will show up here.</p>
                         </div>
                     ) : (
                         <div className="glass-panel" style={{ padding: 0, overflow: 'hidden', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
@@ -445,10 +444,10 @@ export default function Attendance() {
                                 <table className="table">
                                     <thead>
                                         <tr style={{ background: 'rgba(255, 255, 255, 0.03)' }}>
-                                            <th style={{ padding: '24px 40px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--color-primary)' }}>Session Date</th>
-                                            <th style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--color-primary)' }}>Presence Breakdown</th>
-                                            <th style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--color-primary)' }}>Reliability Rate</th>
-                                            <th style={{ textAlign: 'right', paddingRight: '40px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--color-primary)' }}>Operational Control</th>
+                                            <th style={{ padding: '24px 40px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--color-primary)' }}>Class Date</th>
+                                            <th style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--color-primary)' }}>Attendance Summary</th>
+                                            <th style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--color-primary)' }}>Attendance %</th>
+                                            <th style={{ textAlign: 'right', paddingRight: '40px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--color-primary)' }}>Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody>

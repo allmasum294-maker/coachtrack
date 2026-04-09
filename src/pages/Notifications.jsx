@@ -27,7 +27,7 @@ export default function Notifications() {
                 return db2 - da;
             }));
         } catch (err) {
-            console.error('Core Signaling Error:', err);
+            console.error('Error loading notifications:', err);
         } finally {
             setLoading(false);
         }
@@ -40,7 +40,7 @@ export default function Notifications() {
                 prev.map((n) => (n.id === notificationId ? { ...n, isRead: true } : n))
             );
         } catch (err) {
-            console.error('Signal Update Error:', err);
+            console.error('Error updating notification:', err);
         }
     }
 
@@ -52,7 +52,7 @@ export default function Notifications() {
             );
             setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
         } catch (err) {
-            console.error('Global Signal Reset Error:', err);
+            console.error('Error resetting notifications:', err);
         }
     }
 
@@ -87,26 +87,26 @@ export default function Notifications() {
             <div className="page-header" style={{ marginBottom: 'var(--space-8)' }}>
                 <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-                        <div style={{ padding: '4px 10px', background: 'rgba(59, 130, 246, 0.1)', color: 'var(--color-primary)', borderRadius: '8px', fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Communication Hub</div>
+                        <div style={{ padding: '4px 10px', background: 'rgba(59, 130, 246, 0.1)', color: 'var(--color-primary)', borderRadius: '8px', fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Notifications Center</div>
                     </div>
                     <h1 className="page-title" style={{ fontSize: '32px', fontWeight: 900 }}>Notifications</h1>
                     <p className="page-subtitle" style={{ color: unreadCount > 0 ? 'var(--color-primary)' : 'var(--color-text-muted)', fontWeight: 600 }}>
-                        {unreadCount > 0 ? `${unreadCount} Pending Signals` : 'System Synchronized: All clear'}
+                        {unreadCount > 0 ? `${unreadCount} Unread Notifications` : 'All caught up!'}
                     </p>
                 </div>
                 {unreadCount > 0 && (
                     <button className="btn btn-primary" onClick={markAllRead} style={{ padding: '0 24px', height: '44px', fontWeight: 900, boxShadow: '0 8px 20px rgba(59, 130, 246, 0.2)' }}>
-                        <Check size={16} /> CLEAR ALL
+                        <Check size={16} /> MARK ALL AS READ
                     </button>
                 )}
             </div>
 
             <div className="glass-panel" style={{ padding: '6px', marginBottom: 'var(--space-8)', display: 'inline-flex', gap: '6px', background: 'rgba(255, 255, 255, 0.03)' }}>
                 <button className={`tab ${tab === 'all' ? 'active' : ''}`} onClick={() => setTab('all')} style={{ padding: '10px 20px', borderRadius: '10px', fontSize: '13px', fontWeight: 800 }}>
-                    Chronicle ({notifications.length})
+                    All ({notifications.length})
                 </button>
                 <button className={`tab ${tab === 'unread' ? 'active' : ''}`} onClick={() => setTab('unread')} style={{ padding: '10px 20px', borderRadius: '10px', fontSize: '13px', fontWeight: 800 }}>
-                    Critical {unreadCount > 0 && <span className="badge badge-red" style={{ marginLeft: '8px', fontSize: '10px' }}>{unreadCount}</span>}
+                    Unread {unreadCount > 0 && <span className="badge badge-red" style={{ marginLeft: '8px', fontSize: '10px' }}>{unreadCount}</span>}
                 </button>
             </div>
 
@@ -115,8 +115,8 @@ export default function Notifications() {
                     <div style={{ width: '100px', height: '100px', background: 'rgba(255,255,255,0.03)', color: 'var(--color-text-muted)', borderRadius: '50%', margin: '0 auto 24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <Bell size={40} opacity={0.3} />
                     </div>
-                    <h3 style={{ fontSize: '22px', fontWeight: 900 }}>Signal Silence</h3>
-                    <p style={{ color: 'var(--color-text-muted)', maxWidth: '340px', margin: '8px auto', fontWeight: 500 }}>No telemetry or event triggers found in this frequency segment.</p>
+                    <h3 style={{ fontSize: '22px', fontWeight: 900 }}>No Notifications</h3>
+                    <p style={{ color: 'var(--color-text-muted)', maxWidth: '340px', margin: '8px auto', fontWeight: 500 }}>Everything is quiet. No new alerts for now.</p>
                 </div>
             ) : (
                 <div style={{ display: 'grid', gap: '12px' }}>
@@ -162,7 +162,7 @@ export default function Notifications() {
                                     </div>
                                     {!notif.isRead && (
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '12px', color: accent, fontSize: '11px', fontWeight: 900, textTransform: 'uppercase' }}>
-                                            <Sparkles size={12} /> New Transmission
+                                            <Sparkles size={12} /> New
                                         </div>
                                     )}
                                 </div>

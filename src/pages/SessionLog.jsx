@@ -5,7 +5,7 @@ import {
     collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, Timestamp
 } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { FileEdit, Plus, Edit2, Trash2, X, Clock, Link2, Filter, BookOpen, Calendar, ChevronRight } from 'lucide-react';
+import { FileEdit, Plus, Edit2, Trash2, X, Clock, Link2, Filter, BookOpen, Calendar, ChevronRight, Info } from 'lucide-react';
 import { format, addDays } from 'date-fns';
 import toast from 'react-hot-toast';
 import { batchService } from '../services/batchService';
@@ -185,11 +185,11 @@ export default function SessionLog() {
         <div className="animate-fade-in">
             <div className="page-header" style={{ marginBottom: 'var(--space-8)' }}>
                 <div>
-                    <h1 className="page-title">Session Logs</h1>
-                    <p className="page-subtitle">Historical record of teaching activities and assignments</p>
+                    <h1 className="page-title">Class Records</h1>
+                    <p className="page-subtitle">A simple history of what you've taught in each class</p>
                 </div>
                 <button className="btn btn-primary" onClick={openCreate} style={{ boxShadow: 'var(--shadow-primary)' }}>
-                    <Plus size={18} /> New Log Entry
+                    <Plus size={18} /> Add Class Record
                 </button>
             </div>
 
@@ -211,8 +211,8 @@ export default function SessionLog() {
                     <div style={{ width: '80px', height: '80px', background: 'rgba(255,255,255,0.05)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto var(--space-6)' }}>
                         <FileEdit size={40} style={{ color: 'var(--color-text-muted)', opacity: 0.3 }} />
                     </div>
-                    <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '8px' }}>No Logs Found</h2>
-                    <p style={{ color: 'var(--color-text-muted)', maxWidth: '400px', margin: '0 auto' }}>You haven't recorded any sessions for this selection yet.</p>
+                    <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '8px' }}>No Records Found</h2>
+                    <p style={{ color: 'var(--color-text-muted)', maxWidth: '400px', margin: '0 auto' }}>You haven't added any class records yet.</p>
                 </div>
             ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
@@ -253,7 +253,7 @@ export default function SessionLog() {
                                             
                                             {log.notes && (
                                                 <div style={{ background: 'rgba(255,255,255,0.03)', padding: '12px 16px', borderRadius: '8px' }}>
-                                                    <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>Session Notes</span>
+                                                    <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>Class Notes</span>
                                                     <p style={{ fontSize: '14px', color: 'var(--color-text-secondary)', lineHeight: 1.6, margin: 0 }}>{log.notes}</p>
                                                 </div>
                                             )}
@@ -279,7 +279,7 @@ export default function SessionLog() {
             <Modal
                 isOpen={showModal}
                 onClose={() => setShowModal(false)}
-                title={editingLog ? 'Edit Session Log' : 'Create Session Log'}
+                title={editingLog ? 'Edit Class Record' : 'Add Class Record'}
                 maxWidth="650px"
             >
                 <form onSubmit={handleSave} style={{ padding: 'var(--space-2)' }}>
@@ -287,7 +287,7 @@ export default function SessionLog() {
                         <div className="form-group">
                             <label className="form-label">Batch <span style={{ color: 'var(--color-danger)' }}>*</span></label>
                             <select className="form-select" value={form.batchId} onChange={(e) => setForm({ ...form, batchId: e.target.value, scheduleId: '' })} required>
-                                <option value="">Select Target Batch</option>
+                                <option value="">Select Batch</option>
                                 {batches.map((b) => (<option key={b.id} value={b.id}>{b.name}</option>))}
                             </select>
                         </div>
@@ -330,7 +330,7 @@ export default function SessionLog() {
                     </div>
 
                     <div className="form-group" style={{ marginBottom: 'var(--space-4)' }}>
-                        <label className="form-label">Session Notes</label>
+                        <label className="form-label">Class Notes</label>
                         <textarea className="form-textarea" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={3} placeholder="Add any details about class experience, student behavior, etc." />
                     </div>
 
@@ -348,7 +348,7 @@ export default function SessionLog() {
                     <div style={{ display: 'flex', gap: '12px', marginTop: 'var(--space-8)' }}>
                         <button type="button" className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setShowModal(false)}>Cancel</button>
                         <button type="submit" className="btn btn-primary" style={{ flex: 2, boxShadow: 'var(--shadow-primary)' }}>
-                            {editingLog ? 'Update Session Log' : 'Save Session Log'}
+                            {editingLog ? 'Update Record' : 'Save Record'}
                         </button>
                     </div>
                 </form>

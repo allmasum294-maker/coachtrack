@@ -75,9 +75,9 @@ export default function StudyPlans() {
             setStudyPlan(plan);
             setIsGenerating(false);
             if (plan.topics.length === 0) {
-                toast.error("Insufficient analytical data for this profile.");
+                toast.error("Not enough data for this student yet.");
             } else {
-                toast.success("AI Synthesis Complete: Plan Authorized.");
+                toast.success("Study Plan Created!");
             }
         }, 2000);
     }
@@ -136,8 +136,8 @@ export default function StudyPlans() {
             const minutes = 45 + (i * 15);
             const days = i === 0 ? "Daily Routine" : "Alternate Days";
             actionItems.push({
-                title: `Intensive Review: ${weak.topic}`,
-                description: `Analytical deficit identified in ${weak.topic}. Focus on foundational logic and error-mapping from previous assessments.`,
+                title: `Focus on: ${weak.topic}`,
+                description: `Lower marks found in ${weak.topic}. Try covering the basics and reviewing your mistakes from old tests.`,
                 time: `${minutes}m`,
                 frequency: days,
                 type: 'weakness'
@@ -146,8 +146,8 @@ export default function StudyPlans() {
 
         topStrengths.forEach((strong, i) => {
             actionItems.push({
-                title: `Advanced Application: ${strong.topic}`,
-                description: `Demonstrated mastery in ${strong.topic}. Transition to high-complexity problem sets to reinforce competitive edge.`,
+                title: `Keep it up: ${strong.topic}`,
+                description: `Doing great in ${strong.topic}! Try more difficult questions to get even better.`,
                 time: `30m`,
                 frequency: "Weekend Review",
                 type: 'strength'
@@ -179,8 +179,8 @@ export default function StudyPlans() {
         <div className="animate-fade-in">
             <div className="page-header">
                 <div>
-                    <h1 className="page-title">Cognitive Roadmap</h1>
-                    <p className="page-subtitle">AI-synthesized revision strategies tailored to individual performance metrics</p>
+                    <h1 className="page-title">Study Plan</h1>
+                    <p className="page-subtitle">Smart study plans based on student marks and progress</p>
                 </div>
                 <div style={{ display: 'flex', gap: '10px' }}>
                     <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'rgba(59, 130, 246, 0.1)', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -195,17 +195,17 @@ export default function StudyPlans() {
                 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px', position: 'relative', zIndex: 1 }}>
                     <div>
-                        <label style={{ display: 'block', fontSize: '11px', fontWeight: 900, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '10px', letterSpacing: '0.05em' }}>Batch Intelligence</label>
+                        <label style={{ display: 'block', fontSize: '11px', fontWeight: 900, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '10px', letterSpacing: '0.05em' }}>Batch</label>
                         <select className="form-select" value={selectedBatchId} onChange={(e) => { setSelectedBatchId(e.target.value); setStudyPlan(null); }} style={{ height: '48px', fontWeight: 700 }}>
-                            <option value="">Scan All Batches</option>
+                            <option value="">Select a Batch</option>
                             {batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                         </select>
                     </div>
 
                     <div>
-                        <label style={{ display: 'block', fontSize: '11px', fontWeight: 900, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '10px', letterSpacing: '0.05em' }}>Target Subject Profile</label>
+                        <label style={{ display: 'block', fontSize: '11px', fontWeight: 900, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '10px', letterSpacing: '0.05em' }}>Student</label>
                         <select className="form-select" value={selectedStudentId} onChange={(e) => { setSelectedStudentId(e.target.value); setStudyPlan(null); }} style={{ height: '48px', fontWeight: 700 }}>
-                            <option value="">Locate Student...</option>
+                            <option value="">Select a Student...</option>
                             {filteredStudents.map(s => <option key={s.id} value={s.id}>{s.name} (Grade {s.grade})</option>)}
                         </select>
                     </div>
@@ -218,7 +218,7 @@ export default function StudyPlans() {
                             style={{ height: '48px', width: '100%', borderRadius: '14px', fontWeight: 900, boxShadow: '0 10px 25px -5px rgba(59, 130, 246, 0.4)', gap: '12px', fontSize: '15px' }}
                         >
                             {isGenerating ? <Loader2 size={18} className="animate-spin" /> : <BrainCircuit size={20} />}
-                            {isGenerating ? 'Synthesizing...' : 'Generate Roadmap'}
+                            {isGenerating ? 'Creating...' : 'Create Study Plan'}
                         </button>
                     </div>
                 </div>
@@ -229,8 +229,8 @@ export default function StudyPlans() {
                     <div style={{ width: '100px', height: '100px', borderRadius: '30px', background: 'rgba(255,255,255,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto var(--space-8)' }}>
                         <Sparkles size={48} style={{ color: '#fbbf24', opacity: 0.5 }} />
                     </div>
-                    <h2 style={{ fontSize: '26px', fontWeight: 900, marginBottom: '12px' }}>Awaiting Analytical Input</h2>
-                    <p style={{ color: 'var(--color-text-muted)', maxWidth: '440px', margin: '0 auto' }}>Select a student profile to initiate a heuristic analysis of historical assessment data and generate a personalized revision Directive.</p>
+                    <h2 style={{ fontSize: '26px', fontWeight: 900, marginBottom: '12px' }}>Select a Student</h2>
+                    <p style={{ color: 'var(--color-text-muted)', maxWidth: '440px', margin: '0 auto' }}>Choose a student to analyze their test scores and create a personalized study plan.</p>
                 </div>
             )}
 
@@ -238,8 +238,8 @@ export default function StudyPlans() {
                 <div className="glass-panel" style={{ padding: '80px var(--space-8)', textAlign: 'center' }}>
                     <div className="loading-spinner" style={{ margin: '0 auto 32px' }} />
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        <h3 className="animate-pulse" style={{ fontSize: '24px', fontWeight: 900, color: 'var(--color-primary)' }}>Constructing Neural Logic...</h3>
-                        <p style={{ color: 'var(--color-text-muted)', maxWidth: '500px', margin: '0 auto' }}>Aggregating batch performance curves, topic metadata, and individual historical accuracy to formulate an optimal revision sequence.</p>
+                        <h3 className="animate-pulse" style={{ fontSize: '24px', fontWeight: 900, color: 'var(--color-primary)' }}>Checking marks and progress...</h3>
+                        <p style={{ color: 'var(--color-text-muted)', maxWidth: '500px', margin: '0 auto' }}>Analyzing how the student is doing compared to others to find the best topics to study.</p>
                     </div>
                 </div>
             )}
@@ -249,8 +249,8 @@ export default function StudyPlans() {
                     <div style={{ width: '80px', height: '80px', background: 'rgba(245, 158, 11, 0.1)', color: 'var(--color-warning)', borderRadius: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
                         <Target size={40} />
                     </div>
-                    <h2 style={{ fontSize: '22px', fontWeight: 900, color: 'var(--color-warning)' }}>Insufficient Analytical Density</h2>
-                    <p style={{ color: 'var(--color-text-muted)', maxWidth: '400px', margin: '0 auto' }}>We require more granular exam records with topic-wise point distribution to construct an accurate predictive roadmap for this profile.</p>
+                    <h2 style={{ fontSize: '22px', fontWeight: 900, color: 'var(--color-warning)' }}>Not Enough Data Found</h2>
+                    <p style={{ color: 'var(--color-text-muted)', maxWidth: '400px', margin: '0 auto' }}>We need more detailed exam marks for this student to create a good study plan.</p>
                 </div>
             )}
 
@@ -261,13 +261,13 @@ export default function StudyPlans() {
                             <div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
                                     <div style={{ padding: '8px', background: 'var(--color-primary)', borderRadius: '10px', color: 'white' }}><Zap size={18} /></div>
-                                    <h2 style={{ fontSize: '24px', fontWeight: 900, letterSpacing: '-0.02em' }}>Personalized Revision Directive</h2>
+                                    <h2 style={{ fontSize: '24px', fontWeight: 900, letterSpacing: '-0.02em' }}>Personalized Study Plan</h2>
                                 </div>
-                                <div style={{ fontSize: '15px', color: 'var(--color-text-muted)', fontWeight: 600 }}>Algorithmically tailored for <strong style={{color: 'var(--color-text-primary)'}}>{studyPlan.studentName}</strong> • Grade {studyPlan.grade}</div>
+                                <div style={{ fontSize: '15px', color: 'var(--color-text-muted)', fontWeight: 600 }}>Specially made for <strong style={{color: 'var(--color-text-primary)'}}>{studyPlan.studentName}</strong> • Grade {studyPlan.grade}</div>
                             </div>
                             <div style={{ display: 'flex', gap: '12px' }}>
                                 <button className="btn btn-secondary" onClick={() => window.print()} style={{ height: '44px', borderRadius: '12px', padding: '0 24px', fontWeight: 800 }}>
-                                    Print Directive
+                                    Print Plan
                                 </button>
                             </div>
                         </div>
@@ -277,10 +277,10 @@ export default function StudyPlans() {
                             <div className="glass-panel" style={{ padding: '24px', marginBottom: '40px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
                                 <div style={{ padding: '12px', background: 'rgba(251, 191, 36, 0.1)', color: '#fbbf24', borderRadius: '14px' }}><Lightbulb size={24} /></div>
                                 <div>
-                                    <h4 style={{ fontSize: '13px', fontWeight: 900, color: '#fbbf24', textTransform: 'uppercase', marginBottom: '6px', letterSpacing: '0.1em' }}>Core Analytical Finding</h4>
+                                    <h4 style={{ fontSize: '13px', fontWeight: 900, color: '#fbbf24', textTransform: 'uppercase', marginBottom: '6px', letterSpacing: '0.1em' }}>Key Finding</h4>
                                     <p style={{ margin: 0, lineHeight: 1.7, fontSize: '16px', fontWeight: 500 }}>
-                                        Immediate prioritization required for <strong style={{ color: 'var(--color-text-primary)' }}>{studyPlan.weakTopics.join(', ')}</strong>. 
-                                        Heuristic mapping suggests that isolating these technical segments will yield the highest incremental improvement in aggregate mastery.
+                                        The student mostly needs help with <strong style={{ color: 'var(--color-text-primary)' }}>{studyPlan.weakTopics.join(', ')}</strong>. 
+                                        Based on our analysis, focusing on these topics will help the student improve the most.
                                     </p>
                                 </div>
                             </div>
@@ -288,7 +288,7 @@ export default function StudyPlans() {
                             {/* Strategic Action Items */}
                             <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '24px' }}>
                                 <div style={{ height: '1px', flex: 1, background: 'linear-gradient(to right, transparent, rgba(255,255,255,0.05))' }} />
-                                <h3 style={{ fontSize: '15px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.2em', opacity: 0.6 }}>Operational Roadmap</h3>
+                                <h3 style={{ fontSize: '15px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.2em', opacity: 0.6 }}>What to Study</h3>
                                 <div style={{ height: '1px', flex: 1, background: 'linear-gradient(to left, transparent, rgba(255,255,255,0.05))' }} />
                             </div>
                             

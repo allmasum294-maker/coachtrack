@@ -126,8 +126,8 @@ export default function Lessons() {
         <div className="animate-fade-in">
             <div className="page-header">
                 <div>
-                    <h1 className="page-title">Curriculum Tracker</h1>
-                    <p className="page-subtitle">Manage syllabus coverage and progress per batch</p>
+                    <h1 className="page-title">Topics</h1>
+                    <p className="page-subtitle">Track your teaching progress for each batch</p>
                 </div>
                 <button className="btn btn-primary" onClick={openCreate} disabled={!selectedBatch}>
                     <Plus size={18} /> Add Topic
@@ -150,7 +150,7 @@ export default function Lessons() {
                         <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 'var(--space-6)', minWidth: '300px' }}>
                             <div style={{ flex: 1 }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                                    <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text-secondary)' }}>Coverage Progress</span>
+                                    <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text-secondary)' }}>Class Progress</span>
                                     <span style={{ fontSize: '13px', fontWeight: 800, color: 'var(--color-primary)' }}>{coveragePercent}%</span>
                                 </div>
                                 <div className="progress-bar" style={{ height: '8px', background: 'rgba(0,0,0,0.05)' }}>
@@ -173,7 +173,7 @@ export default function Lessons() {
                             <BookOpen size={48} />
                         </div>
                         <div className="empty-state-title">No Active Batches</div>
-                        <div className="empty-state-text">You need an active batch to start tracking lessons.</div>
+                        <div className="empty-state-text">You need an active batch to start tracking topics.</div>
                     </div>
                 </div>
             ) : lessons.length === 0 ? (
@@ -183,7 +183,7 @@ export default function Lessons() {
                             <BookOpen size={48} />
                         </div>
                         <div className="empty-state-title">No topics added yet</div>
-                        <div className="empty-state-text">Start by adding your first syllabus topic for this batch.</div>
+                        <div className="empty-state-text">Start by adding your first topic for this batch.</div>
                         <button className="btn btn-primary" onClick={openCreate} style={{ marginTop: 'var(--space-4)' }}>
                             <Plus size={18} /> Add First Topic
                         </button>
@@ -231,7 +231,7 @@ export default function Lessons() {
                                     {lesson.description && <span>{lesson.description}</span>}
                                     {lesson.status === 'covered' && (
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--color-success)', fontWeight: 600 }}>
-                                            <Check size={12} /> Covered {lesson.coveredOn && `on ${lesson.coveredOn}`}
+                                            <Check size={12} /> Finished {lesson.coveredOn && `on ${lesson.coveredOn}`}
                                         </div>
                                     )}
                                     {lesson.status === 'planned' && (
@@ -246,7 +246,7 @@ export default function Lessons() {
                                 <button 
                                     className={`btn btn-sm btn-icon ${lesson.status === 'covered' ? 'btn-primary' : 'btn-ghost'}`}
                                     onClick={() => toggleCovered(lesson)}
-                                    title={lesson.status === 'covered' ? 'Unmark' : 'Mark as covered'}
+                                    title={lesson.status === 'covered' ? 'Unmark' : 'Mark as finished'}
                                     style={{ borderRadius: '8px' }}
                                 >
                                     {lesson.status === 'covered' ? <CheckCircle2 size={16} /> : <Circle size={16} />}
@@ -278,26 +278,26 @@ export default function Lessons() {
                                     <input className="form-input" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="e.g., Introduction to Calculus" required />
                                 </div>
                                 <div className="form-group">
-                                    <label className="form-label">Detailed Description</label>
-                                    <textarea className="form-textarea" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={2} placeholder="Optional details about what was covered..." />
+                                    <label className="form-label">Topic Description</label>
+                                    <textarea className="form-textarea" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={2} placeholder="Briefly explain what this topic is about..." />
                                 </div>
                                 <div className="form-row">
                                     <div className="form-group">
-                                        <label className="form-label">Sequence (Order)</label>
+                                        <label className="form-label">Lesson Number</label>
                                         <input className="form-input" type="number" min="1" value={form.order} onChange={(e) => setForm({ ...form, order: e.target.value })} />
                                     </div>
                                     <div className="form-group">
                                         <label className="form-label">Current Status</label>
                                         <select className="form-select" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
-                                            <option value="planned">Planned</option>
-                                            <option value="covered">Covered</option>
+                                            <option value="planned">Not Started</option>
+                                            <option value="covered">Finished</option>
                                             <option value="skipped">Skipped</option>
                                         </select>
                                     </div>
                                 </div>
                                 {form.status === 'covered' && (
                                     <div className="form-group">
-                                        <label className="form-label">Covered On</label>
+                                        <label className="form-label">Finished On</label>
                                         <input className="form-input" type="date" value={form.coveredOn} onChange={(e) => setForm({ ...form, coveredOn: e.target.value })} />
                                     </div>
                                 )}

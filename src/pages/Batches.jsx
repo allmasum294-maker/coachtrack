@@ -44,7 +44,7 @@ export default function Batches() {
             });
             setStudentCounts(counts);
         } catch (err) {
-            console.error('Core Telemetry Error:', err);
+            console.error('Error loading batches:', err);
         } finally {
             setLoading(false);
         }
@@ -84,21 +84,21 @@ export default function Batches() {
             }
             setShowModal(false);
             loadBatches();
-            toast.success(editingBatch ? 'Registry Updated' : 'New Cluster Established');
+            toast.success(editingBatch ? 'Batch Updated' : 'New Batch Created');
         } catch (err) {
-            console.error('Write Error:', err);
-            toast.error('Initialization Failed');
+            console.error('Error saving batch:', err);
+            toast.error('Could not save batch');
         }
     }
 
     async function handleDelete(batchId) {
-        if (!confirm('Are you sure you want to terminate this batch? All associated data will remain but student assignments will need manual cleanup.')) return;
+        if (!confirm('Are you sure you want to delete this batch? All associated data will remain but student assignments will need manual cleanup.')) return;
         try {
             await deleteDoc(doc(db, 'batches', batchId));
             loadBatches();
-            toast.success('Batch Terminated');
+            toast.success('Batch Deleted');
         } catch (err) {
-            console.error('Deletion Error:', err);
+            console.error('Error deleting batch:', err);
         }
     }
 
@@ -111,13 +111,13 @@ export default function Batches() {
             <div className="page-header" style={{ marginBottom: 'var(--space-8)' }}>
                 <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-                        <div style={{ padding: '4px 10px', background: 'rgba(59, 130, 246, 0.1)', color: 'var(--color-primary)', borderRadius: '8px', fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Cluster Management</div>
+                        <div style={{ padding: '4px 10px', background: 'rgba(59, 130, 246, 0.1)', color: 'var(--color-primary)', borderRadius: '8px', fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Class Management</div>
                     </div>
                     <h1 className="page-title" style={{ fontSize: '32px', fontWeight: 900 }}>Batches</h1>
-                    <p className="page-subtitle" style={{ fontWeight: 600 }}>Configure and monitor your pedagogical clusters</p>
+                    <p className="page-subtitle" style={{ fontWeight: 600 }}>Create and manage student batches</p>
                 </div>
                 <button className="btn btn-primary" onClick={openCreate} style={{ padding: '0 24px', height: '48px', fontWeight: 900, boxShadow: '0 8px 20px rgba(59, 130, 246, 0.2)' }}>
-                    <Plus size={18} /> ESTABLISH CLUSTER
+                    <Plus size={18} /> ADD NEW BATCH
                 </button>
             </div>
 
@@ -127,7 +127,7 @@ export default function Batches() {
                     onClick={() => setViewMode('active')}
                     style={{ padding: '10px 24px', borderRadius: '10px', fontSize: '13px', fontWeight: 800 }}
                 >
-                    Operational
+                    Active
                 </button>
                 <button 
                     className={`tab ${viewMode === 'closed' ? 'active' : ''}`} 
@@ -143,15 +143,15 @@ export default function Batches() {
                     <div style={{ width: '100px', height: '100px', background: 'rgba(255,255,255,0.03)', color: 'var(--color-text-muted)', borderRadius: '50%', margin: '0 auto 24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <GraduationCap size={40} opacity={0.3} />
                     </div>
-                    <h2 style={{ fontSize: '24px', fontWeight: 900, marginBottom: '8px' }}>No Clusters Detected</h2>
+                    <h2 style={{ fontSize: '24px', fontWeight: 900, marginBottom: '8px' }}>No Batches Found</h2>
                     <p style={{ color: 'var(--color-text-muted)', maxWidth: '400px', margin: '0 auto 32px', fontWeight: 500 }}>
                         {viewMode === 'active' 
-                            ? 'The operational matrix is currently empty. Establish your first pedagogical cluster to begin telemetry.' 
-                            : 'No archived clusters found in the historical data logs.'}
+                            ? 'You haven\'t created any batches yet. Add your first batch to start organizing your students.' 
+                            : 'No archived batches found.'}
                     </p>
                     {viewMode === 'active' && (
                         <button className="btn btn-primary" onClick={openCreate} style={{ padding: '0 32px', height: '48px', fontWeight: 900 }}>
-                            <Plus size={18} /> INITIALIZE FIRST CLUSTER
+                            <Plus size={18} /> CREATE FIRST BATCH
                         </button>
                     )}
                 </div>
@@ -223,7 +223,7 @@ export default function Batches() {
                             <Link to={`/batches/${batch.id}`} style={{ textDecoration: 'none', color: 'inherit', position: 'relative', zIndex: 1, display: 'block' }}>
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                                     <div className="glass-panel" style={{ padding: '16px', background: 'rgba(255,255,255,0.02)', textAlign: 'center', border: '1px solid rgba(255,255,255,0.05)' }}>
-                                        <div style={{ color: 'var(--color-text-muted)', fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Capacity</div>
+                                        <div style={{ color: 'var(--color-text-muted)', fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Students</div>
                                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
                                             <Users size={14} style={{ color: 'var(--color-primary)' }} />
                                             <span style={{ fontSize: '20px', fontWeight: 900, color: 'var(--color-text-primary)' }}>{studentCounts[batch.id] || 0}</span>
@@ -238,7 +238,7 @@ export default function Batches() {
                                     </div>
                                 </div>
                                 <div style={{ marginTop: '24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px', fontWeight: 900, color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-                                    <span>Detailed Telemetry</span>
+                                    <span>View Details</span>
                                     <ChevronRight size={16} />
                                 </div>
                             </Link>
@@ -250,11 +250,11 @@ export default function Batches() {
             <Modal
                 isOpen={showModal}
                 onClose={() => setShowModal(false)}
-                title={editingBatch ? 'Adjust Cluster' : 'New Cluster Protocol'}
+                title={editingBatch ? 'Edit Batch' : 'Create New Batch'}
             >
                 <form onSubmit={handleSave} style={{ display: 'grid', gap: '24px' }}>
                     <div className="form-group">
-                        <label className="form-label" style={{ fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', marginBottom: '8px', color: 'var(--color-text-muted)' }}>Cluster Designation</label>
+                        <label className="form-label" style={{ fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', marginBottom: '8px', color: 'var(--color-text-muted)' }}>Batch Name</label>
                         <input
                             className="form-input"
                             placeholder="e.g., Class 10 Alpha - Prime"
@@ -266,7 +266,7 @@ export default function Batches() {
                     </div>
                     <div className="form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
                         <div className="form-group">
-                            <label className="form-label" style={{ fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', marginBottom: '8px', color: 'var(--color-text-muted)' }}>Level (Grade)</label>
+                            <label className="form-label" style={{ fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', marginBottom: '8px', color: 'var(--color-text-muted)' }}>Grade</label>
                             <select
                                 className="form-select"
                                 value={form.grade}
@@ -274,7 +274,7 @@ export default function Batches() {
                                 required
                                 style={{ height: '48px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)' }}
                             >
-                                <option value="">Select Level</option>
+                                <option value="">Select Grade</option>
                                 <option value="9">Grade 9</option>
                                 <option value="10">Grade 10</option>
                                 <option value="11">Grade 11</option>
@@ -282,7 +282,7 @@ export default function Batches() {
                             </select>
                         </div>
                         <div className="form-group">
-                            <label className="form-label" style={{ fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', marginBottom: '8px', color: 'var(--color-text-muted)' }}>Domain (Subject)</label>
+                            <label className="form-label" style={{ fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', marginBottom: '8px', color: 'var(--color-text-muted)' }}>Subject</label>
                             <input
                                 className="form-input"
                                 value={form.subject}
@@ -301,13 +301,13 @@ export default function Batches() {
                                     onChange={(e) => setForm({ ...form, isClosed: e.target.checked })}
                                     style={{ width: '18px', height: '18px' }}
                                 />
-                                <span style={{ fontSize: '13px', fontWeight: 700 }}>Archive this cluster (stops data collection)</span>
+                                <span style={{ fontSize: '13px', fontWeight: 700 }}>Archive this batch (class finished)</span>
                             </label>
                         </div>
                     )}
                     <div className="modal-footer" style={{ padding: '0', marginTop: '12px', border: 'none', display: 'flex', gap: '12px' }}>
-                        <button type="button" className="btn btn-ghost" onClick={() => setShowModal(false)} style={{ flex: 1, height: '48px', fontWeight: 800, borderRadius: '12px' }}>ABORT</button>
-                        <button type="submit" className="btn btn-primary" style={{ flex: 2, height: '48px', fontWeight: 900, borderRadius: '12px' }}>{editingBatch ? 'SAVE PROTOCOL' : 'INITIALIZE'}</button>
+                        <button type="button" className="btn btn-ghost" onClick={() => setShowModal(false)} style={{ flex: 1, height: '48px', fontWeight: 800, borderRadius: '12px' }}>Cancel</button>
+                        <button type="submit" className="btn btn-primary" style={{ flex: 2, height: '48px', fontWeight: 900, borderRadius: '12px' }}>{editingBatch ? 'SAVE BATCH' : 'CREATE'}</button>
                     </div>
                 </form>
             </Modal>

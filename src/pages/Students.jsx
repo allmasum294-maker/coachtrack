@@ -33,6 +33,7 @@ export default function Students() {
     const [exams, setExams] = useState([]);
     const [homeworks, setHomeworks] = useState([]);
     const [viewMode, setViewMode] = useState('enrolled');
+    const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [filterSchool, setFilterSchool] = useState('');
     const [schoolList, setSchoolList] = useState([]);
     const [form, setForm] = useState({
@@ -65,7 +66,7 @@ export default function Students() {
             setExams(examSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
             setHomeworks(hwSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
         } catch (err) {
-            console.error('Core Roster Fault:', err);
+            console.error('Error loading students:', err);
         } finally {
             setLoading(false);
         }
@@ -117,21 +118,21 @@ export default function Students() {
             }
             setShowModal(false);
             loadData();
-            toast.success(editingStudent ? 'Roster Updated' : 'Identity Materialized');
+            setShowSuccessModal(true);
         } catch (err) {
-            console.error('Save Failure:', err);
-            toast.error('Initialization Failed');
+            console.error('Error saving student:', err);
+            toast.error('Could not save student.');
         }
     }
 
     async function handleDelete(studentId) {
-        if (!confirm('Are you sure you want to terminate this identity record?')) return;
+        if (!confirm('Are you sure you want to remove this student?')) return;
         try {
             await deleteDoc(doc(db, 'students', studentId));
             loadData();
-            toast.success('Identity Terminated');
+            toast.success('Student removed');
         } catch (err) {
-            console.error('Deletion Fault:', err);
+            console.error('Error deleting student:', err);
         }
     }
 
@@ -305,14 +306,14 @@ export default function Students() {
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
         link.setAttribute("href", encodedUri);
-        link.setAttribute("download", "academy_telemetry_template.csv");
+        link.setAttribute("download", "students_template.csv");
         document.body.appendChild(link);
         link.click();
         link.remove();
     }
 
     async function handleImportCSV() {
-        if (csvPreview.length === 0) return toast.error('No telemetry data detected');
+        if (csvPreview.length === 0) return toast.error('No student data found');
         setIsImporting(true);
         try {
             const promises = csvPreview.map(row => {
@@ -336,13 +337,13 @@ export default function Students() {
                 return addDoc(collection(db, 'students'), data);
             });
             await Promise.all(promises);
-            toast.success(`Success: ${csvPreview.length} entities integrated.`);
+            toast.success(`Success: ${csvPreview.length} students added.`);
             setShowImportModal(false);
             setCsvPreview([]);
             loadData();
         } catch (err) {
-            console.error('Migration Error:', err);
-            toast.error('Integration Fault: Some entities failed to upload.');
+            console.error('Error importing students:', err);
+            toast.error('Some students failed to import.');
         } finally {
             setIsImporting(false);
         }
@@ -355,17 +356,17 @@ export default function Students() {
             <div className="page-header" style={{ marginBottom: 'var(--space-8)' }}>
                 <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-                        <div style={{ padding: '4px 10px', background: 'rgba(59, 130, 246, 0.1)', color: 'var(--color-primary)', borderRadius: '8px', fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Registry Control</div>
+                        <div style={{ padding: '4px 10px', background: 'rgba(59, 130, 246, 0.1)', color: 'var(--color-primary)', borderRadius: '8px', fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Student Management</div>
                     </div>
-                    <h1 className="page-title" style={{ fontSize: '32px', fontWeight: 900 }}>Academy Roster</h1>
-                    <p className="page-subtitle" style={{ fontWeight: 600 }}>Command and control for student entity data</p>
+                    <h1 className="page-title" style={{ fontSize: '32px', fontWeight: 900 }}>Student List</h1>
+                    <p className="page-subtitle" style={{ fontWeight: 600 }}>View and manage your student details</p>
                 </div>
                 <div style={{ display: 'flex', gap: '12px' }}>
                     <button className="btn btn-secondary" onClick={() => { setShowImportModal(true); setCsvPreview([]); }} style={{ padding: '0 20px', height: '48px', fontWeight: 800 }}>
-                        <Upload size={18} /> BULK INGEST
+                        <Upload size={18} /> IMPORT LIST
                     </button>
                     <button className="btn btn-primary" onClick={openCreate} style={{ padding: '0 24px', height: '48px', fontWeight: 900, boxShadow: '0 8px 20px rgba(59, 130, 246, 0.2)' }}>
-                        <Plus size={18} /> REGISTER ENTITY
+                        <Plus size={18} /> ADD STUDENT
                     </button>
                 </div>
             </div>
@@ -378,7 +379,7 @@ export default function Students() {
                             onClick={() => { setViewMode('enrolled'); setCurrentPage(1); }}
                             style={{ borderRadius: '10px', padding: '8px 20px', fontSize: '13px', fontWeight: 800 }}
                         >
-                            Operational
+                            Active
                         </button>
                         <button
                             className={`tab ${viewMode === 'unenrolled' ? 'active' : ''}`}
@@ -394,7 +395,7 @@ export default function Students() {
                             <Search className="search-icon" size={16} />
                             <input
                                 className="form-input"
-                                placeholder="Locate entity..."
+                                placeholder="Find student..."
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
                                 style={{ height: '44px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)' }}
@@ -406,7 +407,7 @@ export default function Students() {
                             value={filterBatch}
                             onChange={(e) => setFilterBatch(e.target.value)}
                         >
-                            <option value="">All Clusters</option>
+                            <option value="">All Batches</option>
                             {batches.map((b) => (
                                 <option key={b.id} value={b.id}>{b.name}</option>
                             ))}
@@ -417,7 +418,7 @@ export default function Students() {
                             value={filterSchool}
                             onChange={(e) => setFilterSchool(e.target.value)}
                         >
-                            <option value="">All Institutions</option>
+                            <option value="">All Schools</option>
                             {schoolList.map((s) => (
                                 <option key={s} value={s}>{s}</option>
                             ))}
@@ -431,13 +432,13 @@ export default function Students() {
                     <div style={{ width: '100px', height: '100px', background: 'rgba(255,255,255,0.03)', color: 'var(--color-text-muted)', borderRadius: '50%', margin: '0 auto 24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <Users size={40} opacity={0.3} />
                     </div>
-                    <h2 style={{ fontSize: '24px', fontWeight: 900, marginBottom: '12px' }}>Registry Empty</h2>
+                    <h2 style={{ fontSize: '24px', fontWeight: 900, marginBottom: '12px' }}>No students found</h2>
                     <p style={{ color: 'var(--color-text-muted)', maxWidth: '400px', margin: '0 auto 32px', fontWeight: 500 }}>
-                        No entities detected the current parameters. Register your first student or ingest a telemetry file to begin.
+                        Your student list is empty. Add your first student or import a file to get started.
                     </p>
                     {students.length === 0 && (
                         <button className="btn btn-primary" onClick={openCreate} style={{ padding: '0 32px', height: '48px', fontWeight: 900 }}>
-                            <Plus size={18} /> INITIALIZE ENTITY
+                            <Plus size={18} /> ADD STUDENT
                         </button>
                     )}
                 </div>
@@ -448,17 +449,17 @@ export default function Students() {
                             <thead>
                                 <tr>
                                     <th onClick={() => handleSort('name')} style={{ cursor: 'pointer', padding: '20px' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>Entity {renderSortIcon('name')}</div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>Student {renderSortIcon('name')}</div>
                                     </th>
                                     <th onClick={() => handleSort('grade')} style={{ cursor: 'pointer' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>Level {renderSortIcon('grade')}</div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>Grade {renderSortIcon('grade')}</div>
                                     </th>
-                                    <th>Assigned Clusters</th>
-                                    <th>Comms Channel</th>
+                                    <th>Batches</th>
+                                    <th>Contact Info</th>
                                     <th onClick={() => handleSort('createdAt')} style={{ cursor: 'pointer' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>Established {renderSortIcon('createdAt')}</div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>Joined {renderSortIcon('createdAt')}</div>
                                     </th>
-                                    <th style={{ textAlign: 'right', paddingRight: '20px' }}>Command</th>
+                                    <th style={{ textAlign: 'right', paddingRight: '20px' }}>Actions</th>
                                 </tr>
                             </thead>
                             <tbody style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
@@ -476,7 +477,7 @@ export default function Students() {
                                                 </div>
                                                 <div>
                                                     <div style={{ fontWeight: 800, fontSize: '15px' }}>{student.name}</div>
-                                                    <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 600 }}>{student.school || 'External Entity'}</div>
+                                                    <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 600 }}>{student.school || 'Private Student'}</div>
                                                 </div>
                                             </div>
                                         </td>
@@ -492,7 +493,7 @@ export default function Students() {
                                                     <span key={bid} style={{ padding: '3px 8px', background: 'rgba(59, 130, 246, 0.1)', color: 'var(--color-primary)', borderRadius: '6px', fontSize: '10px', fontWeight: 800 }}>{getBatchName(bid)}</span>
                                                 ))}
                                                 {(!student.batchIds || student.batchIds.length === 0) && (
-                                                    <span style={{ fontSize: '10px', color: '#ef4444', fontWeight: 900 }}>UNASSIGNED</span>
+                                                    <span style={{ fontSize: '10px', color: '#ef4444', fontWeight: 900 }}>NO BATCH</span>
                                                 )}
                                             </div>
                                         </td>
@@ -509,10 +510,10 @@ export default function Students() {
                                         </td>
                                         <td style={{ paddingRight: '20px' }}>
                                             <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
-                                                <button className="btn btn-ghost btn-icon" onClick={() => setViewingStudent(student)} title="View Analytics" style={{ width: '36px', height: '36px', borderRadius: '10px' }}>
+                                                <button className="btn btn-ghost btn-icon" onClick={() => setViewingStudent(student)} title="View Stats" style={{ width: '36px', height: '36px', borderRadius: '10px' }}>
                                                     <Eye size={18} />
                                                 </button>
-                                                <button className="btn btn-ghost btn-icon" onClick={() => openEdit(student)} title="Modify Registry" style={{ width: '36px', height: '36px', borderRadius: '10px' }}>
+                                                <button className="btn btn-ghost btn-icon" onClick={() => openEdit(student)} title="Edit Student" style={{ width: '36px', height: '36px', borderRadius: '10px' }}>
                                                     <Edit2 size={18} />
                                                 </button>
                                                 <button 
@@ -522,19 +523,19 @@ export default function Students() {
                                                         if (confirm(`Are you sure you want to ${newStatus === 'unenrolled' ? 'deactivate' : 'reactivate'} ${student.name}?`)) {
                                                             try {
                                                                 await setStudentStatus(student.id, newStatus);
-                                                                toast.success(`Entity Status: ${newStatus.toUpperCase()}`);
+                                                                toast.success(`Status updated to ${newStatus}`);
                                                                 loadData();
                                                             } catch (err) {
-                                                                toast.error('Sync Interrupted');
+                                                                toast.error('Error updating status');
                                                             }
                                                         }
                                                     }}
-                                                    title={student.status === 'unenrolled' ? 'Activate Entity' : 'Deactivate Entity'}
+                                                    title={student.status === 'unenrolled' ? 'Reactivate Student' : 'Deactivate Student'}
                                                     style={{ width: '36px', height: '36px', borderRadius: '10px', color: student.status === 'unenrolled' ? '#10b981' : '#f59e0b' }}
                                                 >
                                                     <CheckCircle size={18} />
                                                 </button>
-                                                <button className="btn btn-ghost btn-icon" onClick={() => handleDelete(student.id)} title="Purge Record" style={{ width: '36px', height: '36px', borderRadius: '10px' }}>
+                                                <button className="btn btn-ghost btn-icon" onClick={() => handleDelete(student.id)} title="Delete Student" style={{ width: '36px', height: '36px', borderRadius: '10px' }}>
                                                     <Trash2 size={18} style={{ color: '#ef4444', opacity: 0.7 }} />
                                                 </button>
                                             </div>
@@ -548,7 +549,7 @@ export default function Students() {
                     {totalPages > 1 && (
                         <div style={{ padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.01)' }}>
                             <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', fontWeight: 600 }}>
-                                Displaying {(currentPage - 1) * studentsPerPage + 1}-{Math.min(currentPage * studentsPerPage, sortedStudents.length)} / {sortedStudents.length} ENROLLED
+                                Displaying {(currentPage - 1) * studentsPerPage + 1}-{Math.min(currentPage * studentsPerPage, sortedStudents.length)} / {sortedStudents.length} students
                             </div>
                             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                                 <button className="btn btn-ghost btn-icon" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} style={{ width: 32, height: 32, borderRadius: 8 }}>
@@ -564,20 +565,20 @@ export default function Students() {
                 </div>
             )}
 
-            {/* Entity Registration Modal */}
+            {/* Add/Edit Student Modal */}
             <Modal
                 isOpen={showModal}
                 onClose={() => setShowModal(false)}
-                title={editingStudent ? 'Adjust Registry' : 'Establish Entity identity'}
+                title={editingStudent ? 'Edit Student' : 'Add New Student'}
             >
                 <form onSubmit={handleSave} style={{ display: 'grid', gap: '20px' }}>
                     <div className="form-row" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '16px' }}>
                         <div className="form-group">
-                            <label className="form-label" style={{ fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', marginBottom: '8px', color: 'var(--color-text-muted)' }}>Legal Name</label>
+                            <label className="form-label" style={{ fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', marginBottom: '8px', color: 'var(--color-text-muted)' }}>Full Name</label>
                             <input className="form-input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required style={{ height: '48px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)' }} />
                         </div>
                         <div className="form-group">
-                            <label className="form-label" style={{ fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', marginBottom: '8px', color: 'var(--color-text-muted)' }}>Grade Level</label>
+                            <label className="form-label" style={{ fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', marginBottom: '8px', color: 'var(--color-text-muted)' }}>Grade</label>
                             <select className="form-select" value={form.grade} onChange={(e) => setForm({ ...form, grade: e.target.value })} style={{ height: '48px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)' }}>
                                 <option value="">Select</option>
                                 <option value="9">Class 9</option>
@@ -589,36 +590,36 @@ export default function Students() {
                     </div>
                     <div className="form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                         <div className="form-group">
-                            <label className="form-label" style={{ fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', marginBottom: '8px', color: 'var(--color-text-muted)' }}>Email Pulse</label>
-                            <input className="form-input" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="pulse@node.net" style={{ height: '48px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)' }} />
+                            <label className="form-label" style={{ fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', marginBottom: '8px', color: 'var(--color-text-muted)' }}>Email Address</label>
+                            <input className="form-input" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="email@example.com" style={{ height: '48px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)' }} />
                         </div>
                         <div className="form-group">
-                            <label className="form-label" style={{ fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', marginBottom: '8px', color: 'var(--color-text-muted)' }}>Primary Contact</label>
-                            <input className="form-input" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+880..." style={{ height: '48px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)' }} />
+                            <label className="form-label" style={{ fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', marginBottom: '8px', color: 'var(--color-text-muted)' }}>Phone Number</label>
+                            <input className="form-input" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="Enter phone" style={{ height: '48px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)' }} />
                         </div>
                     </div>
                     <div className="form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                         <div className="form-group">
-                            <label className="form-label" style={{ fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', marginBottom: '8px', color: 'var(--color-text-muted)' }}>Guardian Key</label>
+                            <label className="form-label" style={{ fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', marginBottom: '8px', color: 'var(--color-text-muted)' }}>Guardian Name</label>
                             <input className="form-input" value={form.guardianName} onChange={(e) => setForm({ ...form, guardianName: e.target.value })} style={{ height: '48px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)' }} />
                         </div>
                         <div className="form-group">
-                            <label className="form-label" style={{ fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', marginBottom: '8px', color: 'var(--color-text-muted)' }}>Guardian Comms</label>
+                            <label className="form-label" style={{ fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', marginBottom: '8px', color: 'var(--color-text-muted)' }}>Guardian Phone</label>
                             <input className="form-input" value={form.guardianPhone} onChange={(e) => setForm({ ...form, guardianPhone: e.target.value })} style={{ height: '48px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)' }} />
                         </div>
                     </div>
                     <div className="form-group">
-                        <label className="form-label" style={{ fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', marginBottom: '8px', color: 'var(--color-text-muted)' }}>Host Institution</label>
+                        <label className="form-label" style={{ fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', marginBottom: '8px', color: 'var(--color-text-muted)' }}>School Name</label>
                         <input className="form-input" list="school-suggestions" value={form.school} onChange={(e) => setForm({ ...form, school: e.target.value })} placeholder="School/College name" style={{ height: '48px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)' }} />
                     </div>
                     
                     <div style={{ marginTop: '12px', padding: '24px', background: 'rgba(255,255,255,0.03)', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.05)' }}>
                         <label className="form-label" style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 900, fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-primary)' }}>
-                            <Box size={14} /> Cluster Affiliation
+                            Batch Assignments
                         </label>
                         <div style={{ display: 'grid', gap: '8px' }}>
                             {batches.length === 0 ? (
-                                <p style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>Initialize clusters to assign entities.</p>
+                                <p style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>Create batches first to assign students.</p>
                             ) : batches.filter(b => !b.isClosed).map((b) => {
                                 const isEnrolled = (form.batchIds || []).includes(b.id);
                                 const isUnenrolled = (form.unenrolledBatchIds || []).includes(b.id);
@@ -628,7 +629,7 @@ export default function Students() {
                                         <div style={{ display: 'flex', gap: '4px' }}>
                                             <button type="button" onClick={() => setBatchStatus(b.id, 'none')} className={`btn btn-sm ${!isEnrolled && !isUnenrolled ? 'btn-primary' : 'btn-ghost'}`} style={{ padding: '4px 12px', fontSize: '10px', height: '28px' }}>NONE</button>
                                             <button type="button" onClick={() => setBatchStatus(b.id, 'enrolled')} className={`btn btn-sm ${isEnrolled ? 'btn-primary' : 'btn-ghost'}`} style={{ padding: '4px 12px', fontSize: '10px', height: '28px', color: isEnrolled ? '#fff' : '#10b981' }}>ENROLL</button>
-                                            <button type="button" onClick={() => setBatchStatus(b.id, 'unenrolled')} className={`btn btn-sm ${isUnenrolled ? 'btn-danger' : 'btn-ghost'}`} style={{ padding: '4px 12px', fontSize: '10px', height: '28px' }}>DISSOLVE</button>
+                                            <button type="button" onClick={() => setBatchStatus(b.id, 'unenrolled')} className={`btn btn-sm ${isUnenrolled ? 'btn-danger' : 'btn-ghost'}`} style={{ padding: '4px 12px', fontSize: '10px', height: '28px' }}>UNENROLL</button>
                                         </div>
                                     </div>
                                 );
@@ -637,13 +638,13 @@ export default function Students() {
                     </div>
 
                     <div className="modal-footer" style={{ padding: '0', marginTop: '12px', border: 'none', display: 'flex', gap: '12px' }}>
-                        <button type="button" className="btn btn-ghost" onClick={() => setShowModal(false)} style={{ flex: 1, height: '48px', fontWeight: 800 }}>ABORT</button>
-                        <button type="submit" className="btn btn-primary" style={{ flex: 2, height: '48px', fontWeight: 900 }}>{editingStudent ? 'SAVE MODIFICATIONS' : 'MATERIALIZE ENTITY'}</button>
+                        <button type="button" className="btn btn-ghost" onClick={() => setShowModal(false)} style={{ flex: 1, height: '48px', fontWeight: 800 }}>Cancel</button>
+                        <button type="submit" className="btn btn-primary" style={{ flex: 2, height: '48px', fontWeight: 900 }}>{editingStudent ? 'Save Changes' : 'Add Student'}</button>
                     </div>
                 </form>
             </Modal>
 
-            {/* Student Viewing Console - Cinematic Profile */}
+            {/* Student Profile Modal */}
             <Modal
                 isOpen={!!viewingStudent}
                 onClose={() => setViewingStudent(null)}
@@ -680,7 +681,7 @@ export default function Students() {
                                 <div>
                                     <h2 style={{ fontSize: '36px', fontWeight: 900, margin: 0, letterSpacing: '-0.04em', color: 'white' }}>{viewingStudent.name}</h2>
                                     <div style={{ opacity: 0.8, fontSize: '15px', marginTop: '4px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <Shield size={16} /> Grade Level {viewingStudent.grade} | {viewingStudent.school || 'Private Node'}
+                                        <Shield size={16} /> Class {viewingStudent.grade} | {viewingStudent.school || 'No school listed'}
                                     </div>
                                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '20px' }}>
                                         {viewingStudent.batchIds?.map((bid) => (
@@ -695,7 +696,7 @@ export default function Students() {
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '40px' }}>
                                 <div>
                                     <h3 style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 900, textTransform: 'uppercase', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px', letterSpacing: '0.15em' }}>
-                                        <Activity size={16} style={{ color: 'var(--color-primary)' }} /> ACADEMIC TELEMETRY
+                                        <Activity size={16} style={{ color: 'var(--color-primary)' }} /> STUDENT PROGRESS
                                     </h3>
                                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
                                         <div className="glass-panel" style={{ padding: '24px 16px', textAlign: 'center', background: 'rgba(20, 184, 166, 0.03)' }}>
@@ -724,17 +725,17 @@ export default function Students() {
                                         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                                             {viewingStats.strengths.length > 0 ? viewingStats.strengths.map(t => (
                                                 <span key={t} style={{ padding: '4px 10px', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', borderRadius: '8px', fontSize: '11px', fontWeight: 800 }}>{t}</span>
-                                            )) : <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>Analyzing patterns...</span>}
+                                            )) : <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>Checking data...</span>}
                                         </div>
                                     </div>
                                     <div className="glass-panel" style={{ padding: '24px', background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.1)' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#ef4444', fontWeight: 900, fontSize: '12px', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-                                            <TrendingDown size={16} /> VULNERABILITIES
+                                            <TrendingDown size={16} /> WEAK AREAS
                                         </div>
                                         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                                             {viewingStats.weaknesses.length > 0 ? viewingStats.weaknesses.map(t => (
                                                 <span key={t} style={{ padding: '4px 10px', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', borderRadius: '8px', fontSize: '11px', fontWeight: 800 }}>{t}</span>
-                                            )) : <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>High resilience detected</span>}
+                                            )) : <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>Doing well in all areas</span>}
                                         </div>
                                     </div>
                                 </div>
@@ -742,7 +743,7 @@ export default function Students() {
 
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
                                 <div>
-                                    <h3 style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 900, textTransform: 'uppercase', marginBottom: '16px', letterSpacing: '0.12em' }}>COMMS RECAP</h3>
+                                    <h3 style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 900, textTransform: 'uppercase', marginBottom: '16px', letterSpacing: '0.12em' }}>CONTACT INFO</h3>
                                     <div className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', background: 'rgba(255,255,255,0.02)' }}>
                                         {viewingStudent.email && (
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '14px' }}>
@@ -767,7 +768,7 @@ export default function Students() {
                                 
                                 {viewingStudent.notes && (
                                     <div>
-                                        <h3 style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 900, textTransform: 'uppercase', marginBottom: '12px', letterSpacing: '0.12em' }}>ENTITY LOGS</h3>
+                                        <h3 style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 900, textTransform: 'uppercase', marginBottom: '12px', letterSpacing: '0.12em' }}>STUDENT NOTES</h3>
                                         <div style={{ fontSize: '13px', color: 'var(--color-text-muted)', background: 'rgba(0,0,0,0.2)', padding: '16px', borderRadius: '14px', lineHeight: 1.6, borderLeft: '4px solid var(--color-primary)' }}>
                                             {viewingStudent.notes}
                                         </div>
@@ -777,26 +778,26 @@ export default function Students() {
                         </div>
                         
                         <div style={{ padding: '24px 40px', borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'flex-end', gap: '12px', background: 'var(--color-bg-primary)', borderRadius: '0 0 24px 24px' }}>
-                            <button className="btn btn-secondary btn-sm" onClick={() => { setViewingStudent(null); openEdit(viewingStudent); }} style={{ height: '40px', padding: '0 20px', fontWeight: 800 }}>ADJUST REGISTRY</button>
-                            <button className="btn btn-primary btn-sm" onClick={() => setViewingStudent(null)} style={{ height: '40px', padding: '0 20px', fontWeight: 900 }}>CLOSE CONSOLE</button>
+                            <button className="btn btn-secondary btn-sm" onClick={() => { setViewingStudent(null); openEdit(viewingStudent); }} style={{ height: '40px', padding: '0 20px', fontWeight: 800 }}>EDIT STUDENT</button>
+                            <button className="btn btn-primary btn-sm" onClick={() => setViewingStudent(null)} style={{ height: '40px', padding: '0 20px', fontWeight: 900 }}>CLOSE</button>
                         </div>
                     </div>
                 )}
             </Modal>
 
-            {/* Bulk Ingestion Modal */}
+            {/* Bulk Import Modal */}
             <Modal
                 isOpen={showImportModal}
                 onClose={() => !isImporting && setShowImportModal(false)}
-                title="Telemetry Aggregation (Bulk Import)"
+                title="Bulk Import Students"
             >
                 <div>
                     <div style={{ padding: '40px', border: '2px dashed rgba(255,255,255,0.1)', borderRadius: '20px', textAlign: 'center', background: 'rgba(255,255,255,0.02)', marginBottom: '24px' }}>
                         <div style={{ width: 64, height: 64, background: 'rgba(59, 130, 246, 0.1)', color: 'var(--color-primary)', borderRadius: '18px', margin: '0 auto 20px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             <Upload size={32} />
                         </div>
-                        <h4 style={{ fontSize: '18px', fontWeight: 900, marginBottom: '8px' }}>Select Telemetry File</h4>
-                        <p style={{ fontSize: '14px', color: 'var(--color-text-muted)', marginBottom: '24px' }}>Ingest standardized CSV records into the registry.</p>
+                        <h4 style={{ fontSize: '18px', fontWeight: 900, marginBottom: '8px' }}>Select CSV File</h4>
+                        <p style={{ fontSize: '14px', color: 'var(--color-text-muted)', marginBottom: '24px' }}>Import your student list from a standardized CSV file.</p>
                         <input type="file" accept=".csv" onChange={handleFileUpload} style={{ color: 'var(--color-text-muted)', fontSize: '13px', display: 'block', margin: '0 auto' }} />
                     </div>
 
@@ -806,7 +807,7 @@ export default function Students() {
                         </button>
                         {csvPreview.length > 0 && (
                             <div style={{ fontSize: '13px', color: '#10b981', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <Sparkles size={14} /> {csvPreview.length} ENTITIES PARSED
+                                <Sparkles size={14} /> {csvPreview.length} students found
                             </div>
                         )}
                     </div>
@@ -817,8 +818,8 @@ export default function Students() {
                                 <thead>
                                     <tr style={{ background: 'rgba(255,255,255,0.05)' }}>
                                         <th style={{ padding: '12px' }}>Name</th>
-                                        <th>Level</th>
-                                        <th>Source Instance</th>
+                                        <th>Class</th>
+                                        <th>School/College</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -831,7 +832,7 @@ export default function Students() {
                                     ))}
                                     {csvPreview.length > 5 && (
                                         <tr>
-                                            <td colSpan="3" style={{ textAlign: 'center', padding: '12px', color: 'var(--color-text-muted)', fontWeight: 600 }}>+ {csvPreview.length - 5} additional records...</td>
+                                            <td colSpan="3" style={{ textAlign: 'center', padding: '12px', color: 'var(--color-text-muted)', fontWeight: 600 }}>+ {csvPreview.length - 5} more students...</td>
                                         </tr>
                                     )}
                                 </tbody>
@@ -840,11 +841,39 @@ export default function Students() {
                     )}
 
                     <div className="modal-footer" style={{ padding: '0', border: 'none', display: 'flex', gap: '12px' }}>
-                        <button className="btn btn-ghost" onClick={() => setShowImportModal(false)} style={{ flex: 1, height: '48px', fontWeight: 800 }}>ABORT</button>
+                        <button className="btn btn-ghost" onClick={() => setShowImportModal(false)} style={{ flex: 1, height: '48px', fontWeight: 800 }}>Cancel</button>
                         <button className="btn btn-primary" onClick={handleImportCSV} disabled={isImporting || csvPreview.length === 0} style={{ flex: 2, height: '48px', fontWeight: 900 }}>
-                            {isImporting ? 'INGESTING...' : 'START AGGREGATION'}
+                            {isImporting ? 'Adding...' : 'Import Students'}
                         </button>
                     </div>
+                </div>
+            </Modal>
+            {/* Success Modal */}
+            <Modal
+                isOpen={showSuccessModal}
+                onClose={() => setShowSuccessModal(false)}
+                title=""
+                hideClose
+            >
+                <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                    <div style={{ 
+                        width: '80px', height: '80px', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', 
+                        borderRadius: '50%', margin: '0 auto 24px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        animation: 'bounceIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+                    }}>
+                        <Check size={40} />
+                    </div>
+                    <h2 style={{ fontSize: '24px', fontWeight: 900, marginBottom: '12px' }}>Student Saved!</h2>
+                    <p style={{ color: 'var(--color-text-muted)', marginBottom: '32px', fontSize: '16px', fontWeight: 500 }}>
+                        The student's details have been updated and are now live in your list.
+                    </p>
+                    <button 
+                        className="btn btn-primary" 
+                        onClick={() => setShowSuccessModal(false)}
+                        style={{ width: '100%', height: '48px', fontWeight: 900, borderRadius: '14px' }}
+                    >
+                        Got it!
+                    </button>
                 </div>
             </Modal>
         </div>

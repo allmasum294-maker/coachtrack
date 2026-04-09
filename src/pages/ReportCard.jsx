@@ -5,7 +5,8 @@ import { db } from '../services/firebase';
 import { 
     User, FileSignature, Printer, Search, 
     Award, TrendingUp, BarChart3, BookOpen,
-    GraduationCap, Calendar, CheckCircle2, AlertCircle
+    GraduationCap, Calendar, CheckCircle2, AlertCircle,
+    Star, Sparkles
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { batchService } from '../services/batchService';
@@ -46,7 +47,7 @@ export default function ReportCard() {
             setExams(examSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
             setHomework(hwSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
         } catch (err) {
-            console.error('Error loading report credentials:', err);
+            console.error('Error loading student data:', err);
         } finally {
             setLoading(false);
         }
@@ -171,8 +172,8 @@ export default function ReportCard() {
             
             <div className="page-header no-print">
                 <div>
-                    <h1 className="page-title">Performance Credentials</h1>
-                    <p className="page-subtitle">Generate official achievement summaries for student records</p>
+                    <h1 className="page-title">Report Card</h1>
+                    <p className="page-subtitle">Create and print report cards for your students</p>
                 </div>
             </div>
 
@@ -181,19 +182,19 @@ export default function ReportCard() {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 'var(--space-6)' }}>
                     <div className="form-group">
                         <label className="form-label" style={{ color: 'var(--color-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <BookOpen size={14} /> BATCH CLASSIFICATION
+                            <BookOpen size={14} /> SELECT BATCH
                         </label>
                         <select className="form-select" value={selectedBatchId} onChange={(e) => setSelectedBatchId(e.target.value)} style={{ height: '52px', fontWeight: 700 }}>
-                            <option value="">Search Across All Batches</option>
+                            <option value="">All Batches</option>
                             {batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                         </select>
                     </div>
                     <div className="form-group">
                         <label className="form-label" style={{ color: 'var(--color-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <GraduationCap size={16} /> TARGET STUDENT
+                            <GraduationCap size={16} /> SELECT STUDENT
                         </label>
                         <select className="form-select" value={selectedStudentId} onChange={(e) => setSelectedStudentId(e.target.value)} style={{ height: '52px', fontWeight: 700 }}>
-                            <option value="">Locate Student Profile...</option>
+                            <option value="">Choose a student...</option>
                             {filteredStudents.map(s => <option key={s.id} value={s.id}>{s.name} (Grade {s.grade})</option>)}
                         </select>
                     </div>
@@ -218,28 +219,25 @@ export default function ReportCard() {
                                         <Sparkles size={24} className="animate-pulse" />
                                     </div>
                                 </div>
-                                <h2 style={{ fontSize: '38px', fontWeight: 900, color: 'var(--color-text-primary)', marginBottom: '8px', letterSpacing: '-0.02em' }}>Progress Verification</h2>
+                                <h2 style={{ fontSize: '38px', fontWeight: 900, color: 'var(--color-text-primary)', marginBottom: '8px', letterSpacing: '-0.02em' }}>Report Card</h2>
                                 <div style={{ height: '3px', width: '80px', background: 'var(--color-primary)', margin: '0 auto var(--space-4)', borderRadius: '2px' }} />
-                                <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', letterSpacing: '0.2em', textTransform: 'uppercase', fontWeight: 900 }}>Academic Performance Certificate</p>
                             </div>
-
-                            {/* Academic Identity */}
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-8)', marginBottom: 'var(--space-12)', padding: 'var(--space-8)', background: 'rgba(255,255,255,0.03)', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.05)' }}>
                                 <div>
-                                    <h4 style={{ fontSize: '11px', color: 'var(--color-primary)', textTransform: 'uppercase', fontWeight: 900, marginBottom: '6px', letterSpacing: '0.05em' }}>SCHOLAR NAME</h4>
+                                    <h4 style={{ fontSize: '11px', color: 'var(--color-primary)', textTransform: 'uppercase', fontWeight: 900, marginBottom: '6px', letterSpacing: '0.05em' }}>STUDENT NAME</h4>
                                     <p style={{ fontSize: '20px', fontWeight: 900 }}>{selectedStudent.name}</p>
                                 </div>
                                 <div>
-                                    <h4 style={{ fontSize: '11px', color: 'var(--color-primary)', textTransform: 'uppercase', fontWeight: 900, marginBottom: '6px', letterSpacing: '0.05em' }}>GRADE LEVEL</h4>
-                                    <p style={{ fontSize: '20px', fontWeight: 900 }}>Standard {selectedStudent.grade}</p>
+                                    <h4 style={{ fontSize: '11px', color: 'var(--color-primary)', textTransform: 'uppercase', fontWeight: 900, marginBottom: '6px', letterSpacing: '0.05em' }}>GRADE</h4>
+                                    <p style={{ fontSize: '20px', fontWeight: 900 }}>{selectedStudent.grade}</p>
                                 </div>
                                 <div>
-                                    <h4 style={{ fontSize: '11px', color: 'var(--color-primary)', textTransform: 'uppercase', fontWeight: 900, marginBottom: '6px', letterSpacing: '0.05em' }}>ACADEMIC YEAR</h4>
+                                    <h4 style={{ fontSize: '11px', color: 'var(--color-primary)', textTransform: 'uppercase', fontWeight: 900, marginBottom: '6px', letterSpacing: '0.05em' }}>YEAR</h4>
                                     <p style={{ fontSize: '20px', fontWeight: 900 }}>{format(new Date(), 'yyyy')}</p>
                                 </div>
                             </div>
 
-                            {/* Performance Radar Stats */}
+                            {/* Performance Summary */}
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-6)', marginBottom: 'var(--space-12)' }}>
                                 <div className="glass-card" style={{ padding: 'var(--space-6)', textAlign: 'center', borderBottom: '4px solid var(--color-teal)' }}>
                                     <div style={{ color: 'var(--color-teal)', marginBottom: 'var(--space-3)', display: 'flex', justifyContent: 'center' }}><CheckCircle2 size={24} /></div>
@@ -248,36 +246,36 @@ export default function ReportCard() {
                                 </div>
                                 <div className="glass-card" style={{ padding: 'var(--space-6)', textAlign: 'center', borderBottom: '4px solid var(--color-primary)', background: 'rgba(59, 130, 246, 0.05)' }}>
                                     <div style={{ color: 'var(--color-primary)', marginBottom: 'var(--space-3)', display: 'flex', justifyContent: 'center' }}><TrendingUp size={24} /></div>
-                                    <h4 style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 900, marginBottom: '4px' }}>EXAM MASTERY</h4>
+                                    <h4 style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 900, marginBottom: '4px' }}>EXAM MARKS</h4>
                                     <div style={{ fontSize: '32px', fontWeight: 900 }}>{stats.avgScore}<span style={{ fontSize: '14px', opacity: 0.5 }}>%</span></div>
                                 </div>
                                 <div className="glass-card" style={{ padding: 'var(--space-6)', textAlign: 'center', borderBottom: '4px solid var(--color-warning)' }}>
                                     <div style={{ color: 'var(--color-warning)', marginBottom: 'var(--space-3)', display: 'flex', justifyContent: 'center' }}><Star size={24} /></div>
-                                    <h4 style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 900, marginBottom: '4px' }}>HW ENGAGEMENT</h4>
+                                    <h4 style={{ fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 900, marginBottom: '4px' }}>HOMEWORK</h4>
                                     <div style={{ fontSize: '32px', fontWeight: 900 }}>{stats.hwCompletionRate}<span style={{ fontSize: '14px', opacity: 0.5 }}>%</span></div>
                                 </div>
                             </div>
 
-                            {/* Evaluation Ledger */}
+                            {/* Exam Records */}
                             <div style={{ marginBottom: 'var(--space-12)' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: 'var(--space-6)' }}>
                                     <BarChart3 size={24} color="var(--color-primary)" />
-                                    <h3 style={{ fontSize: '20px', fontWeight: 900 }}>Assessment Ledger</h3>
+                                    <h3 style={{ fontSize: '20px', fontWeight: 900 }}>Exam Records</h3>
                                     <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.05)' }} />
                                 </div>
                                 <div className="table-container" style={{ border: '1px solid rgba(255,255,255,0.05)', borderRadius: '24px', overflow: 'hidden' }}>
                                     <table className="table">
                                         <thead>
                                             <tr>
-                                                <th style={{ padding: '18px 24px', background: 'rgba(255,255,255,0.02)' }}>CURRICULUM UNIT</th>
-                                                <th style={{ background: 'rgba(255,255,255,0.02)' }}>SESSION DATE</th>
-                                                <th style={{ background: 'rgba(255,255,255,0.02)' }}>POINTS SECURED</th>
-                                                <th style={{ background: 'rgba(255,255,255,0.02)', textAlign: 'right', paddingRight: '24px' }}>PERFORMANCE</th>
+                                                <th style={{ padding: '18px 24px', background: 'rgba(255,255,255,0.02)' }}>EXAM TITLE</th>
+                                                <th style={{ background: 'rgba(255,255,255,0.02)' }}>DATE</th>
+                                                <th style={{ background: 'rgba(255,255,255,0.02)' }}>MARKS</th>
+                                                <th style={{ background: 'rgba(255,255,255,0.02)', textAlign: 'right', paddingRight: '24px' }}>RESULT</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {stats.studentExams.length === 0 ? (
-                                                <tr><td colSpan="4" style={{ textAlign: 'center', padding: '48px', color: 'var(--color-text-muted)', fontSize: '15px', fontStyle: 'italic' }}>Historical data remains synchronized. No evaluations recorded for this profile yet.</td></tr>
+                                                <tr><td colSpan="4" style={{ textAlign: 'center', padding: '48px', color: 'var(--color-text-muted)', fontSize: '15px', fontStyle: 'italic' }}>No exams found for this student yet.</td></tr>
                                             ) : (
                                                 stats.studentExams.map((e, i) => (
                                                     <tr key={i}>
@@ -300,16 +298,16 @@ export default function ReportCard() {
                                 </div>
                             </div>
 
-                            {/* Mentorship Insight */}
+                            {/* Teacher's Notes */}
                             <div className="no-print" style={{ marginBottom: 'var(--space-8)' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
                                     <TrendingUp size={18} color="var(--color-primary)" />
-                                    <h3 style={{ fontSize: '16px', fontWeight: 900 }}>Educator Remarks</h3>
+                                    <h3 style={{ fontSize: '16px', fontWeight: 900 }}>Teacher's Notes</h3>
                                 </div>
                                 <textarea 
                                     className="form-textarea" 
                                     rows={4} 
-                                    placeholder="Annotate student progress, specific milestones achieved, and strategic areas for academic optimization..."
+                                    placeholder="Write your notes about the student's progress and areas for improvement here..."
                                     style={{ borderRadius: '20px', padding: '20px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', fontSize: '15px', fontWeight: 600, lineHeight: '1.6' }}
                                     value={remarks}
                                     onChange={(e) => setRemarks(e.target.value)}
@@ -320,8 +318,8 @@ export default function ReportCard() {
                             <div style={{ marginTop: 'var(--space-12)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
                                 <div>
                                     <div style={{ width: '180px', height: '1px', background: 'black', marginBottom: '10px', display: 'none' }} className="only-print"></div>
-                                    <div style={{ fontWeight: 900, fontSize: '15px' }}>{userProfile?.displayName || 'LEAD EDUCATOR'}</div>
-                                    <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em' }}>FACULTY SIGNATURE</div>
+                                    <div style={{ fontWeight: 900, fontSize: '15px' }}>{userProfile?.displayName || 'TEACHER'}</div>
+                                    <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em' }}>TEACHER SIGNATURE</div>
                                 </div>
                                 <div style={{ textAlign: 'right' }}>
                                     <div style={{ fontWeight: 900, fontSize: '15px' }}>{format(new Date(), 'MMMM d, yyyy')}</div>
@@ -333,7 +331,7 @@ export default function ReportCard() {
                         {/* Export Trigger */}
                         <div className="no-print" style={{ marginTop: 'var(--space-8)', display: 'flex', justifyContent: 'flex-end' }}>
                             <button className="btn btn-primary btn-lg" onClick={handlePrint} style={{ height: '60px', padding: '0 40px', borderRadius: '18px', fontSize: '16px', fontWeight: 900, boxShadow: '0 15px 30px -10px rgba(59, 130, 246, 0.4)', gap: '12px' }}>
-                                <Printer size={20} /> AUTHORIZE & PRINT
+                                <Printer size={20} /> PRINT REPORT
                             </button>
                         </div>
                     </div>
@@ -344,8 +342,8 @@ export default function ReportCard() {
                         <div style={{ width: '100px', height: '100px', borderRadius: '30px', background: 'rgba(255,255,255,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto var(--space-8)' }}>
                             <GraduationCap size={44} style={{ color: 'var(--color-border)', opacity: 0.5 }} />
                         </div>
-                        <h2 style={{ fontSize: '26px', fontWeight: 900, marginBottom: '12px' }}>Academic Inventory</h2>
-                        <p style={{ color: 'var(--color-text-muted)', maxWidth: '440px', margin: '0 auto' }}>Synchronize student data by selecting a profile to generate a detailed academic audit and achievement certificate.</p>
+                        <h2 style={{ fontSize: '26px', fontWeight: 900, marginBottom: '12px' }}>Create a Report</h2>
+                        <p style={{ color: 'var(--color-text-muted)', maxWidth: '440px', margin: '0 auto' }}>Select a student above to see their report card and print it.</p>
                     </div>
                 </div>
             )}

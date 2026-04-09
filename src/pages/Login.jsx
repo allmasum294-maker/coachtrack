@@ -27,11 +27,11 @@ export default function Login() {
         } catch (err) {
             console.error('Authentication Error:', err);
             if (err.code === 'auth/invalid-credential') {
-                setError('Invalid credentials detected.');
+                setError('Email or password was incorrect.');
             } else if (err.code === 'auth/too-many-requests') {
-                setError('System lock: Too many attempts. Try later.');
+                setError('Too many failed attempts. Please try again later.');
             } else {
-                setError('Verification failed. Re-enter data.');
+                setError('Login failed. Please check your details and try again.');
             }
         } finally {
             setLoading(false);
@@ -72,8 +72,8 @@ export default function Login() {
                     }}>
                         <ShieldCheck size={32} />
                     </div>
-                    <h1 style={{ fontSize: '28px', fontWeight: 900, marginBottom: '8px', letterSpacing: '-0.02em' }}>Identity Verification</h1>
-                    <p style={{ color: 'var(--color-text-muted)', fontSize: '15px', fontWeight: 500 }}>Access your secure coaching frequency</p>
+                    <h1 style={{ fontSize: '28px', fontWeight: 900, marginBottom: '8px', letterSpacing: '-0.02em' }}>Teacher Login</h1>
+                    <p style={{ color: 'var(--color-text-muted)', fontSize: '15px', fontWeight: 500 }}>Sign in to manage your students and classes</p>
                 </div>
 
                 {error && (
@@ -91,7 +91,7 @@ export default function Login() {
 
                 <form className="auth-form" onSubmit={handleSubmit} style={{ display: 'grid', gap: '20px' }}>
                     <div className="form-group">
-                        <label className="form-label" style={{ fontSize: '12px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-muted)', marginBottom: '8px', display: 'block' }}>Teacher Signal (Email)</label>
+                        <label className="form-label" style={{ fontSize: '12px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-muted)', marginBottom: '8px', display: 'block' }}>Email Address</label>
                         <div style={{ position: 'relative' }}>
                             <Mail size={18} style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }} />
                             <input
@@ -107,7 +107,7 @@ export default function Login() {
                     </div>
 
                     <div className="form-group">
-                        <label className="form-label" style={{ fontSize: '12px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-muted)', marginBottom: '8px', display: 'block' }}>Access Key (Password)</label>
+                        <label className="form-label" style={{ fontSize: '12px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-muted)', marginBottom: '8px', display: 'block' }}>Password</label>
                         <div style={{ position: 'relative' }}>
                             <Lock size={18} style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }} />
                             <input
@@ -128,14 +128,14 @@ export default function Login() {
                         disabled={loading}
                         style={{ width: '100%', height: '52px', borderRadius: '12px', fontWeight: 900, fontSize: '15px', marginTop: '8px', boxShadow: '0 15px 30px -5px rgba(59, 130, 246, 0.4)' }}
                     >
-                        {loading ? <span className="loading-spinner" style={{ width: 20, height: 20 }} /> : 'ESTABLISH LINK'}
+                        {loading ? <span className="loading-spinner" style={{ width: 20, height: 20 }} /> : 'LOGIN'}
                     </button>
                 </form>
 
                 <div style={{ marginTop: '32px', textAlign: 'center' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
                         <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.05)' }} />
-                        <span style={{ color: 'var(--color-text-muted)', fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em' }}>OR CLONE SIGN-IN</span>
+                        <span style={{ color: 'var(--color-text-muted)', fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em' }}>OR LOGIN WITH</span>
                         <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.05)' }} />
                     </div>
                     
@@ -156,11 +156,11 @@ export default function Login() {
                             <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
                             <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
                         </svg>
-                        Google Authorization
+                        Google Login
                     </button>
                     
                     <p style={{ marginTop: '32px', color: 'var(--color-text-muted)', fontSize: '14px', fontWeight: 600 }}>
-                        New to the cluster? <Link to="/register" style={{ color: 'var(--color-primary)', fontWeight: 900 }}>CREATE ACCOUNT</Link>
+                        New here? <Link to="/register" style={{ color: 'var(--color-primary)', fontWeight: 900 }}>CREATE ACCOUNT</Link>
                     </p>
                 </div>
             </div>

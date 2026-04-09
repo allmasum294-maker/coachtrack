@@ -18,10 +18,10 @@ export default function Register() {
     async function handleGoogleRegister() {
         setLoading(true);
         try {
-            toast.success('Google registration pulse detected');
+            toast.success('Google login started');
             setTimeout(() => setLoading(false), 1000);
         } catch (err) {
-            setError('Global Signal Interrupted: Google Auth Failed');
+            setError('Google login failed. Please try again.');
             setLoading(false);
         }
     }
@@ -31,10 +31,10 @@ export default function Register() {
         setError('');
 
         if (password !== confirmPassword) {
-            return setError('Quantum Mismatch: Passwords do not align.');
+            return setError('Passwords do not match.');
         }
         if (password.length < 6) {
-            return setError('Security Violation: Password below minimum entropy.');
+            return setError('Password is too short. Please use at least 6 characters.');
         }
 
         setLoading(true);
@@ -42,13 +42,13 @@ export default function Register() {
             await register(email, password, displayName);
             setSuccess(true);
         } catch (err) {
-            console.error('Registration Fault:', err);
+            console.error('Registration Error:', err);
             if (err.code === 'auth/email-already-in-use') {
-                setError('Signal Collision: Email already registered in the cluster.');
+                setError('This email is already in use.');
             } else if (err.code === 'auth/invalid-email') {
-                setError('Invalid telemetry: Check email format.');
+                setError('Please check your email format.');
             } else {
-                setError('Initialization Error: System failure during creation.');
+                setError('Failed to create account. Please try again.');
             }
         } finally {
             setLoading(false);
@@ -74,12 +74,12 @@ export default function Register() {
                     }}>
                         <ShieldCheck size={40} />
                     </div>
-                    <h1 style={{ fontSize: '32px', fontWeight: 900, marginBottom: '16px' }}>Initialization Complete</h1>
+                    <h1 style={{ fontSize: '32px', fontWeight: 900, marginBottom: '16px' }}>Account Created!</h1>
                     <p style={{ color: 'var(--color-text-muted)', fontSize: '16px', lineHeight: 1.6, marginBottom: '40px', fontWeight: 500 }}>
-                        Your node has been established. <strong>Administrative clearance</strong> is now required. An overseer will verify your credentials shortly.
+                        Your account has been set up successfully. You can now log in and start managing your classes.
                     </p>
                     <Link to="/login" className="btn btn-primary" style={{ width: '100%', height: '56px', borderRadius: '14px', fontWeight: 900 }}>
-                        ACCESS LOGIN PORTAL
+                        GO TO LOGIN
                     </Link>
                 </div>
             </div>
@@ -120,8 +120,8 @@ export default function Register() {
                     }}>
                         <UserPlus size={32} />
                     </div>
-                    <h1 style={{ fontSize: '28px', fontWeight: 900, marginBottom: '8px', letterSpacing: '-0.02em' }}>Initialize Identity</h1>
-                    <p style={{ color: 'var(--color-text-muted)', fontSize: '15px', fontWeight: 500 }}>Create your unique teacher node in the cluster</p>
+                    <h1 style={{ fontSize: '28px', fontWeight: 900, marginBottom: '8px', letterSpacing: '-0.02em' }}>Create Account</h1>
+                    <p style={{ color: 'var(--color-text-muted)', fontSize: '15px', fontWeight: 500 }}>Join our coaching platform as a teacher</p>
                 </div>
 
                 {error && (
@@ -139,7 +139,7 @@ export default function Register() {
 
                 <form className="auth-form" onSubmit={handleSubmit} style={{ display: 'grid', gap: '20px' }}>
                     <div className="form-group">
-                        <label className="form-label" style={{ fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-muted)', marginBottom: '8px', display: 'block' }}>Entity Name</label>
+                        <label className="form-label" style={{ fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-muted)', marginBottom: '8px', display: 'block' }}>Full Name</label>
                         <div style={{ position: 'relative' }}>
                             <User size={18} style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }} />
                             <input
@@ -155,7 +155,7 @@ export default function Register() {
                     </div>
 
                     <div className="form-group">
-                        <label className="form-label" style={{ fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-muted)', marginBottom: '8px', display: 'block' }}>Communication Frequency (Email)</label>
+                        <label className="form-label" style={{ fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-muted)', marginBottom: '8px', display: 'block' }}>Email Address</label>
                         <div style={{ position: 'relative' }}>
                             <Mail size={18} style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }} />
                             <input
@@ -172,7 +172,7 @@ export default function Register() {
 
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                         <div className="form-group">
-                            <label className="form-label" style={{ fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-muted)', marginBottom: '8px', display: 'block' }}>Passcode</label>
+                            <label className="form-label" style={{ fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-muted)', marginBottom: '8px', display: 'block' }}>Password</label>
                             <div style={{ position: 'relative' }}>
                                 <Lock size={18} style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }} />
                                 <input
@@ -210,14 +210,14 @@ export default function Register() {
                         disabled={loading}
                         style={{ width: '100%', height: '52px', borderRadius: '12px', fontWeight: 900, fontSize: '15px', marginTop: '8px', boxShadow: '0 15px 30px -5px rgba(59, 130, 246, 0.4)', background: 'linear-gradient(135deg, var(--color-gold), #b45309)' }}
                     >
-                        {loading ? <span className="loading-spinner" style={{ width: 20, height: 20 }} /> : 'GENERATE NODE'}
+                        {loading ? <span className="loading-spinner" style={{ width: 20, height: 20 }} /> : 'REGISTER'}
                     </button>
                 </form>
 
                 <div style={{ marginTop: '32px', textAlign: 'center' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
                         <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.05)' }} />
-                        <span style={{ color: 'var(--color-text-muted)', fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em' }}>ALGORITHMIC REGISTRATION</span>
+                        <span style={{ color: 'var(--color-text-muted)', fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em' }}>OR REGISTER WITH</span>
                         <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.05)' }} />
                     </div>
                     
@@ -237,11 +237,11 @@ export default function Register() {
                             <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
                             <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
                         </svg>
-                        Google Authorization
+                        Google Register
                     </button>
                     
                     <p style={{ marginTop: '32px', color: 'var(--color-text-muted)', fontSize: '14px', fontWeight: 600 }}>
-                        Already in the cluster? <Link to="/login" style={{ color: 'var(--color-gold)', fontWeight: 900 }}>LOGIN PORTAL</Link>
+                        Already have an account? <Link to="/login" style={{ color: 'var(--color-gold)', fontWeight: 900 }}>LOGIN</Link>
                     </p>
                 </div>
             </div>

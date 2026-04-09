@@ -25,7 +25,7 @@ export default function AdminPanel() {
             setPendingUsers(users.filter((u) => !u.isApproved && u.role !== 'admin'));
             setApprovedUsers(users.filter((u) => u.isApproved && u.role !== 'admin'));
         } catch (err) {
-            console.error('Core Registry Failure:', err);
+            console.error('Error loading users:', err);
         } finally {
             setLoading(false);
         }
@@ -43,31 +43,31 @@ export default function AdminPanel() {
     }
 
     async function rejectUser(userId) {
-        if (!confirm('Permanently purge this registration request?')) return;
+        if (!confirm('Delete this registration request?')) return;
         try {
             await deleteDoc(doc(db, 'users', userId));
             loadUsers();
-            toast.success('Request Purged');
+            toast.success('Request deleted');
         } catch (err) {
-            console.error('Purge Error:', err);
+            console.error('Error deleting request:', err);
         }
     }
 
     async function revokeAccess(userId) {
-        if (!confirm('Revoke security clearance for this user?')) return;
+        if (!confirm('Remove access for this tutor?')) return;
         try {
             await updateDoc(doc(db, 'users', userId), { isApproved: false });
             loadUsers();
-            toast.success('Access Revoked');
+            toast.success('Access removed');
         } catch (err) {
-            console.error('Revocation Error:', err);
+            console.error('Error removing access:', err);
         }
     }
 
     async function runInitialSync() {
-        if (!confirm('Initialize platform-wide data consistency? (This updates all legacy student and batch records)')) return;
+        if (!confirm('Update your database to the latest version? (This ensures all your records are consistent)')) return;
         setIsMigrating(true);
-        const toastId = toast.loading('Synchronizing Data Matrix...');
+        const toastId = toast.loading('Updating records...');
         try {
             let batchCount = 0;
             let studentCount = 0;
@@ -91,10 +91,10 @@ export default function AdminPanel() {
             });
 
             await Promise.all([...batchPromises, ...studentPromises]);
-            toast.success(`Matrix Synced: ${batchCount} Batches, ${studentCount} Students`, { id: toastId });
+            toast.success(`Database Updated: ${batchCount} Batches, ${studentCount} Students`, { id: toastId });
         } catch (err) {
             console.error('Sync Error:', err);
-            toast.error('Synchronization Aborted', { id: toastId });
+            toast.error('Update Failed', { id: toastId });
         } finally {
             setIsMigrating(false);
         }
@@ -107,8 +107,8 @@ export default function AdminPanel() {
                     <div style={{ background: 'rgba(239, 68, 68, 0.1)', color: 'var(--color-danger)', width: '80px', height: '80px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
                         <Lock size={40} />
                     </div>
-                    <h1 style={{ fontSize: '24px', fontWeight: 900, marginBottom: '12px' }}>Clearance Required</h1>
-                    <p style={{ color: 'var(--color-text-muted)', fontSize: '15px', lineHeight: 1.6 }}>Your current authentication token does not have Level 0 Administrative privileges.</p>
+                    <h1 style={{ fontSize: '24px', fontWeight: 900, marginBottom: '12px' }}>Admin Access Required</h1>
+                    <p style={{ color: 'var(--color-text-muted)', fontSize: '15px', lineHeight: 1.6 }}>You need admin permissions to view this page.</p>
                 </div>
             </div>
         );
@@ -121,18 +121,18 @@ export default function AdminPanel() {
             <div className="page-header" style={{ marginBottom: 'var(--space-8)' }}>
                 <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-                        <div style={{ padding: '4px 10px', background: 'rgba(59, 130, 246, 0.1)', color: 'var(--color-primary)', borderRadius: '8px', fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em' }}>System Oversight</div>
+                        <div style={{ padding: '4px 10px', background: 'rgba(59, 130, 246, 0.1)', color: 'var(--color-primary)', borderRadius: '8px', fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Admin Only</div>
                     </div>
-                    <h1 className="page-title" style={{ fontSize: '32px', fontWeight: 900 }}>Security Console</h1>
-                    <p className="page-subtitle">Manage educator credentials and platform data integrity</p>
+                    <h1 className="page-title" style={{ fontSize: '32px', fontWeight: 900 }}>Admin Panel</h1>
+                    <p className="page-subtitle">Manage tutors and system data</p>
                 </div>
             </div>
 
             <div className="glass-panel" style={{ padding: '8px', marginBottom: 'var(--space-8)', display: 'inline-flex', gap: '8px', background: 'rgba(255, 255, 255, 0.03)' }}>
                 {[
-                    { id: 'pending', label: 'Pending Approval', icon: <ShieldAlert size={16} />, count: pendingUsers.length },
-                    { id: 'approved', label: 'Active Tutors', icon: <Check size={16} />, count: approvedUsers.length },
-                    { id: 'maintenance', label: 'Matrix Control', icon: <Database size={16} /> }
+                    { id: 'pending', label: 'Waiting for Approval', icon: <ShieldAlert size={16} />, count: pendingUsers.length },
+                    { id: 'approved', label: 'Tutors', icon: <Check size={16} />, count: approvedUsers.length },
+                    { id: 'maintenance', label: 'Data Tools', icon: <Database size={16} /> }
                 ].map((t) => (
                     <button 
                         key={t.id}
@@ -167,8 +167,8 @@ export default function AdminPanel() {
                                 <div style={{ width: '80px', height: '80px', background: 'rgba(255,255,255,0.03)', color: 'var(--color-text-muted)', borderRadius: '50%', margin: '0 auto 24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                     <Users size={32} />
                                 </div>
-                                <h3 style={{ fontSize: '20px', fontWeight: 800 }}>Clearance Buffer Empty</h3>
-                                <p style={{ color: 'var(--color-text-muted)', maxWidth: '300px', margin: '8px auto' }}>No new registration requests detected in the buffer.</p>
+                                <h3 style={{ fontSize: '20px', fontWeight: 800 }}>No Pending Requests</h3>
+                                <p style={{ color: 'var(--color-text-muted)', maxWidth: '300px', margin: '8px auto' }}>Everything is up to date.</p>
                             </div>
                         ) : (
                             <div style={{ display: 'grid', gap: '16px' }}>
@@ -187,10 +187,10 @@ export default function AdminPanel() {
                                         </div>
                                         <div style={{ display: 'flex', gap: '12px' }}>
                                             <button className="btn btn-primary" onClick={() => approveUser(user.id)} style={{ padding: '0 20px', height: '40px', fontSize: '12px', fontWeight: 900 }}>
-                                                <Check size={16} /> GRANT ACCESS
+                                                <Check size={16} /> APPROVE
                                             </button>
                                             <button className="btn btn-ghost" onClick={() => rejectUser(user.id)} style={{ color: '#ef4444', height: '40px', fontSize: '12px', fontWeight: 900 }}>
-                                                <X size={16} /> REJECT
+                                                <X size={16} /> REMOVE
                                             </button>
                                         </div>
                                     </div>
@@ -222,7 +222,7 @@ export default function AdminPanel() {
                                             </div>
                                         </div>
                                         <button className="btn btn-ghost" onClick={() => revokeAccess(user.id)} style={{ color: '#ef4444', height: '40px', fontSize: '12px', fontWeight: 900 }}>
-                                            REVOKE SECURITY CLEARANCE
+                                            REMOVE ACCESS
                                         </button>
                                     </div>
                                 ))}
@@ -239,19 +239,18 @@ export default function AdminPanel() {
                                     <Database size={28} />
                                 </div>
                                 <div>
-                                    <h3 style={{ fontSize: '20px', fontWeight: 900 }}>Central Data Matrix</h3>
-                                    <p style={{ color: 'var(--color-text-muted)', fontSize: '14px' }}>Platform-wide consistency and legacy record synchronization</p>
+                                    <h3 style={{ fontSize: '20px', fontWeight: 900 }}>Data Management</h3>
+                                    <p style={{ color: 'var(--color-text-muted)', fontSize: '14px' }}>Keep all records consistent and updated</p>
                                 </div>
                             </div>
 
                             <div className="glass-panel" style={{ padding: '32px', background: 'rgba(255, 255, 255, 0.02)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <div style={{ flex: 1 }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                                         <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--color-primary)' }} />
-                                        <div style={{ fontWeight: 800, fontSize: '16px' }}>Legacy Enrollment Logic Sync</div>
+                                        <div style={{ fontWeight: 800, fontSize: '16px' }}>Update Old Records</div>
                                     </div>
                                     <p style={{ fontSize: '14px', color: 'var(--color-text-muted)', lineHeight: 1.5, maxWidth: '500px' }}>
-                                        Applies modern state containers to legacy records. Sets <code style={{ color: 'var(--color-primary)' }}>isClosed: false</code> for all active batches and <code style={{ color: 'var(--color-primary)' }}>status: 'enrolled'</code> for all active student profiles.
+                                        Adds new features to your older records. This ensures all your batches and students have the latest settings applied.
                                     </p>
                                 </div>
                                 <button 
@@ -260,7 +259,7 @@ export default function AdminPanel() {
                                     disabled={isMigrating}
                                     style={{ padding: '0 32px', height: '48px', fontWeight: 900, boxShadow: '0 8px 20px rgba(59, 130, 246, 0.3)' }}
                                 >
-                                    {isMigrating ? <span className="loading-spinner" style={{ width: 16, height: 16, borderWeight: 2 }} /> : <><Zap size={16} /> TRIGGER SYNC</>}
+                                    {isMigrating ? <span className="loading-spinner" style={{ width: 16, height: 16, borderWeight: 2 }} /> : <><Zap size={16} /> START UPDATE</>}
                                 </button>
                             </div>
 
@@ -268,7 +267,7 @@ export default function AdminPanel() {
                                 <ShieldAlert size={20} style={{ color: '#ef4444', marginTop: '2px' }} />
                                 <div>
                                     <div style={{ fontWeight: 900, fontSize: '14px', color: '#ef4444', marginBottom: '4px' }}>DANGER ZONE</div>
-                                    <p style={{ fontSize: '13px', color: '#ef4444', opacity: 0.8, fontWeight: 600 }}>This operation modifies broad datasets. Ensure all educators are offline during synchronization to prevent race conditions.</p>
+                                    <p style={{ fontSize: '13px', color: '#ef4444', opacity: 0.8, fontWeight: 600 }}>This operation changes many records at once. Make sure you don't have other windows open while running this to avoid errors.</p>
                                 </div>
                             </div>
                         </div>

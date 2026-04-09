@@ -122,13 +122,13 @@ export default function Leaderboard() {
         <div className="animate-fade-in">
             <div className="page-header">
                 <div>
-                    <h1 className="page-title">Hall of Fame</h1>
-                    <p className="page-subtitle">Recognizing excellence and consistent engagement</p>
+                    <h1 className="page-title">Top Students</h1>
+                    <p className="page-subtitle">Celebrating our hardest working students</p>
                 </div>
                 <div className="glass-card" style={{ padding: '10px 20px', display: 'flex', alignItems: 'center', gap: '15px', border: '1px solid var(--color-primary)' }}>
                     <div style={{ color: 'var(--color-primary)' }}><Filter size={20} /></div>
                     <div>
-                        <div style={{ fontSize: '10px', fontWeight: 900, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Competitive Batch</div>
+                        <div style={{ fontSize: '10px', fontWeight: 900, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Batch</div>
                         <select 
                             className="form-select" 
                             value={selectedBatchId} 
@@ -148,8 +148,8 @@ export default function Leaderboard() {
                     <div style={{ width: '100px', height: '100px', borderRadius: '30px', background: 'rgba(255,255,255,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto var(--space-8)' }}>
                         <Trophy size={48} style={{ color: 'var(--color-border)', opacity: 0.5 }} />
                     </div>
-                    <h2 style={{ fontSize: '26px', fontWeight: 900, marginBottom: '12px' }}>Arena Waiting...</h2>
-                    <p style={{ color: 'var(--color-text-muted)', maxWidth: '400px', margin: '0 auto' }}>Select an active batch to reveal the current standing of our top performers.</p>
+                    <h2 style={{ fontSize: '26px', fontWeight: 900, marginBottom: '12px' }}>Select a Batch</h2>
+                    <p style={{ color: 'var(--color-text-muted)', maxWidth: '400px', margin: '0 auto' }}>Choose a batch to see who's leading the class.</p>
                 </div>
             ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-10)' }}>
@@ -170,7 +170,7 @@ export default function Leaderboard() {
                                 <div className="glass-panel" style={{ width: '100%', height: '160px', borderTopLeftRadius: '24px', borderTopRightRadius: '24px', borderBottomLeftRadius: 0, borderBottomRightRadius: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(148, 163, 184, 0.05)', border: '1px solid rgba(148, 163, 184, 0.2)', borderBottom: 'none' }}>
                                     <div style={{ fontWeight: 800, fontSize: '18px', textAlign: 'center', marginBottom: '4px' }}>{leaderboardData[1].name}</div>
                                     <div style={{ fontSize: '28px', fontWeight: 900, color: '#94a3b8' }}>{leaderboardData[1].points}<span style={{ fontSize: '12px', opacity: 0.6, marginLeft: '4px' }}>pts</span></div>
-                                    <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--color-text-muted)', marginTop: '8px' }}>SILVER MEDALIST</div>
+                                    <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--color-text-muted)', marginTop: '8px' }}>2nd Place</div>
                                 </div>
                             </div>
                         )}
@@ -191,7 +191,7 @@ export default function Leaderboard() {
                             <div className="glass-panel" style={{ width: '100%', height: '220px', borderTopLeftRadius: '32px', borderTopRightRadius: '32px', borderBottomLeftRadius: 0, borderBottomRightRadius: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(251, 191, 36, 0.08)', border: '1px solid rgba(251, 191, 36, 0.3)', borderBottom: 'none', boxShadow: '0 -20px 40px -20px rgba(251, 191, 36, 0.2)' }}>
                                 <div style={{ fontWeight: 900, fontSize: '22px', textAlign: 'center', marginBottom: '6px' }}>{leaderboardData[0].name}</div>
                                 <div style={{ fontSize: '42px', fontWeight: 900, color: '#fbbf24', textShadow: '0 0 20px rgba(251, 191, 36, 0.4)' }}>{leaderboardData[0].points}</div>
-                                <div style={{ fontSize: '13px', fontWeight: 900, color: '#fbbf24', letterSpacing: '0.1em', marginTop: '10px' }}>GRAND CHAMPION</div>
+                                <div style={{ fontSize: '13px', fontWeight: 900, color: '#fbbf24', letterSpacing: '0.1em', marginTop: '10px' }}>1st Place</div>
                             </div>
                         </div>
 
@@ -209,7 +209,7 @@ export default function Leaderboard() {
                                 <div className="glass-panel" style={{ width: '100%', height: '140px', borderTopLeftRadius: '24px', borderTopRightRadius: '24px', borderBottomLeftRadius: 0, borderBottomRightRadius: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(180, 83, 9, 0.05)', border: '1px solid rgba(180, 83, 9, 0.2)', borderBottom: 'none' }}>
                                     <div style={{ fontWeight: 800, fontSize: '17px', textAlign: 'center', marginBottom: '4px' }}>{leaderboardData[2].name}</div>
                                     <div style={{ fontSize: '26px', fontWeight: 900, color: '#b45309' }}>{leaderboardData[2].points}<span style={{ fontSize: '12px', opacity: 0.6, marginLeft: '4px' }}>pts</span></div>
-                                    <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--color-text-muted)', marginTop: '8px' }}>BRONZE MEDALIST</div>
+                                    <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--color-text-muted)', marginTop: '8px' }}>3rd Place</div>
                                 </div>
                             </div>
                         )}
@@ -220,7 +220,7 @@ export default function Leaderboard() {
                         <div style={{ padding: '24px 32px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.01)' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                 <TrendingUp size={22} color="var(--color-primary)" />
-                                <h3 style={{ fontSize: '18px', fontWeight: 900 }}>Power Standings</h3>
+                                <h3 style={{ fontSize: '18px', fontWeight: 900 }}>Full Rankings</h3>
                             </div>
                             <div style={{ fontSize: '13px', color: 'var(--color-text-muted)', fontWeight: 600 }}>Ranking for {batches.find(b => b.id === selectedBatchId)?.name}</div>
                         </div>
@@ -229,11 +229,11 @@ export default function Leaderboard() {
                                 <thead>
                                     <tr>
                                         <th style={{ width: '100px', textAlign: 'center' }}>RANK</th>
-                                        <th>STUDENT ARCHETYPE</th>
+                                        <th>STUDENT</th>
                                         <th style={{ textAlign: 'center' }}>ATTENDANCE</th>
-                                        <th style={{ textAlign: 'center' }}>SYLLABUS</th>
-                                        <th style={{ textAlign: 'center' }}>MASTERY</th>
-                                        <th style={{ textAlign: 'right', paddingRight: '32px' }}>TOTAL SCORE</th>
+                                        <th style={{ textAlign: 'center' }}>HOMEWORK</th>
+                                        <th style={{ textAlign: 'center' }}>EXAMS</th>
+                                        <th style={{ textAlign: 'right', paddingRight: '32px' }}>TOTAL POINTS</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -310,9 +310,9 @@ export default function Leaderboard() {
                     {/* Point Scoring Mechanics */}
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-6)' }}>
                         {[
-                            { title: 'Consistency', subtitle: 'Attendance Discipline', value: '+10 pts / session', icon: UserCheck, color: 'var(--color-teal)' },
-                            { title: 'Diligence', subtitle: 'Homework Submission', value: '+20 pts / completion', icon: Star, color: 'var(--color-warning)' },
-                            { title: 'Aptitude', subtitle: 'Examination Performance', value: '50% of marks secured', icon: Trophy, color: 'var(--color-primary)' }
+                            { title: 'Attendance', subtitle: 'Being on time', value: '+10 pts / class', icon: UserCheck, color: 'var(--color-teal)' },
+                            { title: 'Homework', subtitle: 'Finishing tasks', value: '+20 pts / task', icon: Star, color: 'var(--color-warning)' },
+                            { title: 'Exams', subtitle: 'Doing well in tests', value: '50% of your marks', icon: Trophy, color: 'var(--color-primary)' }
                         ].map((card, i) => (
                             <div key={i} className="glass-card" style={{ padding: '24px', position: 'relative', overflow: 'hidden' }}>
                                 <div style={{ position: 'absolute', top: '-10px', right: '-10px', opacity: 0.05 }}>

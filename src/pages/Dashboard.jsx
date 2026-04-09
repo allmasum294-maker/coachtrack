@@ -215,7 +215,7 @@ export default function Dashboard() {
                     const last = scores[scores.length - 1];
                     const prev = scores[scores.length - 2];
                     if (last < prev - 10) { 
-                        addRisk(sid, `Performance Regression Detected`, 'medium');
+                        addRisk(sid, `Scores dropped recently`, 'medium');
                     }
                 }
             });
@@ -232,7 +232,7 @@ export default function Dashboard() {
             setAtRiskList(finalAtRiskList);
             setUpcomingClasses(upcoming);
         } catch (err) {
-            console.error('Core Analytical Fault:', err);
+            console.error('Error loading dashboard:', err);
         } finally {
             setLoading(false);
         }
@@ -257,14 +257,14 @@ export default function Dashboard() {
                     <div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
                             <div style={{ padding: '6px 12px', background: 'rgba(59, 130, 246, 0.1)', color: 'var(--color-primary)', borderRadius: '20px', fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <Crown size={12} /> Elite Educator Profile
+                                <Crown size={12} /> Teacher Profile
                             </div>
                         </div>
                         <h1 style={{ fontSize: 'clamp(24px, 4vw, 36px)', fontWeight: 900, marginBottom: '8px', letterSpacing: '-0.02em' }}>
-                            {greeting()}, <span className="text-gradient">{userProfile?.displayName?.split(' ')[0] || 'Academic Director'}</span>
+                            {greeting}, <span className="text-gradient">{userProfile?.displayName?.split(' ')[0] || 'Teacher'}</span>
                         </h1>
                         <p style={{ color: 'var(--color-text-muted)', fontSize: '16px', fontWeight: 500, maxWidth: '500px', lineHeight: 1.6 }}>
-                            Your academic landscape is synchronized. You have <span style={{ color: 'var(--color-text-primary)', fontWeight: 800 }}>{stats.classesToday} active sessions</span> targeting optimized learning outcomes today.
+                            Your dashboard is up to date. You have <span style={{ color: 'var(--color-text-primary)', fontWeight: 800 }}>{stats.classesToday} classes</span> scheduled for today.
                         </p>
                     </div>
                     
@@ -279,10 +279,10 @@ export default function Dashboard() {
                             }}
                             style={{ fontSize: '10px', height: '32px', opacity: 0.5 }}
                         >
-                            SYNC SCHEMA
+                            REFRESH DATABASE
                         </button>
                         <Link to="/attendance" className="btn btn-primary" style={{ padding: '0 28px', height: '48px', borderRadius: '14px', fontWeight: 900, boxShadow: '0 10px 30px -5px rgba(59, 130, 246, 0.4)', gap: '10px' }}>
-                            <ClipboardCheck size={20} /> SYNC ATTENDANCE
+                            <ClipboardCheck size={20} /> TAKE ATTENDANCE
                         </Link>
                     </div>
                 </div>
@@ -291,10 +291,10 @@ export default function Dashboard() {
             {/* Quick Metrics Grid */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px', marginBottom: 'var(--space-8)' }}>
                 {[
-                    { label: 'Active Sessions', val: stats.classesToday, icon: <PlayCircle size={24} />, color: '#10b981', delay: '0s' },
-                    { label: 'Yield Rate (Week)', val: `${stats.weekAttendance}%`, icon: <TrendingUp size={24} />, color: '#3b82f6', delay: '0.1s' },
-                    { label: 'Phase Assessment', val: stats.nextExamDays, icon: <Clock size={24} />, color: '#f59e0b', delay: '0.2s' },
-                    { label: 'Critical Profiles', val: stats.attentionNeeded, icon: <AlertTriangle size={24} />, color: '#ef4444', delay: '0.3s', isUrgent: stats.attentionNeeded > 0 }
+                    { label: 'Classes Today', val: stats.classesToday, icon: <PlayCircle size={24} />, color: '#10b981', delay: '0s' },
+                    { label: 'Attendance (Week)', val: `${stats.weekAttendance}%`, icon: <TrendingUp size={24} />, color: '#3b82f6', delay: '0.1s' },
+                    { label: 'Next Exam', val: stats.nextExamDays, icon: <Clock size={24} />, color: '#f59e0b', delay: '0.2s' },
+                    { label: 'Needs Attention', val: stats.attentionNeeded, icon: <AlertTriangle size={24} />, color: '#ef4444', delay: '0.3s', isUrgent: stats.attentionNeeded > 0 }
                 ].map((m, i) => (
                     <div key={i} className="glass-card hover-lift animate-fade-in-up" style={{ padding: '24px', display: 'flex', alignItems: 'center', gap: '20px', animationDelay: m.delay }}>
                         <div style={{ 
@@ -330,12 +330,12 @@ export default function Dashboard() {
                                 <ShieldAlert size={20} />
                             </div>
                             <div>
-                                <h3 style={{ fontSize: '18px', fontWeight: 900, color: '#ef4444' }}>Mission Control: Intervention Alerts</h3>
-                                <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', fontWeight: 600 }}>Profiles requiring immediate cognitive realignment</p>
+                                <h3 style={{ fontSize: '18px', fontWeight: 900, color: '#ef4444' }}>Students Needing Attention</h3>
+                                <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', fontWeight: 600 }}>Students who might need extra help or have missed classes</p>
                             </div>
                         </div>
                         <div style={{ padding: '6px 16px', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', borderRadius: '10px', fontSize: '11px', fontWeight: 900, textTransform: 'uppercase' }}>
-                            {atRiskList.length} PROFILES FLAGGED
+                            {atRiskList.length} STUDENTS NEED HELP
                         </div>
                     </div>
 
@@ -345,8 +345,8 @@ export default function Dashboard() {
                                 <div style={{ width: '100px', height: '100px', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', borderRadius: '50%', marginBottom: '24px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
                                     <Activity size={48} />
                                 </div>
-                                <h4 style={{ fontSize: '22px', fontWeight: 900, color: '#10b981', marginBottom: '8px' }}>Ecosystem Stability: Optimal</h4>
-                                <p style={{ color: 'var(--color-text-muted)', maxWidth: '340px', margin: 'auto', fontWeight: 500 }}>No performance deltas or adherence risks identified in the current cycle.</p>
+                                <h4 style={{ fontSize: '22px', fontWeight: 900, color: '#10b981', marginBottom: '8px' }}>Everything looks good!</h4>
+                                <p style={{ color: 'var(--color-text-muted)', maxWidth: '340px', margin: 'auto', fontWeight: 500 }}>No students are currently flagged for attention.</p>
                             </div>
                         ) : (
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
@@ -373,7 +373,7 @@ export default function Dashboard() {
                                             ))}
                                         </div>
                                         <Link to="/students" style={{ display: 'flex', width: '100%', marginTop: '20px', fontSize: '11px', fontWeight: 900, color: 'var(--color-primary)', textDecoration: 'none', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
-                                            PROFILE ANALYSIS <ChevronRight size={14} />
+                                            VIEW STUDENT <ChevronRight size={14} />
                                         </Link>
                                     </div>
                                 ))}
@@ -383,16 +383,16 @@ export default function Dashboard() {
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                    {/* Operational Queue */}
+                    {/* Upcoming Classes */}
                     <div className="glass-card" style={{ padding: 0, overflow: 'hidden' }}>
                         <div style={{ padding: '24px 28px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.01)' }}>
-                            <h3 style={{ fontSize: '16px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Operational Queue</h3>
-                            <Link to="/schedule" style={{ fontSize: '12px', fontWeight: 900, color: 'var(--color-primary)', textDecoration: 'none' }}>LEDGER</Link>
+                            <h3 style={{ fontSize: '16px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Upcoming Classes</h3>
+                            <Link to="/schedule" style={{ fontSize: '12px', fontWeight: 900, color: 'var(--color-primary)', textDecoration: 'none' }}>FULL SCHEDULE</Link>
                         </div>
                         <div style={{ padding: '20px' }}>
                             {upcomingClasses.length === 0 ? (
-                                <div style={{ padding: '20px 0', textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '14px', fontWeight: 500 }}>
-                                    No sessions buffered.
+                                <div style={{ padding: '20px', textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '14px', fontWeight: 500 }}>
+                                    No classes scheduled yet.
                                 </div>
                             ) : (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -430,13 +430,13 @@ export default function Dashboard() {
 
                     {/* Quick Access Matrix */}
                     <div className="glass-card" style={{ padding: '24px' }}>
-                        <h3 style={{ fontSize: '13px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '20px', color: 'var(--color-text-muted)' }}>Navigation Matrix</h3>
+                        <h3 style={{ fontSize: '13px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '20px', color: 'var(--color-text-muted)' }}>Quick Links</h3>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                             {[
-                                { to: '/attendance', icon: <ClipboardCheck size={20} />, label: 'Presence', color: '#10b981' },
-                                { to: '/students', icon: <Users size={20} />, label: 'Profiles', color: '#3b82f6' },
-                                { to: '/homework', icon: <BookOpen size={20} />, label: 'Curricula', color: '#8b5cf6' },
-                                { to: '/analytics', icon: <TrendingUp size={20} />, label: 'Metrics', color: '#f59e0b' }
+                                { to: '/attendance', icon: <ClipboardCheck size={20} />, label: 'Attendance', color: '#10b981' },
+                                { to: '/students', icon: <Users size={20} />, label: 'Students', color: '#3b82f6' },
+                                { to: '/homework', icon: <BookOpen size={20} />, label: 'Homework', color: '#8b5cf6' },
+                                { to: '/analytics', icon: <Activity size={20} />, label: 'Stats', color: '#f59e0b' }
                             ].map((link, i) => (
                                 <Link key={i} to={link.to} className="glass-panel hover-lift" style={{ 
                                     padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', 

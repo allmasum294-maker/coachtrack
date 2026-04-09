@@ -295,8 +295,8 @@ export default function StudentAnalytics() {
         <div className="animate-fade-in">
             <div className="page-header">
                 <div>
-                    <h1 className="page-title">Student Analytics</h1>
-                    <p className="page-subtitle">Detailed performance insights per student</p>
+                    <h1 className="page-title">Student Progress</h1>
+                    <p className="page-subtitle">See exactly how each student is doing</p>
                 </div>
             </div>
 
@@ -346,14 +346,14 @@ export default function StudentAnalytics() {
                             <div className="stat-card-icon teal"><Calendar size={24} /></div>
                             <div>
                                 <div className="stat-card-value">{stats.studentAttRate}%</div>
-                                <div className="stat-card-label">Attendance Rate</div>
+                                <div className="stat-card-label">Attendance</div>
                             </div>
                         </div>
                         <div className="stat-card glass-card">
                             <div className="stat-card-icon blue"><TrendingUp size={24} /></div>
                             <div>
                                 <div className="stat-card-value">{stats.avgScore}%</div>
-                                <div className="stat-card-label">Average Score</div>
+                                <div className="stat-card-label">Average Marks</div>
                             </div>
                         </div>
                         <div className="stat-card glass-card">
@@ -378,7 +378,7 @@ export default function StudentAnalytics() {
                         {/* Attendance Breakdown */}
                         <div className="glass-card" style={{ padding: 'var(--space-6)' }}>
                             <h3 style={{ fontSize: 'var(--font-size-md)', fontWeight: 600, marginBottom: 'var(--space-6)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                                <ClipboardCheck size={20} className="text-accent" /> Attendance Details
+                                <ClipboardCheck size={20} className="text-accent" /> Attendance Record
                             </h3>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
                                 {[
@@ -407,7 +407,7 @@ export default function StudentAnalytics() {
                         {/* Homework Breakdown */}
                         <div className="glass-card" style={{ padding: 'var(--space-6)' }}>
                             <h3 style={{ fontSize: 'var(--font-size-md)', fontWeight: 600, marginBottom: 'var(--space-6)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                                <BookOpen size={20} className="text-primary" /> Homework Details
+                                <BookOpen size={20} className="text-primary" /> Homework Record
                             </h3>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
                                 {[
@@ -473,7 +473,7 @@ export default function StudentAnalytics() {
                                 onClick={() => setShowExamTable(!showExamTable)}
                                 style={{ padding: 'var(--space-4) var(--space-6)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'transparent', border: 'none', borderBottom: showExamTable ? '1px solid var(--color-border)' : 'none' }}
                             >
-                                <h3 style={{ fontSize: 'var(--font-size-md)', fontWeight: 600, margin: 0 }}>📊 Per-Exam Score Details</h3>
+                                <h3 style={{ fontSize: 'var(--font-size-md)', fontWeight: 600, margin: 0 }}>📊 Exam Records Sheet</h3>
                                 {showExamTable ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
                             </button>
                             {showExamTable && (
@@ -591,7 +591,7 @@ export default function StudentAnalytics() {
                         <User size={40} className="text-muted" />
                     </div>
                     <h2 className="empty-state-title" style={{ fontSize: 'var(--font-size-xl)', fontWeight: 700, marginBottom: 'var(--space-2)' }}>No Student Selected</h2>
-                    <p className="empty-state-text" style={{ color: 'var(--color-text-muted)', maxWidth: '400px', margin: '0 auto' }}>Select a student from the dropdown above to view their detailed performance analytics and trends.</p>
+                    <p className="empty-state-text" style={{ color: 'var(--color-text-muted)', maxWidth: '400px', margin: '0 auto' }}>Select a student from the menu above to see their progress and graphs.</p>
                 </div>
             )}
         </div>

@@ -209,7 +209,7 @@ export default function Analytics() {
             const attRate = totalR > 0 ? Math.round((presentR / totalR) * 100) : 0;
 
             const batchLessons = lessons.filter((l) => l.batchId === batch.id);
-            const coveredL = batchLessons.filter((l) => l.status === 'covered').length;
+            const coveredL = batchLessons.filter(l => l.status === 'covered').length;
             const sylRate = batchLessons.length > 0 ? Math.round((coveredL / batchLessons.length) * 100) : 0;
 
             const batchExams = exams.filter((e) => e.batchId === batch.id);
@@ -225,7 +225,7 @@ export default function Analytics() {
             });
             examPerf = examCount > 0 ? Math.round(totalPct / examCount) : 0;
 
-            return { subject: batch.name, Attendance: attRate, Syllabus: sylRate, Performance: examPerf };
+            return { subject: batch.name, Attendance: attRate, Topics: sylRate, Performance: examPerf };
         });
     }
 
@@ -248,29 +248,29 @@ export default function Analytics() {
 
     const targetData = (() => {
         const filtered = getFilteredSchedules();
-        const fulfilled = filtered.filter(s => s.status === 'completed').length;
+        const done = filtered.filter(s => s.status === 'completed').length;
         const cancelled = filtered.filter(s => s.status === 'cancelled').length;
         const scheduled = filtered.filter(s => s.status === 'scheduled').length;
         let target = selectedBatch ? (batches.find(b => b.id === selectedBatch)?.targetClasses || 0) : batches.reduce((sum, b) => sum + (b.targetClasses || 0), 0);
-        return { fulfilled, cancelled, scheduled, target };
+        return { done, cancelled, scheduled, target };
     })();
 
     return (
         <div className="animate-fade-in">
             <div className="page-header">
                 <div>
-                    <h1 className="page-title">Performance Intelligence</h1>
-                    <p className="page-subtitle">Unified insights into coaching metrics and student engagement</p>
+                    <h1 className="page-title">Class Progress</h1>
+                    <p className="page-subtitle">See how your classes and students are doing</p>
                 </div>
             </div>
 
             {/* Quick Stats Summary */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-4)', marginBottom: 'var(--space-8)' }}>
                 {[
-                    { label: 'Enrolled Students', value: stats.studentCount, icon: Users, color: 'var(--color-primary)' },
-                    { label: 'Avg Attendance', value: `${stats.attRate}%`, icon: ClipboardCheck, color: 'var(--color-teal)' },
-                    { label: 'Syllabus Covered', value: `${stats.sylProgress}%`, icon: BookOpen, color: 'var(--color-warning)' },
-                    { label: 'Academic Performance', value: `${stats.avgPerf}%`, icon: Award, color: 'var(--color-primary)' },
+                    { label: 'Total Students', value: stats.studentCount, icon: Users, color: 'var(--color-primary)' },
+                    { label: 'Average Attendance', value: `${stats.attRate}%`, icon: ClipboardCheck, color: 'var(--color-teal)' },
+                    { label: 'Topics Finished', value: `${stats.sylProgress}%`, icon: BookOpen, color: 'var(--color-warning)' },
+                    { label: 'Average Exam Score', value: `${stats.avgPerf}%`, icon: Award, color: 'var(--color-primary)' },
                 ].map((stat, i) => (
                     <div key={i} className="glass-panel" style={{ padding: 'var(--space-5)', display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
                         <div style={{ 
@@ -292,7 +292,7 @@ export default function Analytics() {
             <div className="glass-card" style={{ padding: 'var(--space-6)', marginBottom: 'var(--space-8)', display: 'flex', gap: 'var(--space-6)', flexWrap: 'wrap', alignItems: 'flex-end' }}>
                 <div style={{ flex: 2, minWidth: '240px' }}>
                     <div className="form-group">
-                        <label className="form-label" style={{ fontSize: '11px', fontWeight: 800 }}><Filter size={12} style={{ marginRight: '4px' }} /> Focus Area</label>
+                        <label className="form-label" style={{ fontSize: '11px', fontWeight: 800 }}><Filter size={12} style={{ marginRight: '4px' }} /> Select Batch</label>
                         <select className="form-select" value={selectedBatch} onChange={(e) => setSelectedBatch(e.target.value)}>
                             <option value="">All Active Batches</option>
                             {batches.map((b) => (<option key={b.id} value={b.id}>{b.name}</option>))}
@@ -302,18 +302,18 @@ export default function Analytics() {
 
                 <div style={{ flex: 3, display: 'flex', gap: 'var(--space-3)' }}>
                     <div className="form-group" style={{ flex: 1 }}>
-                        <label className="form-label" style={{ fontSize: '11px', fontWeight: 800 }}>Time Horizon Start</label>
+                        <label className="form-label" style={{ fontSize: '11px', fontWeight: 800 }}>Start Date</label>
                         <input type="date" className="form-input" value={startDate} onChange={e => setStartDate(e.target.value)} />
                     </div>
                     <div className="form-group" style={{ flex: 1 }}>
-                        <label className="form-label" style={{ fontSize: '11px', fontWeight: 800 }}>Time Horizon End</label>
+                        <label className="form-label" style={{ fontSize: '11px', fontWeight: 800 }}>End Date</label>
                         <input type="date" className="form-input" value={endDate} onChange={e => setEndDate(e.target.value)} />
                     </div>
                 </div>
 
                 {selectedBatch && (
                     <div className="form-group" style={{ flex: 2 }}>
-                        <label className="form-label" style={{ fontSize: '11px', fontWeight: 800 }}>Monthly Lesson Goal</label>
+                        <label className="form-label" style={{ fontSize: '11px', fontWeight: 800 }}>Monthly Class Goal</label>
                         <div style={{ display: 'flex', gap: '8px' }}>
                             <input type="number" className="form-input" placeholder="Classes" value={targetClasses} onChange={e => setTargetClasses(e.target.value)} />
                             <button className="btn btn-primary" onClick={handleSaveTarget} style={{ height: '42px', padding: '0 20px' }}><Zap size={16} /> Set</button>
@@ -327,19 +327,19 @@ export default function Analytics() {
                 <div className="glass-panel" style={{ gridColumn: 'span 12', padding: 'var(--space-6)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--space-8)' }}>
                         <div>
-                            <h3 style={{ fontSize: '20px', fontWeight: 800, color: 'var(--color-primary)' }}>Session Analytics</h3>
-                            <p style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>Fulfillment metrics for the selected time horizon</p>
+                            <h3 style={{ fontSize: '20px', fontWeight: 800, color: 'var(--color-primary)' }}>Classes Taken</h3>
+                            <p style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>How many classes you've taken in this period</p>
                         </div>
                         <div className="glass-card" style={{ padding: '8px 16px', background: 'rgba(59, 130, 246, 0.05)', color: 'var(--color-primary)', fontSize: '12px', fontWeight: 800 }}>
-                            {targetData.fulfilled} Classes Delivered
+                            {targetData.done} Classes Done
                         </div>
                     </div>
                     
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--space-6)', alignItems: 'center' }}>
                         <div className="glass-card" style={{ padding: 'var(--space-5)', textAlign: 'center' }}>
                             <Clock size={32} style={{ color: 'var(--color-primary)', marginBottom: '12px' }} />
-                            <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Fulfilled</div>
-                            <div style={{ fontSize: '36px', fontWeight: 900 }}>{targetData.fulfilled}</div>
+                            <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Done</div>
+                            <div style={{ fontSize: '36px', fontWeight: 900 }}>{targetData.done}</div>
                         </div>
                         <div className="glass-card" style={{ padding: 'var(--space-5)', textAlign: 'center' }}>
                             <Calendar size={32} style={{ color: 'var(--color-teal)', marginBottom: '12px' }} />
@@ -349,7 +349,7 @@ export default function Analytics() {
                         <div className="glass-card" style={{ padding: 'var(--space-5)', textAlign: 'center' }}>
                             <Target size={32} style={{ color: 'var(--color-warning)', marginBottom: '12px' }} />
                             <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Target Progress</div>
-                            <div style={{ fontSize: '36px', fontWeight: 900 }}>{targetData.target > 0 ? Math.min(Math.round((targetData.fulfilled / targetData.target) * 100), 100) : 0}%</div>
+                            <div style={{ fontSize: '36px', fontWeight: 900 }}>{targetData.target > 0 ? Math.min(Math.round((targetData.done / targetData.target) * 100), 100) : 0}%</div>
                         </div>
                         
                         <div style={{ height: '180px', gridColumn: 'span 2' }}>
@@ -357,17 +357,17 @@ export default function Analytics() {
                                 <PieChart>
                                     <Pie 
                                         data={[
-                                            { name: 'Fulfilled', value: targetData.fulfilled, color: 'var(--color-primary)' },
+                                            { name: 'Done', value: targetData.done, color: 'var(--color-primary)' },
                                             { name: 'Cancelled', value: targetData.cancelled, color: 'var(--color-danger)' },
-                                            { name: 'Scheduled', value: targetData.scheduled, color: 'var(--color-teal)' }
+                                            { name: 'Upcoming', value: targetData.scheduled, color: 'var(--color-teal)' }
                                         ].filter(x => x.value > 0)} 
                                         cx="50%" cy="50%" innerRadius={60} outerRadius={80} dataKey="value" stroke="none" paddingAngle={8}
                                     >
                                         {
                                             [
-                                                { name: 'Fulfilled', value: targetData.fulfilled, color: 'var(--color-primary)' },
+                                                { name: 'Done', value: targetData.done, color: 'var(--color-primary)' },
                                                 { name: 'Cancelled', value: targetData.cancelled, color: 'var(--color-danger)' },
-                                                { name: 'Scheduled', value: targetData.scheduled, color: 'var(--color-teal)' }
+                                                { name: 'Upcoming', value: targetData.scheduled, color: 'var(--color-teal)' }
                                             ].filter(x => x.value > 0).map((entry, index) => (
                                                 <Cell key={`cell-${index}`} fill={entry.color} />
                                             ))
@@ -384,8 +384,8 @@ export default function Analytics() {
                 {/* Attendance Area Chart */}
                 <div className="glass-panel" style={{ gridColumn: 'span 8', padding: 'var(--space-6)' }}>
                     <div style={{ marginBottom: 'var(--space-6)' }}>
-                        <h3 style={{ fontSize: '18px', fontWeight: 800 }}>Attendance Progression</h3>
-                        <p style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>Roll-call engagement over the last 15 sessions</p>
+                        <h3 style={{ fontSize: '18px', fontWeight: 800 }}>Attendance Trends</h3>
+                        <p style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>Student attendance in recent classes</p>
                     </div>
                     <div style={{ height: '320px' }}>
                         <ResponsiveContainer width="100%" height="100%">
@@ -409,8 +409,8 @@ export default function Analytics() {
                 {/* Academic Radar */}
                 <div className="glass-panel" style={{ gridColumn: 'span 4', padding: 'var(--space-6)' }}>
                     <div style={{ marginBottom: 'var(--space-6)' }}>
-                        <h3 style={{ fontSize: '18px', fontWeight: 800 }}>Radar Overview</h3>
-                        <p style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>Multi-dimensional performance</p>
+                        <h3 style={{ fontSize: '18px', fontWeight: 800 }}>Overall Progress</h3>
+                        <p style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>How the class is doing overall</p>
                     </div>
                     <div style={{ height: '320px' }}>
                         <ResponsiveContainer width="100%" height="100%">
@@ -419,7 +419,7 @@ export default function Analytics() {
                                 <PolarAngleAxis dataKey="subject" stroke="var(--color-text-muted)" fontSize={10} />
                                 <PolarRadiusAxis domain={[0, 100]} stroke="rgba(255,255,255,0.1)" fontSize={9} />
                                 <Radar name="Attendance" dataKey="Attendance" stroke="var(--color-teal)" fill="var(--color-teal)" fillOpacity={0.4} />
-                                <Radar name="Performance" dataKey="Performance" stroke="var(--color-primary)" fill="var(--color-primary)" fillOpacity={0.4} />
+                                <Radar name="Topics" dataKey="Topics" stroke="var(--color-primary)" fill="var(--color-primary)" fillOpacity={0.4} />
                                 <Tooltip contentStyle={{ background: 'rgba(15, 23, 42, 0.9)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', color: '#fff' }} />
                                 <Legend />
                             </RadarChart>
@@ -430,8 +430,8 @@ export default function Analytics() {
                 {/* Performance Line Chart */}
                 <div className="glass-panel" style={{ gridColumn: 'span 6', padding: 'var(--space-6)' }}>
                     <div style={{ marginBottom: 'var(--space-6)' }}>
-                        <h3 style={{ fontSize: '18px', fontWeight: 800 }}>Exam Trajectory</h3>
-                        <p style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>Average academic score progression</p>
+                        <h3 style={{ fontSize: '18px', fontWeight: 800 }}>Exam Marks</h3>
+                        <p style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>See how marks are changing over time</p>
                     </div>
                     <div style={{ height: '300px' }}>
                         <ResponsiveContainer width="100%" height="100%">
@@ -449,8 +449,8 @@ export default function Analytics() {
                 {/* Syllabus Gauge List */}
                 <div className="glass-panel" style={{ gridColumn: 'span 6', padding: 'var(--space-6)' }}>
                     <div style={{ marginBottom: 'var(--space-6)' }}>
-                        <h3 style={{ fontSize: '18px', fontWeight: 800 }}>Curriculum Coverage</h3>
-                        <p style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>Lesson completion by active batch</p>
+                        <h3 style={{ fontSize: '18px', fontWeight: 800 }}>Lessons Finished</h3>
+                        <p style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>See how many lessons are done for each batch</p>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
                         {getSyllabusCoverage().map((item, i) => (
@@ -458,7 +458,7 @@ export default function Analytics() {
                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
                                     <div>
                                         <div style={{ fontSize: '15px', fontWeight: 800 }}>{item.name}</div>
-                                        <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>{item.covered} / {item.total} Modules Covered</div>
+                                        <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>{item.covered} / {item.total} Topics Finished</div>
                                     </div>
                                     <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--color-primary)' }}>{item.percent}%</div>
                                 </div>
@@ -477,8 +477,8 @@ export default function Analytics() {
                 {/* Effort Chart */}
                 <div className="glass-panel" style={{ gridColumn: 'span 12', padding: 'var(--space-6)' }}>
                     <div style={{ marginBottom: 'var(--space-6)' }}>
-                        <h3 style={{ fontSize: '18px', fontWeight: 800 }}>Instructional Intensity</h3>
-                        <p style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>Weekly teaching hours investment</p>
+                        <h3 style={{ fontSize: '18px', fontWeight: 800 }}>Class Hours</h3>
+                        <p style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>Total hours you've spent teaching each week</p>
                     </div>
                     <div style={{ height: '280px' }}>
                         <ResponsiveContainer width="100%" height="100%">

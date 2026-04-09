@@ -11,10 +11,10 @@ import autoTable from 'jspdf-autotable';
 import toast from 'react-hot-toast';
 
 const EXPORT_TYPES = [
-    { id: 'attendance', icon: ClipboardCheck, title: 'Attendance Logs', desc: 'Present/Absent/Late records for students across sessions' },
-    { id: 'lessons', icon: BookOpen, title: 'Syllabus Tracker', desc: 'Curriculum coverage, lesson dates, and completion status' },
-    { id: 'exams', icon: BarChart3, title: 'Exam Scores', desc: 'Student marks, percentages, and performance metrics' },
-    { id: 'students', icon: UserCheck, title: 'Student Directory', desc: 'Enrolled student profiles and batch assignments' },
+    { id: 'attendance', icon: ClipboardCheck, title: 'Attendance History', desc: 'Present/Absent/Late records for students' },
+    { id: 'lessons', icon: BookOpen, title: 'Lesson Progress', desc: 'Which lessons are finished and when they were taught' },
+    { id: 'exams', icon: BarChart3, title: 'Exam Scores', desc: 'Student marks and how they are doing in tests' },
+    { id: 'students', icon: UserCheck, title: 'Student List', desc: 'Profiles and which batches they belong to' },
 ];
 
 export default function Export() {
@@ -222,8 +222,8 @@ export default function Export() {
         <div className="animate-fade-in">
             <div className="page-header">
                 <div>
-                    <h1 className="page-title">Digital Export</h1>
-                    <p className="page-subtitle">Generate comprehensive PDF or CSV reports for offline use</p>
+                    <h1 className="page-title">Download Reports</h1>
+                    <p className="page-subtitle">Save your records to your computer as PDF or CSV files</p>
                 </div>
             </div>
 
@@ -275,12 +275,12 @@ export default function Export() {
                 <div className="glass-panel" style={{ padding: 'var(--space-6)', position: 'sticky', top: 'var(--space-8)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: 'var(--space-6)', color: 'var(--color-primary)' }}>
                         <Filter size={18} />
-                        <h3 style={{ fontSize: '15px', fontWeight: 800, margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Export Filters</h3>
+                        <h3 style={{ fontSize: '15px', fontWeight: 800, margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Filters</h3>
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
                         <div className="form-group">
-                            <label className="form-label" style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase' }}>Target Batch</label>
+                            <label className="form-label" style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase' }}>Select Batch</label>
                             <select className="form-select" value={selectedBatch} onChange={(e) => setSelectedBatch(e.target.value)}>
                                 <option value="">All Batches</option>
                                 {batches.map((b) => (<option key={b.id} value={b.id}>{b.name}</option>))}
@@ -301,7 +301,7 @@ export default function Export() {
                         )}
 
                         <div className="form-group" style={{ marginTop: 'var(--space-2)' }}>
-                            <label className="form-label" style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase' }}>Output Format</label>
+                            <label className="form-label" style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase' }}>Save As</label>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-2)' }}>
                                 <button 
                                     className={`btn btn-sm ${exportFormat === 'csv' ? 'btn-primary' : 'btn-secondary'}`} 
@@ -334,7 +334,7 @@ export default function Export() {
                                 boxShadow: '0 8px 16px -4px rgba(59, 130, 246, 0.25)'
                             }}
                         >
-                            <Download size={18} /> {exporting ? 'Generating...' : 'Export Now'}
+                            <Download size={18} /> {exporting ? 'Saving...' : 'Download Now'}
                         </button>
                     </div>
                 </div>

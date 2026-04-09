@@ -344,11 +344,11 @@ export default function Exams() {
         <div className="animate-fade-in">
             <div className="page-header" style={{ marginBottom: 'var(--space-8)' }}>
                 <div>
-                    <h1 className="page-title">Exams & Assessments</h1>
-                    <p className="page-subtitle">Track tests and student performance across active batches</p>
+                    <h1 className="page-title">Exams & Tests</h1>
+                    <p className="page-subtitle">Track tests and student progress in your batches</p>
                 </div>
                 <button className="btn btn-primary" onClick={openCreate} style={{ boxShadow: 'var(--shadow-primary)' }}>
-                    <Plus size={18} /> Create Exam
+                    <Plus size={18} /> Add Exam
                 </button>
             </div>
 
@@ -482,7 +482,7 @@ export default function Exams() {
             <Modal
                 isOpen={showModal}
                 onClose={() => setShowModal(false)}
-                title={editingExam ? 'Edit Exam' : 'Create Exam'}
+                title={editingExam ? 'Edit Exam' : 'Add New Exam'}
                 maxWidth="640px"
             >
                 <form onSubmit={handleSave} style={{ padding: '4px' }}>
@@ -521,7 +521,7 @@ export default function Exams() {
                     </div>
 
                     <div className="form-group" style={{ marginBottom: 'var(--space-6)' }}>
-                        <label className="form-label">Topics & Marks Allocation</label>
+                        <label className="form-label">Topics & Marks</label>
                         <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '16px', overflow: 'hidden' }}>
                             <div style={{ display: 'flex', gap: 'var(--space-2)', padding: 'var(--space-4)', background: 'rgba(255,255,255,0.03)' }}>
                                 <input className="form-input" placeholder="Topic (e.g., Algebra)" value={newTopicName} onChange={(e) => setNewTopicName(e.target.value)} style={{ flex: 2 }} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTopic(); } }} />
@@ -537,14 +537,14 @@ export default function Exams() {
                                                 <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: 'var(--color-primary-light)', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 800 }}>{i + 1}</div>
                                                 <div>
                                                     <div style={{ fontWeight: 600, fontSize: '14px' }}>{t.name}</div>
-                                                    <div style={{ color: 'var(--color-text-muted)', fontSize: '11px', fontWeight: 500 }}>Weightage: {t.maxMarks} marks</div>
+                                                    <div style={{ color: 'var(--color-text-muted)', fontSize: '11px', fontWeight: 500 }}>Marks: {t.maxMarks}</div>
                                                 </div>
                                             </div>
                                             <button type="button" className="btn btn-ghost btn-icon" onClick={() => removeTopic(i)} style={{ color: 'var(--color-danger)' }}><X size={16} /></button>
                                         </div>
                                     ))}
                                     <div style={{ padding: '16px 0', borderTop: '2px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                        <span style={{ fontWeight: 700, fontSize: '14px', color: 'var(--color-text-secondary)' }}>Total Assessment Marks</span>
+                                        <span style={{ fontWeight: 700, fontSize: '14px', color: 'var(--color-text-secondary)' }}>Total Exam Marks</span>
                                         <span style={{ fontWeight: 800, fontSize: '18px', color: 'var(--color-accent)' }}>{getTopicTotal()}</span>
                                     </div>
                                 </div>
@@ -562,7 +562,7 @@ export default function Exams() {
 
                     <div style={{ display: 'flex', gap: '12px' }}>
                         <button type="button" className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setShowModal(false)}>Cancel</button>
-                        <button type="submit" className="btn btn-primary" style={{ flex: 2, boxShadow: 'var(--shadow-primary)' }}>{editingExam ? 'Save Changes' : 'Launch Exam'}</button>
+                        <button type="submit" className="btn btn-primary" style={{ flex: 2, boxShadow: 'var(--shadow-primary)' }}>{editingExam ? 'Save Changes' : 'Add Exam'}</button>
                     </div>
                 </form>
             </Modal>
@@ -578,7 +578,7 @@ export default function Exams() {
                     <div style={{ padding: '4px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-6)', padding: '16px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px' }}>
                             <div>
-                                <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>Assessment Weight</div>
+                                <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>Marks Summary</div>
                                 <div style={{ fontSize: '18px', fontWeight: 800 }}>{scoringExam.totalMarks} <span style={{ fontSize: '12px', color: 'var(--color-text-muted)', fontWeight: 500 }}>Total Marks</span></div>
                             </div>
                             <div style={{ display: 'flex', gap: '8px' }}>
@@ -658,8 +658,8 @@ export default function Exams() {
                             })}
                         </div>
                         <div style={{ display: 'flex', gap: '12px', marginTop: 'var(--space-6)' }}>
-                            <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setShowScoresModal(false)}>Discard</button>
-                            <button className="btn btn-primary" style={{ flex: 2, boxShadow: 'var(--shadow-primary)' }} onClick={handleSaveScores}>Sync Scores</button>
+                            <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setShowScoresModal(false)}>Cancel</button>
+                            <button className="btn btn-primary" style={{ flex: 2, boxShadow: 'var(--shadow-primary)' }} onClick={handleSaveScores}>Save Scores</button>
                         </div>
                     </div>
                 )}
@@ -677,8 +677,8 @@ export default function Exams() {
                     <div style={{ overflow: 'hidden' }}>
                         <div style={{ background: 'linear-gradient(135deg, var(--color-gold), #f59e0b)', padding: 'var(--space-8)', color: 'white', textAlign: 'center' }}>
                             <Trophy size={48} style={{ margin: '0 auto var(--space-4)', filter: 'drop-shadow(0 4px 10px rgba(0,0,0,0.2))' }} />
-                            <h2 style={{ fontSize: '28px', fontWeight: 800, margin: 0, textShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>Hall of Fame</h2>
-                            <div style={{ opacity: 0.9, fontSize: '14px', marginTop: '4px', fontWeight: 600 }}>{leaderboardExam.title} Evaluation</div>
+                            <h2 style={{ fontSize: '28px', fontWeight: 800, margin: 0, textShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>Top Scorers</h2>
+                            <div style={{ opacity: 0.9, fontSize: '14px', marginTop: '4px', fontWeight: 600 }}>{leaderboardExam.title} Results</div>
                         </div>
                         <div style={{ maxHeight: '60vh', overflowY: 'auto', background: 'rgba(255,255,255,0.02)' }}>
                             {(!leaderboardExam.scores || leaderboardExam.scores.length === 0) ? (
@@ -750,7 +750,7 @@ export default function Exams() {
                     <form onSubmit={handleSaveAttendance} style={{ padding: '4px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'var(--color-warning-light)', padding: '12px', borderRadius: '12px', marginBottom: 'var(--space-6)', color: 'var(--color-warning)', fontSize: '13px', fontWeight: 500 }}>
                             <Info size={18} />
-                            Only present students can be graded for this evaluation.
+                            Only present students can be given marks for this exam.
                         </div>
                         <div style={{ maxHeight: '400px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', paddingRight: '4px' }}>
                             {students.filter(s => (s.batchIds || []).includes(scoringExam.batchId)).map(student => (
@@ -793,7 +793,7 @@ export default function Exams() {
                         </div>
                         <div style={{ display: 'flex', gap: '12px', marginTop: 'var(--space-6)' }}>
                             <button type="button" className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setShowAttendanceModal(false)}>Cancel</button>
-                            <button type="submit" className="btn btn-primary" style={{ flex: 2, boxShadow: 'var(--shadow-primary)' }}>Commit Attendance</button>
+                            <button type="submit" className="btn btn-primary" style={{ flex: 2, boxShadow: 'var(--shadow-primary)' }}>Save Attendance</button>
                         </div>
                     </form>
                 )}

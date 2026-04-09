@@ -431,16 +431,16 @@ export default function Schedule() {
                         <div style={{ padding: '8px', background: 'rgba(59, 130, 246, 0.1)', color: 'var(--color-primary)', borderRadius: '12px' }}>
                             <CalendarIcon size={24} />
                         </div>
-                        <h1 className="page-title" style={{ margin: 0 }}>Operations Timeline</h1>
+                        <h1 className="page-title" style={{ margin: 0 }}>Class Schedule</h1>
                     </div>
-                    <p className="page-subtitle">Personalised view of classes, exams and deadlines</p>
+                    <p className="page-subtitle">View and manage your classes, exams, and deadlines</p>
                 </div>
                 <div style={{ display: 'flex', gap: 'var(--space-4)' }}>
                     <button className="btn btn-secondary" onClick={() => openRecurringCreate()} style={{ height: '48px', padding: '0 24px', borderRadius: '14px', fontWeight: 700 }}>
-                        <RefreshCw size={18} /> Batch Recurring
+                        <RefreshCw size={18} /> Recurring Classes
                     </button>
                     <button className="btn btn-primary" onClick={() => openCreate()} style={{ height: '48px', padding: '0 24px', borderRadius: '14px', fontWeight: 800, boxShadow: '0 10px 20px -5px rgba(59, 130, 246, 0.3)' }}>
-                        <Plus size={20} /> New Segment
+                        <Plus size={20} /> New Class
                     </button>
                 </div>
             </div>
@@ -449,10 +449,10 @@ export default function Schedule() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-6)', flex: 1, minWidth: '300px' }}>
                     <div className="form-group" style={{ marginBottom: 0, minWidth: '280px' }}>
                         <label className="form-label" style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 900, color: 'var(--color-primary)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <Filter size={14} /> Batch Stream
+                            <Filter size={14} /> Filter by Batch
                         </label>
                         <select className="form-select" value={filterBatch} onChange={(e) => setFilterBatch(e.target.value)} style={{ height: '48px', borderRadius: '12px', background: 'rgba(255, 255, 255, 0.04)', fontWeight: 700 }}>
-                            <option value="">All Operational Streams</option>
+                            <option value="">All Batches</option>
                             {batches.map((b) => (<option key={b.id} value={b.id}>{b.name}</option>))}
                         </select>
                     </div>
@@ -520,29 +520,29 @@ export default function Schedule() {
                                 <div style={{ padding: '8px', background: 'rgba(59, 130, 246, 0.1)', color: 'var(--color-primary)', borderRadius: '10px' }}>
                                     <Layers size={20} />
                                 </div>
-                                <h2 className="modal-title" style={{ fontSize: '22px', fontWeight: 900 }}>{editingSchedule ? 'Edit Timeline Segment' : 'Schedule New Segment'}</h2>
+                                <h2 className="modal-title" style={{ fontSize: '22px', fontWeight: 900 }}>{editingSchedule ? 'Edit Class' : 'Add New Class'}</h2>
                             </div>
                             <button className="btn btn-ghost btn-icon" onClick={() => setShowModal(false)} style={{ borderRadius: '12px' }}><X size={22} /></button>
                         </div>
                         <form onSubmit={handleSave}>
                             <div className="modal-body" style={{ padding: '32px', gap: '24px' }}>
                                 <div className="form-group">
-                                    <label className="form-label" style={{ fontWeight: 800, fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-primary)' }}>Target Operational Stream *</label>
+                                    <label className="form-label" style={{ fontWeight: 800, fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-primary)' }}>Batch *</label>
                                     <select className="form-select" value={form.batchId} required style={{ height: '52px', borderRadius: '14px', fontWeight: 700 }}
                                         onChange={(e) => setForm({ ...form, batchId: e.target.value, title: batches.find(b => b.id === e.target.value)?.name || form.title })}>
-                                        <option value="">Select Stream...</option>
+                                        <option value="">Select Batch...</option>
                                         {batches.map((b) => (
                                             <option key={b.id} value={b.id}>{b.name}</option>
                                         ))}
                                     </select>
                                 </div>
                                 <div className="form-group">
-                                    <label className="form-label" style={{ fontWeight: 800, fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-primary)' }}>Segment Designation</label>
+                                    <label className="form-label" style={{ fontWeight: 800, fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-primary)' }}>Class Title</label>
                                     <input className="form-input" placeholder="e.g., Weekly Math Session" value={form.title} style={{ height: '52px', borderRadius: '14px', fontWeight: 700 }}
                                         onChange={(e) => setForm({ ...form, title: e.target.value })} />
                                 </div>
                                 <div className="form-group">
-                                    <label className="form-label" style={{ fontWeight: 800, fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-primary)' }}>Execution Date</label>
+                                    <label className="form-label" style={{ fontWeight: 800, fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-primary)' }}>Date</label>
                                     <div style={{ position: 'relative' }}>
                                         <input className="form-input" type="date" value={form.date} style={{ height: '52px', borderRadius: '14px', fontWeight: 700, paddingLeft: '48px' }}
                                             onChange={(e) => setForm({ ...form, date: e.target.value })} required />
@@ -551,18 +551,18 @@ export default function Schedule() {
                                 </div>
                                 <div className="form-row">
                                     <div className="form-group">
-                                        <label className="form-label" style={{ fontWeight: 800, fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-primary)' }}>Commencement</label>
+                                        <label className="form-label" style={{ fontWeight: 800, fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-primary)' }}>Start Time</label>
                                         <input className="form-input" type="time" value={form.startTime} style={{ height: '52px', borderRadius: '14px', fontWeight: 700 }}
                                             onChange={(e) => setForm({ ...form, startTime: e.target.value })} />
                                     </div>
                                     <div className="form-group">
-                                        <label className="form-label" style={{ fontWeight: 800, fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-primary)' }}>Completion</label>
+                                        <label className="form-label" style={{ fontWeight: 800, fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-primary)' }}>End Time</label>
                                         <input className="form-input" type="time" value={form.endTime} style={{ height: '52px', borderRadius: '14px', fontWeight: 700 }}
                                             onChange={(e) => setForm({ ...form, endTime: e.target.value })} />
                                     </div>
                                 </div>
                                 <div className="form-group">
-                                    <label className="form-label" style={{ fontWeight: 800, fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-primary)' }}>Clearance Status</label>
+                                    <label className="form-label" style={{ fontWeight: 800, fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-primary)' }}>Status</label>
                                     <select className="form-select" value={form.status} style={{ height: '52px', borderRadius: '14px', fontWeight: 700 }}
                                         onChange={(e) => setForm({ ...form, status: e.target.value })}>
                                         <option value="scheduled">Scheduled</option>
@@ -572,25 +572,25 @@ export default function Schedule() {
                                     </select>
                                 </div>
                                 <div className="form-group">
-                                    <label className="form-label" style={{ fontWeight: 800, fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-primary)' }}>Operational Intelligence</label>
+                                    <label className="form-label" style={{ fontWeight: 800, fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-primary)' }}>Notes</label>
                                     <textarea className="form-textarea" value={form.notes} style={{ borderRadius: '16px', padding: '16px', fontWeight: 600 }}
-                                        onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={3} placeholder="Add specific operational directives..." />
+                                        onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={3} placeholder="Add any specific class notes..." />
                                 </div>
                             </div>
                             <div className="modal-footer" style={{ padding: '24px 32px 32px', border: 'none', background: 'rgba(255, 255, 255, 0.02)' }}>
                                 {editingSchedule && (
                                     <div style={{ marginRight: 'auto', display: 'flex', gap: 'var(--space-3)' }}>
                                         <button type="button" className="btn btn-danger" onClick={handleDelete} style={{ borderRadius: '12px', height: '48px', padding: '0 20px', fontWeight: 700 }}>
-                                            Purge
+                                            Delete
                                         </button>
                                         <button type="button" className="btn btn-secondary" onClick={openCompleteSession} style={{ borderRadius: '12px', height: '48px', padding: '0 20px', fontWeight: 700 }}>
-                                            Finalize & Track
+                                            Finish & Mark Attendance
                                         </button>
                                     </div>
                                 )}
                                 <button type="button" className="btn btn-ghost" onClick={() => setShowModal(false)} style={{ height: '48px', fontWeight: 700 }}>Cancel</button>
                                 <button type="submit" className="btn btn-primary" style={{ height: '48px', padding: '0 32px', borderRadius: '14px', fontWeight: 800 }}>
-                                    {editingSchedule ? 'Update Timeline' : 'Commit Schedule'}
+                                    {editingSchedule ? 'Update Class' : 'Add Class'}
                                 </button>
                             </div>
                         </form>
@@ -607,22 +607,22 @@ export default function Schedule() {
                                 <div style={{ padding: '8px', background: 'rgba(59, 130, 246, 0.1)', color: 'var(--color-primary)', borderRadius: '10px' }}>
                                     <RefreshCw size={20} />
                                 </div>
-                                <h2 className="modal-title" style={{ fontSize: '22px', fontWeight: 900 }}>Streaming Recursion Setup</h2>
+                                <h2 className="modal-title" style={{ fontSize: '22px', fontWeight: 900 }}>Set Recurring Classes</h2>
                             </div>
                             <button className="btn btn-ghost btn-icon" onClick={() => setShowRecurringModal(false)}><X size={22} /></button>
                         </div>
                         <form onSubmit={handleSaveRecurring}>
                             <div className="modal-body" style={{ padding: '32px', gap: '24px' }}>
                                 <div className="form-group">
-                                    <label className="form-label" style={{ fontWeight: 800, fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-primary)' }}>Target Operational Stream *</label>
+                                    <label className="form-label" style={{ fontWeight: 800, fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-primary)' }}>Batch *</label>
                                     <select className="form-select" value={recurringForm.batchId} required style={{ height: '52px', borderRadius: '14px', fontWeight: 700 }} 
                                         onChange={(e) => setRecurringForm({...recurringForm, batchId: e.target.value})}>
-                                        <option value="">Select Stream...</option>
+                                        <option value="">Select Batch...</option>
                                         {batches.map((b) => (<option key={b.id} value={b.id}>{b.name}</option>))}
                                     </select>
                                 </div>
                                 <div className="form-group">
-                                    <label className="form-label" style={{ fontWeight: 800, fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-primary)' }}>Operational Cycles *</label>
+                                    <label className="form-label" style={{ fontWeight: 800, fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-primary)' }}>Select Days *</label>
                                     <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                                         {daysOfWeek.map(d => (
                                             <button 
@@ -650,24 +650,24 @@ export default function Schedule() {
                                 </div>
                                 <div className="form-row">
                                     <div className="form-group">
-                                        <label className="form-label" style={{ fontWeight: 800, fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-primary)' }}>Commencement Date *</label>
+                                        <label className="form-label" style={{ fontWeight: 800, fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-primary)' }}>Start From *</label>
                                         <input className="form-input" type="date" value={recurringForm.startDate} required style={{ height: '52px', borderRadius: '14px', fontWeight: 700 }}
                                             onChange={(e) => setRecurringForm({...recurringForm, startDate: e.target.value})} />
                                     </div>
                                     <div className="form-group">
-                                        <label className="form-label" style={{ fontWeight: 800, fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-primary)' }}>Termination Date *</label>
+                                        <label className="form-label" style={{ fontWeight: 800, fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-primary)' }}>End On *</label>
                                         <input className="form-input" type="date" value={recurringForm.endDate} required min={recurringForm.startDate} style={{ height: '52px', borderRadius: '14px', fontWeight: 700 }}
                                             onChange={(e) => setRecurringForm({...recurringForm, endDate: e.target.value})} />
                                     </div>
                                 </div>
                                 <div className="form-row">
                                     <div className="form-group">
-                                        <label className="form-label" style={{ fontWeight: 800, fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-primary)' }}>Sync Start *</label>
+                                        <label className="form-label" style={{ fontWeight: 800, fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-primary)' }}>Start Time *</label>
                                         <input className="form-input" type="time" value={recurringForm.startTime} required style={{ height: '52px', borderRadius: '14px', fontWeight: 700 }}
                                             onChange={(e) => setRecurringForm({...recurringForm, startTime: e.target.value})} />
                                     </div>
                                     <div className="form-group">
-                                        <label className="form-label" style={{ fontWeight: 800, fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-primary)' }}>Sync End</label>
+                                        <label className="form-label" style={{ fontWeight: 800, fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-primary)' }}>End Time</label>
                                         <input className="form-input" type="time" value={recurringForm.endTime} style={{ height: '52px', borderRadius: '14px', fontWeight: 700 }}
                                             onChange={(e) => setRecurringForm({...recurringForm, endTime: e.target.value})} />
                                     </div>
@@ -675,7 +675,7 @@ export default function Schedule() {
                             </div>
                             <div className="modal-footer" style={{ padding: '24px 32px 32px', border: 'none' }}>
                                 <button type="button" className="btn btn-ghost" onClick={() => setShowRecurringModal(false)} style={{ height: '48px', fontWeight: 700 }}>Cancel</button>
-                                <button type="submit" className="btn btn-primary" style={{ height: '48px', padding: '0 32px', borderRadius: '14px', fontWeight: 800 }}>Generate Continuous Stream</button>
+                                <button type="submit" className="btn btn-primary" style={{ height: '48px', padding: '0 32px', borderRadius: '14px', fontWeight: 800 }}>Create Recurring Classes</button>
                             </div>
                         </form>
                     </div>
@@ -691,7 +691,7 @@ export default function Schedule() {
                                 <div style={{ padding: '8px', background: 'rgba(20, 184, 166, 0.1)', color: 'var(--color-accent)', borderRadius: '10px' }}>
                                     <CheckCircle2 size={24} />
                                 </div>
-                                <h2 className="modal-title" style={{ fontSize: '24px', fontWeight: 950 }}>Finalize Mission & Registry</h2>
+                                <h2 className="modal-title" style={{ fontSize: '24px', fontWeight: 950 }}>Finish Class & Take Attendance</h2>
                             </div>
                             <button className="btn btn-ghost btn-icon" onClick={() => setShowCompleteModal(false)}><X size={24} /></button>
                         </div>
@@ -700,29 +700,29 @@ export default function Schedule() {
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--color-accent)' }}>
                                         <Info size={18} />
-                                        <h3 style={{ fontSize: '16px', fontWeight: 800, margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Operational Summary</h3>
+                                        <h3 style={{ fontSize: '16px', fontWeight: 800, margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Class Summary</h3>
                                     </div>
                                     <div className="form-group">
-                                        <label className="form-label" style={{ fontWeight: 800, fontSize: '12px', color: 'var(--color-text-muted)' }}>TOPICS EXPLORED *</label>
-                                        <input className="form-input" value={completeForm.topicsCovered} placeholder="e.g., Quantum Entanglement Basics" style={{ height: '52px', borderRadius: '14px', fontWeight: 700 }}
+                                        <label className="form-label" style={{ fontWeight: 800, fontSize: '12px', color: 'var(--color-text-muted)' }}>TOPICS COVERED *</label>
+                                        <input className="form-input" value={completeForm.topicsCovered} placeholder="e.g., Introduction to Algebra" style={{ height: '52px', borderRadius: '14px', fontWeight: 700 }}
                                             onChange={(e) => setCompleteForm({...completeForm, topicsCovered: e.target.value})} required />
                                     </div>
                                     <div className="form-group">
-                                        <label className="form-label" style={{ fontWeight: 800, fontSize: '12px', color: 'var(--color-text-muted)' }}>INTELLIGENCE DIRECTIVES (HOMEWORK)</label>
+                                        <label className="form-label" style={{ fontWeight: 800, fontSize: '12px', color: 'var(--color-text-muted)' }}>HOMEWORK ASSIGNED</label>
                                         <textarea className="form-textarea" value={completeForm.homeworkAssigned} style={{ borderRadius: '18px', padding: '16px', fontWeight: 600 }}
-                                            onChange={(e) => setCompleteForm({...completeForm, homeworkAssigned: e.target.value})} rows={4} placeholder="Deploy mission directives to students..." />
+                                            onChange={(e) => setCompleteForm({...completeForm, homeworkAssigned: e.target.value})} rows={4} placeholder="Assign homework to students..." />
                                     </div>
                                     <div className="form-group">
-                                        <label className="form-label" style={{ fontWeight: 800, fontSize: '12px', color: 'var(--color-text-muted)' }}>PRIVATE DEBRIEF NOTES</label>
+                                        <label className="form-label" style={{ fontWeight: 800, fontSize: '12px', color: 'var(--color-text-muted)' }}>TEACHER NOTES</label>
                                         <textarea className="form-textarea" value={completeForm.notes} style={{ borderRadius: '18px', padding: '16px', fontWeight: 600 }}
-                                            onChange={(e) => setCompleteForm({...completeForm, notes: e.target.value})} rows={3} placeholder="Confidential observations about the stream..." />
+                                            onChange={(e) => setCompleteForm({...completeForm, notes: e.target.value})} rows={3} placeholder="Private notes about this class..." />
                                     </div>
                                 </div>
 
                                 <div className="glass-card" style={{ padding: '32px', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '24px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '24px', color: 'var(--color-accent)' }}>
                                         <UserCheck size={20} />
-                                        <h3 style={{ fontSize: '16px', fontWeight: 800, margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Student Registry</h3>
+                                        <h3 style={{ fontSize: '16px', fontWeight: 800, margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Take Attendance</h3>
                                     </div>
                                     <div style={{ maxHeight: '450px', overflowY: 'auto', paddingRight: '4px' }}>
                                         {students.filter(s => (s.batchIds || []).includes(editingSchedule.batchId)).map((student, idx) => (
@@ -773,9 +773,9 @@ export default function Schedule() {
                                 </div>
                             </div>
                             <div className="modal-footer" style={{ padding: '24px 32px 32px', border: 'none', background: 'rgba(255, 255, 255, 0.02)' }}>
-                                <button type="button" className="btn btn-ghost" onClick={() => setShowCompleteModal(false)} style={{ height: '52px', fontWeight: 800 }}>Abort Mission</button>
+                                <button type="button" className="btn btn-ghost" onClick={() => setShowCompleteModal(false)} style={{ height: '52px', fontWeight: 800 }}>Cancel</button>
                                 <button type="submit" className="btn btn-primary" style={{ height: '52px', padding: '0 40px', borderRadius: '16px', fontWeight: 900, boxShadow: '0 10px 30px -5px rgba(20, 184, 166, 0.4)' }}>
-                                    Commit Mission Archive
+                                    Save and Finish
                                 </button>
                             </div>
                         </form>
@@ -802,9 +802,9 @@ export default function Schedule() {
                                 alignItems: 'center',
                                 gap: '8px'
                             }}>
-                                {selectedEvent.displayType === 'exam' ? '📋 Protocol: Exam' : 
-                                 selectedEvent.displayType === 'homework' ? '📚 Brief: Mission' :
-                                 '🕒 Segment: Class'}
+                                {selectedEvent.displayType === 'exam' ? '📋 Exam Details' : 
+                                 selectedEvent.displayType === 'homework' ? '📚 Homework' :
+                                 '🕒 Class Details'}
                             </div>
                             <button className="btn btn-ghost btn-icon" onClick={() => setShowQuickView(false)} style={{ borderRadius: '12px' }}><X size={20} /></button>
                         </div>
@@ -813,7 +813,7 @@ export default function Schedule() {
                                 <h3 style={{ fontSize: '22px', fontWeight: 900, color: 'white', lineHeight: 1.3, letterSpacing: '-0.01em' }}>{selectedEvent.title}</h3>
                                 {(selectedEvent.batchName || selectedEvent.displayBatchName) && (
                                     <div style={{ display: 'inline-flex', marginTop: '12px', padding: '4px 12px', borderRadius: '8px', background: 'rgba(59, 130, 246, 0.1)', color: 'var(--color-primary)', fontSize: '12px', fontWeight: 800 }}>
-                                        Stream: {selectedEvent.batchName || selectedEvent.displayBatchName}
+                                        Batch: {selectedEvent.batchName || selectedEvent.displayBatchName}
                                     </div>
                                 )}
                             </div>
@@ -859,7 +859,7 @@ export default function Schedule() {
                                 )}
                                 {(selectedEvent.notes || selectedEvent.description) && (
                                     <div className="glass-card" style={{ padding: '16px', background: 'rgba(255, 255, 255, 0.03)', marginTop: '8px', borderRadius: '16px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
-                                        <div style={{ fontSize: '10px', fontWeight: 900, color: 'var(--color-text-muted)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.1em' }}>INTELLIGENCE_REMARKS</div>
+                                        <div style={{ fontSize: '10px', fontWeight: 900, color: 'var(--color-text-muted)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.1em' }}>NOTES</div>
                                         <div style={{ fontSize: '14px', lineHeight: 1.6, fontWeight: 600, color: 'rgba(255, 255, 255, 0.8)' }}>{selectedEvent.notes || selectedEvent.description}</div>
                                     </div>
                                 )}

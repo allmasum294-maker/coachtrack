@@ -218,8 +218,8 @@ export default function Homework() {
         <div className="animate-fade-in">
             <div className="page-header" style={{ marginBottom: 'var(--space-8)' }}>
                 <div>
-                    <h1 className="page-title">Homework Tracker</h1>
-                    <p className="page-subtitle">Assign, track and grade student assignments</p>
+                    <h1 className="page-title">Homework & Assignments</h1>
+                    <p className="page-subtitle">Give work to students and track their progress</p>
                 </div>
                 <button className="btn btn-primary" onClick={openCreate} style={{ boxShadow: 'var(--shadow-primary)' }}>
                     <Plus size={18} /> New Assignment
@@ -244,8 +244,8 @@ export default function Homework() {
                     <div style={{ width: '80px', height: '80px', background: 'rgba(255,255,255,0.05)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto var(--space-6)' }}>
                         <BookOpen size={40} style={{ color: 'var(--color-text-muted)', opacity: 0.3 }} />
                     </div>
-                    <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '8px' }}>No Assignments Found</h2>
-                    <p style={{ color: 'var(--color-text-muted)', maxWidth: '400px', margin: '0 auto' }}>Create an assignment for your active batches to start tracking progress.</p>
+                    <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '8px' }}>No Homework Found</h2>
+                    <p style={{ color: 'var(--color-text-muted)', maxWidth: '400px', margin: '0 auto' }}>Create an assignment for your batches to see them here.</p>
                 </div>
             ) : (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 'var(--space-6)' }}>
@@ -277,7 +277,7 @@ export default function Homework() {
                                     <div style={{ fontSize: '12px', color: 'var(--color-primary)', background: 'var(--color-primary-light)', padding: '8px 12px', borderRadius: '8px', marginBottom: 'var(--space-4)', display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
                                         <FileEdit size={14} style={{ marginTop: '1px' }} />
                                         <span>
-                                            Linked to session: <strong>{linkedLog.topicsCovered}</strong>
+                                            Linked to class: <strong>{linkedLog.topicsCovered}</strong>
                                         </span>
                                     </div>
                                 )}
@@ -311,7 +311,7 @@ export default function Homework() {
 
                                 <div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: 600, marginBottom: '8px' }}>
-                                        <span style={{ color: 'var(--color-text-secondary)' }}>Overall Completion</span>
+                                        <span style={{ color: 'var(--color-text-secondary)' }}>Class Progress</span>
                                         <span style={{ color: 'var(--color-text)' }}>{stats.completed}/{stats.total} students</span>
                                     </div>
                                     <div className="progress-bar" style={{ height: 10, background: 'rgba(255,255,255,0.05)', marginBottom: 'var(--space-6)' }}>
@@ -322,7 +322,7 @@ export default function Homework() {
                                         }} />
                                     </div>
                                     <button className="btn btn-secondary" style={{ width: '100%', borderRadius: '12px', fontWeight: 700 }} onClick={() => setTrackingAssignment(hw)}>
-                                        Check Submissions
+                                        Check Student Progress
                                     </button>
                                 </div>
                             </div>
@@ -362,7 +362,7 @@ export default function Homework() {
                         <div className="form-group" style={{ marginBottom: 'var(--space-4)' }}>
                             <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <FileEdit size={14} className="text-primary" /> 
-                                Link to Session Log
+                                Link to Class Session
                                 <span style={{ fontSize: '10px', fontWeight: 500, color: 'var(--color-text-muted)', marginLeft: 'auto' }}>Optional</span>
                             </label>
                             <select className="form-select" value={form.sessionLogId} onChange={e => setForm({ ...form, sessionLogId: e.target.value })} style={{ borderStyle: 'dashed' }}>
@@ -404,7 +404,7 @@ export default function Homework() {
             <Modal
                 isOpen={!!trackingAssignment}
                 onClose={() => setTrackingAssignment(null)}
-                title={trackingAssignment?.title || 'Check Submissions'}
+                title={trackingAssignment?.title || 'Check Progress'}
                 maxWidth="650px"
             >
                 {trackingAssignment && (
@@ -415,7 +415,7 @@ export default function Homework() {
                             </div>
                             <div>
                                 <div style={{ fontSize: '14px', fontWeight: 700 }}>{getBatchName(trackingAssignment.batchId)}</div>
-                                <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>Status Tracking for {students.filter(s => s.batchIds?.includes(trackingAssignment.batchId)).length} Enrolled Students</div>
+                                <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>Work status for students in this batch</div>
                             </div>
                         </div>
 
@@ -473,7 +473,7 @@ export default function Homework() {
                         </div>
 
                         <button className="btn btn-primary" style={{ width: '100%', marginTop: 'var(--space-6)', borderRadius: '12px', boxShadow: 'var(--shadow-primary)' }} onClick={() => setTrackingAssignment(null)}>
-                            Finish Grading
+                            Done
                         </button>
                     </div>
                 )}

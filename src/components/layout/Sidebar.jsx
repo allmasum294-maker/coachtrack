@@ -26,33 +26,36 @@ import {
     BookCheck,
     Award,
     BrainCircuit,
-    History
+    History,
+    Activity,
+    Layers,
+    TrendingUp,
+    Trophy,
+    FileDown
 } from 'lucide-react';
 
 const mainNavItems = [
     { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-    { path: '/batches', icon: GraduationCap, label: 'Batches' },
     { path: '/students', icon: Users, label: 'Students' },
+    { path: '/batches', icon: GraduationCap, label: 'Batches' },
     { path: '/schedule', icon: Calendar, label: 'Schedule' },
 ];
 
 const managementNavItems = [
     { path: '/attendance', icon: ClipboardCheck, label: 'Attendance' },
-    { path: '/homework', icon: BookCheck, label: 'Homework' },
     { path: '/lessons', icon: BookOpen, label: 'Lessons' },
+    { path: '/homework', icon: BookCheck, label: 'Homework' },
     { path: '/exams', icon: FileText, label: 'Exams' },
-    { path: '/sessions', icon: FileEdit, label: 'Session Logs' },
 ];
 
 const insightNavItems = [
-    { path: '/analytics', icon: BarChart3, label: 'Analytics' },
-    { path: '/student-analytics', icon: LineChart, label: 'Student Analytics' },
-    { path: '/report-card', icon: FileSignature, label: 'Report Cards' },
-    { path: '/leaderboard', icon: Award, label: 'Leaderboard' },
-    { path: '/study-plans', icon: BrainCircuit, label: 'AI Study Plans' },
-    { path: '/timeline', icon: History, label: 'Timeline' },
-    { path: '/export', icon: Download, label: 'Export' },
+    { path: '/analytics', icon: BarChart3, label: 'Class Progress' },
+    { path: '/leaderboard', icon: Award, label: 'Top Students' },
+];
+
+const systemNavItems = [
     { path: '/notifications', icon: Bell, label: 'Notifications' },
+    { path: '/export', icon: Download, label: 'Export Data' },
 ];
 
 export default function Sidebar() {
@@ -164,11 +167,13 @@ export default function Sidebar() {
 
                 {/* Nav */}
                 <nav className="sidebar-nav" style={{ padding: 'var(--space-4) 0' }}>
-                    {renderNavSection('Overview', mainNavItems)}
+                    {renderNavSection('Coaching', mainNavItems)}
                     <div style={{ margin: 'var(--space-4) 12px', height: '1px', background: 'rgba(255, 255, 255, 0.03)' }} />
-                    {renderNavSection('Management', managementNavItems)}
+                    {renderNavSection('Teaching', managementNavItems)}
                     <div style={{ margin: 'var(--space-4) 12px', height: '1px', background: 'rgba(255, 255, 255, 0.03)' }} />
-                    {renderNavSection('Insights', insightNavItems)}
+                    {renderNavSection('Results', insightNavItems)}
+                    <div style={{ margin: 'var(--space-4) 12px', height: '1px', background: 'rgba(255, 255, 255, 0.03)' }} />
+                    {renderNavSection('System', systemNavItems)}
                     {isAdmin && (
                         <>
                             <div style={{ margin: 'var(--space-4) 12px', height: '1px', background: 'rgba(255, 255, 255, 0.03)' }} />
@@ -213,7 +218,7 @@ export default function Sidebar() {
                                     {userProfile?.displayName || currentUser?.displayName || 'User'}
                                 </div>
                                 <div className="sidebar-user-role" style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-accent)', fontWeight: 800 }}>
-                                    {userProfile?.role === 'admin' ? 'Administrator' : 'Lead Instructor'}
+                                    {userProfile?.role === 'admin' ? 'Administrator' : 'Teacher'}
                                 </div>
                             </div>
                         )}

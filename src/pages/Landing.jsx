@@ -18,54 +18,54 @@ import {
 const features = [
     {
         icon: Layout,
-        title: 'Glassmorphism UI',
-        description: 'Experience a stunning, futuristic interface designed for maximum pedagogical focus and aesthetic excellence.',
+        title: 'Beautiful Design',
+        description: 'Experience a stunning interface designed to keep you focused on what matters most: your students.',
         color: '#3b82f6',
         delay: '0s'
     },
     {
         icon: ClipboardCheck,
-        title: 'Mission-Control Sync',
-        description: 'Real-time attendance and session tracking with enrollment-aware filtering. Never miss a single pedagogical beat.',
+        title: 'Real-time Tracking',
+        description: 'Track attendance and classes easily. Our smart filters handle the lists based on who is enrolled.',
         color: '#10b981',
         delay: '0.1s'
     },
     {
         icon: BarChart3,
-        title: 'Deep Analytics',
-        description: 'Quantum-level insights into student performance, attendance trends, and predictive risk assessment.',
+        title: 'Progress Reports',
+        description: 'Clear charts showing how your students are doing in classes and exams over time.',
         color: '#f59e0b',
         delay: '0.2s'
     },
     {
         icon: BookOpen,
-        title: 'Curriculum Ledger',
-        description: 'Comprehensive syllabus tracking and lesson planning. Map the entire academic journey with precision.',
+        title: 'Lesson Planning',
+        description: 'Keep track of which topics you have covered and what is coming next for each batch.',
         color: '#8b5cf6',
         delay: '0.3s'
     },
     {
         icon: Calendar,
-        title: 'Temporal Manager',
-        description: 'Advanced scheduling matrix with visual calendar integration. Orchestrate your sessions with zero friction.',
+        title: 'Class Schedule',
+        description: 'A visual calendar to help you manage your weekly sessions without any overlapping.',
         color: '#ec4899',
         delay: '0.4s'
     },
     {
         icon: Shield,
-        title: 'Fortified Security',
-        description: 'Level-0 administrative clearance and teacher-only data silos. Your intellectual property is safe.',
+        title: 'Secure & Private',
+        description: 'Your and your students\' data is safe with us. Private access for teachers and admins only.',
         color: '#ef4444',
         delay: '0.5s'
     },
 ];
 
 const benefits = [
-    'Private tutoring centers managing multi-grade clusters',
-    'Elite academic freelancers (Class 9–12 Specialists)',
-    'Growth-stage coaching centers seeking scientific management',
-    'Educators focused on statistical performance optimization',
-    'Professional mentors requiring exportable clinical reports',
+    'Private coaching centers managing multiple batches',
+    'Independent tutors teaching classes 9–12',
+    'Growing educational centers looking for easy management',
+    'Teachers wanting to improve student marks and attendance',
+    'Professionals needing printable report cards for parents',
 ];
 
 export default function Landing() {
@@ -133,47 +133,38 @@ export default function Landing() {
                         fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', 
                         letterSpacing: '0.1em', marginBottom: '32px'
                     }}>
-                        <Sparkles size={14} /> The Elite Standard for Educators
+                        <Sparkles size={14} /> Built for Passionate Teachers
                     </div>
-                    <h1 style={{ 
-                        fontSize: 'clamp(40px, 8vw, 84px)', 
-                        fontWeight: 900, 
-                        lineHeight: 1.05, 
-                        marginBottom: '24px',
-                        letterSpacing: '-0.04em'
-                    }}>
-                        The <span className="text-gradient">Scientific Way</span><br />
-                        to Orchestrate <span style={{ color: 'var(--color-text-primary)', opacity: 0.9 }}>Coaching</span>
+                    <h2 style={{ fontSize: 'clamp(14px, 2vw, 16px)', fontWeight: 900, color: 'var(--color-primary)', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: '24px' }}>
+                        Simple Student Management
+                    </h2>
+                    <h1 style={{ fontSize: 'clamp(40px, 8vw, 84px)', fontWeight: 900, lineHeight: 0.95, letterSpacing: '-0.04em', marginBottom: '32px' }}>
+                        Teach Smarter, <br />
+                        <span className="text-gradient">Not Harder.</span>
                     </h1>
-                    <p style={{ 
-                        fontSize: 'clamp(16px, 1.5vw, 20px)', 
-                        color: 'var(--color-text-muted)', 
-                        maxWidth: '700px', 
-                        margin: '0 auto 48px',
-                        lineHeight: 1.6,
-                        fontWeight: 500
-                    }}>
-                        Engineered for elite pedagogical centers. Manage batches, students, and cognitive performance via a stunning mission-control interface.
+                    <p style={{ fontSize: 'clamp(16px, 2vw, 20px)', color: 'var(--color-text-muted)', lineHeight: 1.6, maxWidth: '600px', margin: '0 auto 48px', fontWeight: 500 }}>
+                        Track attendance, manage lessons, and keep an eye on student progress with our all-in-one simple dashboard. Built specifically for modern tutors.
                     </p>
+
                     <div style={{ display: 'flex', gap: '20px', justifyContent: 'center', flexWrap: 'wrap' }}>
-                        <Link to="/register" className="btn btn-primary" style={{ padding: '0 40px', height: '60px', borderRadius: '16px', fontSize: '16px', fontWeight: 900, boxShadow: '0 20px 40px -10px rgba(59, 130, 246, 0.4)' }}>
-                            ESTABLISH CLEARANCE <ArrowRight size={20} style={{ marginLeft: '10px' }} />
+                        <Link to="/register" className="btn btn-primary" style={{ padding: '0 40px', height: '64px', borderRadius: '18px', fontSize: '18px', fontWeight: 900, boxShadow: '0 20px 40px -10px rgba(59, 130, 246, 0.5)', gap: '12px' }}>
+                            <Zap size={24} /> START TEACHING
                         </Link>
-                        <a href="#features" className="btn btn-ghost" style={{ padding: '0 32px', height: '60px', borderRadius: '16px', fontSize: '16px', fontWeight: 900, background: 'rgba(255,255,255,0.03)' }}>
-                            VIEW TELEMETRY
-                        </a>
+                        <button className="btn btn-ghost" style={{ padding: '0 40px', height: '64px', borderRadius: '18px', fontSize: '18px', fontWeight: 800, border: '1px solid rgba(255,255,255,0.1)' }}>
+                            HOW IT WORKS
+                        </button>
                     </div>
                 </div>
             </section>
 
             {/* Feature Matrix */}
             <section id="features" style={{ padding: '100px clamp(1rem, 5vw, 4rem)', position: 'relative', zIndex: 1 }}>
-                <div style={{ textAlign: 'center', marginBottom: '80px' }}>
-                    <h2 style={{ fontSize: 'clamp(32px, 4vw, 48px)', fontWeight: 900, marginBottom: '16px', letterSpacing: '-0.02em' }}>Omniscient Feature Matrix</h2>
-                    <p style={{ color: 'var(--color-text-muted)', fontSize: '18px', fontWeight: 500 }}>A unified ecosystem engineered for data-driven academic directors.</p>
+                <div className="section-header" style={{ textAlign: 'center', marginBottom: '80px' }}>
+                    <h2 style={{ fontSize: '14px', fontWeight: 900, color: 'var(--color-primary)', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: '16px' }}>Built for Teachers</h2>
+                    <h3 style={{ fontSize: 'clamp(32px, 5vw, 48px)', fontWeight: 900 }}>Everything You Need</h3>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '32px' }}>
                     {features.map((f, i) => (
                         <div key={i} className="glass-card hover-lift animate-fade-in-up" style={{ padding: '40px', animationDelay: f.delay }}>
                             <div style={{ 
@@ -200,8 +191,8 @@ export default function Landing() {
                             color: 'var(--color-gold)', borderRadius: '8px', 
                             fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', 
                             letterSpacing: '0.1em', marginBottom: '24px', display: 'inline-block'
-                        }}>Target Demographics</div>
-                        <h2 style={{ fontSize: '40px', fontWeight: 900, marginBottom: '32px', lineHeight: 1.2 }}>Who is <span className="text-gradient">CoachTrack</span> Engineered For?</h2>
+                        }}>Who is this for?</div>
+                        <h2 style={{ fontSize: '40px', fontWeight: 900, marginBottom: '32px', lineHeight: 1.2 }}>Who is <span className="text-gradient">CoachTrack</span> built for?</h2>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                             {benefits.map((b, i) => (
                                 <div key={i} style={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
@@ -214,19 +205,16 @@ export default function Landing() {
                         </div>
                     </div>
 
-                    <div className="glass-card" style={{ padding: '60px', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
-                        <div style={{ position: 'absolute', top: '-50px', right: '-50px', width: '200px', height: '200px', background: 'var(--color-primary)', filter: 'blur(100px)', opacity: 0.1 }} />
-                        
-                        <div style={{ 
-                            width: '100px', height: '100px', background: 'linear-gradient(135deg, var(--color-primary), var(--color-gold))',
-                            borderRadius: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            margin: '0 auto 32px', boxShadow: '0 20px 40px -10px rgba(59, 130, 246, 0.4)'
-                        }}>
-                            <GraduationCap size={50} color="white" />
+                    <div className="glass-card" style={{ padding: '80px 40px', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
+                        <div style={{ position: 'relative', zIndex: 1 }}>
+                            <h2 style={{ fontSize: 'clamp(32px, 5vw, 48px)', fontWeight: 900, marginBottom: '24px' }}>Ready to simplify your teaching?</h2>
+                            <p style={{ fontSize: '20px', color: 'var(--color-text-muted)', marginBottom: '48px', maxWidth: '600px', margin: '0 auto 48px', fontWeight: 500 }}>
+                                Join other teachers who are already saving time and focusing more on their students.
+                            </p>
+                            <Link to="/register" className="btn btn-primary" style={{ padding: '0 48px', height: '64px', borderRadius: '18px', fontSize: '18px', fontWeight: 900, boxShadow: '0 20px 40px -10px rgba(59, 130, 246, 0.4)' }}>
+                                REGISTER NOW
+                            </Link>
                         </div>
-                        <h3 style={{ fontSize: '28px', fontWeight: 900, marginBottom: '16px' }}>Evolve Your Practice</h3>
-                        <p style={{ color: 'var(--color-text-muted)', fontSize: '16px', marginBottom: '40px', fontWeight: 500 }}>Join the elite tier of educators leveraging scientific management for superior outcomes.</p>
-                        <Link to="/register" className="btn btn-primary" style={{ width: '100%', height: '56px', borderRadius: '14px', fontSize: '15px', fontWeight: 900 }}>INITIALIZE FREE ACCOUNT</Link>
                     </div>
                 </div>
             </section>
@@ -242,10 +230,10 @@ export default function Landing() {
             }}>
                 <div style={{ display: 'flex', justifyContent: 'center', gap: '24px', marginBottom: '24px' }}>
                     <span style={{ color: 'var(--color-text-primary)', fontWeight: 900 }}>COACHTRACK v2.0</span>
-                    <span>SYSTEM READY</span>
-                    <span>ENCRYPTION ACTIVE</span>
+                    <span>SIMPLE TO USE</span>
+                    <span>SECURE DATA</span>
                 </div>
-                <p>© {new Date().getFullYear()} CoachTrack — Built for the Next Generation of Elite Educators.</p>
+                <p>© {new Date().getFullYear()} CoachTrack — Built for the Next Generation of Teachers.</p>
             </footer>
         </div>
     );

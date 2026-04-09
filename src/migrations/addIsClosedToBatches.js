@@ -7,28 +7,53 @@ import { db } from '../services/firebase';
  * will ignore documents where the field is undefined.
  */
 export async function migrateBatchesIsClosed() {
-  console.log('Starting migration: addIsClosedToBatches...');
-  const batchesRef = collection(db, 'batches');
-  const querySnapshot = await getDocs(batchesRef);
-  
-  const batch = writeBatch(db);
-  let count = 0;
+  console.log('Starting deep data repair scan...');
+  const batchMap = {};
+  let totalFixed = 0;
 
-  querySnapshot.forEach((d) => {
-    const data = d.data();
-    if (data.isClosed === undefined) {
-      const docRef = doc(db, 'batches', d.id);
-      batch.update(docRef, { isClosed: false });
-      count++;
+  try {
+    // 1. Fix Batches and extract correct teacher IDs
+    const batchSnap = await getDocs(collection(db, 'batches'));
+    for (const d of batchSnap.docs) {
+      const data = d.data();
+      const patch = {};
+      let needsUpdate = false;
+
+      // Repair nested teacherId if trapped in studentIds map
+      if (!data.teacherId && data.studentIds?.teacherId) {
+        patch.teacherId = data.studentIds.teacherId;
+        needsUpdate = true;
+      }
+      
+      if (data.isClosed === undefined) {
+        patch.isClosed = false;
+        needsUpdate = true;
+      }
+
+      if (needsUpdate) {
+        await updateDoc(doc(db, 'batches', d.id), patch);
+        totalFixed++;
+      }
+      batchMap[d.id] = (patch.teacherId || data.teacherId);
     }
-  });
 
-  if (count > 0) {
-    await batch.commit();
-    console.log(`Migration completed. Updated ${count} batches.`);
-    return { success: true, count };
-  } else {
-    console.log('No batches found needing migration.');
-    return { success: true, count: 0 };
+    // 2. Fix Orphans in various collections missing teacherId
+    const collections = ['exams', 'attendance', 'homeworks', 'lessons', 'schedules', 'sessionLogs'];
+    for (const collName of collections) {
+      const collSnap = await getDocs(collection(db, collName));
+      for (const d of collSnap.docs) {
+        const data = d.data();
+        if (!data.teacherId && data.batchId && batchMap[data.batchId]) {
+          await updateDoc(doc(db, collName, d.id), { teacherId: batchMap[data.batchId] });
+          totalFixed++;
+        }
+      }
+    }
+
+    console.log(`Deep repair completed. Fixed ${totalFixed} structural issues.`);
+    return { success: true, count: totalFixed };
+  } catch (err) {
+    console.error('Migration failed:', err);
+    return { success: false, error: err.message };
   }
 }

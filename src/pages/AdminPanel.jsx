@@ -65,36 +65,67 @@ export default function AdminPanel() {
     }
 
     async function runInitialSync() {
-        if (!confirm('Update your database to the latest version? (This ensures all your records are consistent)')) return;
+        if (!confirm('Update your database to the latest version? This will restore any "missing" data by fixing consistency issues.')) return;
         setIsMigrating(true);
-        const toastId = toast.loading('Updating records...');
+        const toastId = toast.loading('Performing deep scan and repair...');
         try {
             let batchCount = 0;
             let studentCount = 0;
+            let orphanedCount = 0;
 
+            // 1. Load batches and fix top-level fields (including nested teacherId)
             const batchSnap = await getDocs(collection(db, 'batches'));
-            const batchPromises = batchSnap.docs.map(async (d) => {
+            const batchMap = {}; // To find teacherId for linked records
+
+            for (const d of batchSnap.docs) {
                 const data = d.data();
-                if (data.isClosed === undefined) {
-                    await updateDoc(doc(db, 'batches', d.id), { isClosed: false });
+                const updatePatch = {};
+                let needsUpdate = false;
+
+                // FIX: Move teacherId out of nested maps if it got stuck there (e.g. inside studentIds)
+                if (!data.teacherId && data.studentIds?.teacherId) {
+                    updatePatch.teacherId = data.studentIds.teacherId;
+                    needsUpdate = true;
+                }
+                
+                // FIX: Simple consistency fields
+                if (data.isClosed === undefined) { updatePatch.isClosed = false; needsUpdate = true; }
+                if (!data.subject && data.studentIds?.subject) { updatePatch.subject = data.studentIds.subject; needsUpdate = true; }
+
+                if (needsUpdate) {
+                    await updateDoc(doc(db, 'batches', d.id), updatePatch);
                     batchCount++;
                 }
-            });
+                batchMap[d.id] = (updatePatch.teacherId || data.teacherId);
+            }
 
+            // 2. Fix students (consistency)
             const studentSnap = await getDocs(collection(db, 'students'));
-            const studentPromises = studentSnap.docs.map(async (d) => {
+            for (const d of studentSnap.docs) {
                 const data = d.data();
                 if (data.status === undefined) {
                     await updateDoc(doc(db, 'students', d.id), { status: 'enrolled' });
                     studentCount++;
                 }
-            });
+            }
 
-            await Promise.all([...batchPromises, ...studentPromises]);
-            toast.success(`Database Updated: ${batchCount} Batches, ${studentCount} Students`, { id: toastId });
+            // 3. Fix Orphaned Records (Exams, Attendance, Homework, etc. missing teacherId)
+            const collectionsToFix = ['exams', 'attendance', 'homeworks', 'lessons', 'schedules', 'sessionLogs'];
+            for (const collName of collectionsToFix) {
+                const collSnap = await getDocs(collection(db, collName));
+                for (const d of collSnap.docs) {
+                    const data = d.data();
+                    if (!data.teacherId && data.batchId && batchMap[data.batchId]) {
+                        await updateDoc(doc(db, collName, d.id), { teacherId: batchMap[data.batchId] });
+                        orphanedCount++;
+                    }
+                }
+            }
+
+            toast.success(`Scan Complete: ${batchCount} batches fixed, ${orphanedCount} orphaned records restored.`, { id: toastId });
         } catch (err) {
-            console.error('Sync Error:', err);
-            toast.error('Update Failed', { id: toastId });
+            console.error('Deep Sync Error:', err);
+            toast.error('Repair process failed. See console for details.', { id: toastId });
         } finally {
             setIsMigrating(false);
         }

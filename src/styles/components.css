@@ -110,10 +110,10 @@
 }
 
 .card-glass {
-    background: rgba(26, 34, 53, 0.7);
+    background: var(--color-bg-glass);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--color-border-glass);
     border-radius: var(--radius-lg);
     padding: var(--space-6);
 }
@@ -288,12 +288,12 @@
 }
 
 .modal {
-    background: var(--color-bg-secondary);
-    border: 1px solid var(--color-border);
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border-glass);
     border-radius: var(--radius-xl);
     width: 100%;
     max-width: 560px;
-    max-height: 85vh;
+    max-height: 90vh;
     overflow-y: auto;
     box-shadow: var(--shadow-xl);
     animation: scaleIn var(--transition-base) ease;
@@ -625,11 +625,12 @@
     position: absolute;
     top: calc(100% + 4px);
     right: 0;
-    background: var(--color-bg-secondary);
-    border: 1px solid var(--color-border);
+    background: var(--color-bg-card);
+    backdrop-filter: blur(20px);
+    border: 1px solid var(--color-border-glass);
     border-radius: var(--radius-md);
     box-shadow: var(--shadow-lg);
-    min-width: 180px;
+    min-width: 200px;
     z-index: 100;
     animation: scaleIn var(--transition-fast) ease;
     overflow: hidden;
@@ -687,27 +688,27 @@
 
 /* --- FullCalendar Overrides --- */
 .calendar-styles-override .fc {
-    --fc-border-color: rgba(255, 255, 255, 0.08);
-    --fc-button-bg-color: rgba(255, 255, 255, 0.05);
-    --fc-button-border-color: rgba(255, 255, 255, 0.1);
-    --fc-button-hover-bg-color: rgba(255, 255, 255, 0.1);
+    --fc-border-color: var(--color-border-glass);
+    --fc-button-bg-color: var(--color-bg-elevated);
+    --fc-button-border-color: var(--color-border-glass);
+    --fc-button-hover-bg-color: var(--color-bg-card-hover);
     --fc-button-active-bg-color: var(--color-accent);
     --fc-event-bg-color: var(--color-accent);
     --fc-event-border-color: transparent;
     --fc-page-bg-color: transparent;
-    --fc-neutral-bg-color: rgba(255, 255, 255, 0.02);
-    --fc-today-bg-color: rgba(20, 184, 166, 0.08);
+    --fc-neutral-bg-color: var(--color-bg-secondary);
+    --fc-today-bg-color: var(--color-accent-soft);
     font-family: var(--font-family);
 }
 
 .calendar-styles-override .fc-theme-standard td, 
 .calendar-styles-override .fc-theme-standard th {
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--color-border-glass);
 }
 
 .calendar-styles-override .fc-col-header-cell {
     padding: 12px 0;
-    background: rgba(255, 255, 255, 0.02);
+    background: var(--color-bg-secondary);
 }
 
 .calendar-styles-override .fc-col-header-cell-cushion {

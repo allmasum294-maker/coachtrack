@@ -58,11 +58,10 @@ const systemNavItems = [
     { path: '/export', icon: Download, label: 'Export Data' },
 ];
 
-export default function Sidebar() {
+export default function Sidebar({ mobileOpen, setMobileOpen }) {
     const { currentUser, userProfile, logout, isAdmin } = useAuth();
     const { theme, toggleTheme } = useTheme();
     const navigate = useNavigate();
-    const [mobileOpen, setMobileOpen] = useState(false);
     const [collapsed, setCollapsed] = useState(false);
 
     async function handleLogout() {
@@ -106,27 +105,10 @@ export default function Sidebar() {
 
     return (
         <>
-            {/* Mobile toggle */}
+            {/* Mobile toggle button - now handled by CSS display rules */}
             <button
                 className="sidebar-toggle glass-panel"
                 onClick={() => setMobileOpen(true)}
-                style={{
-                    position: 'fixed',
-                    top: '20px',
-                    left: '20px',
-                    zIndex: 1000,
-                    width: '44px',
-                    height: '44px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    borderRadius: '12px',
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    background: 'rgba(15, 23, 42, 0.6)',
-                    backdropFilter: 'blur(12px)',
-                    color: 'var(--color-text-primary)',
-                    boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
-                }}
             >
                 <Menu size={22} />
             </button>
@@ -139,44 +121,38 @@ export default function Sidebar() {
 
             <aside
                 className={`sidebar ${collapsed ? 'collapsed' : ''} ${mobileOpen ? 'mobile-open' : ''} glass-panel`}
-                style={{
-                    borderRight: '1px solid rgba(255, 255, 255, 0.05)',
-                    boxShadow: '10px 0 30px rgba(0, 0, 0, 0.2)'
-                }}
             >
                 {/* Brand */}
-                <div className="sidebar-brand" style={{ padding: 'var(--space-6) var(--space-4)', borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                <div className="sidebar-brand" style={{ borderBottom: '1px solid var(--color-border-glass)' }}>
                     <div className="sidebar-brand-logo" style={{ 
                         background: 'linear-gradient(135deg, var(--color-accent), #0d9488)',
-                        boxShadow: '0 0 15px var(--color-accent-glow)'
                     }}>CT</div>
                     {!collapsed && (
                         <div className="sidebar-brand-text">
                             Coach<span>Track</span>
                         </div>
                     )}
-                    {/* Mobile close */}
+                    {/* Mobile close button */}
                     <button
-                        className="sidebar-toggle"
+                        className="sidebar-close-btn"
                         onClick={() => setMobileOpen(false)}
-                        style={{ marginLeft: 'auto', display: mobileOpen ? 'flex' : 'none' }}
                     >
                         <X size={20} />
                     </button>
                 </div>
 
                 {/* Nav */}
-                <nav className="sidebar-nav" style={{ padding: 'var(--space-4) 0' }}>
+                <nav className="sidebar-nav">
                     {renderNavSection('Coaching', mainNavItems)}
-                    <div style={{ margin: 'var(--space-4) 12px', height: '1px', background: 'rgba(255, 255, 255, 0.03)' }} />
+                    <div className="sidebar-divider" />
                     {renderNavSection('Teaching', managementNavItems)}
-                    <div style={{ margin: 'var(--space-4) 12px', height: '1px', background: 'rgba(255, 255, 255, 0.03)' }} />
+                    <div className="sidebar-divider" />
                     {renderNavSection('Results', insightNavItems)}
-                    <div style={{ margin: 'var(--space-4) 12px', height: '1px', background: 'rgba(255, 255, 255, 0.03)' }} />
+                    <div className="sidebar-divider" />
                     {renderNavSection('System', systemNavItems)}
                     {isAdmin && (
                         <>
-                            <div style={{ margin: 'var(--space-4) 12px', height: '1px', background: 'rgba(255, 255, 255, 0.03)' }} />
+                            <div className="sidebar-divider" />
                             {renderNavSection('Admin', [
                                 { path: '/admin', icon: ShieldCheck, label: 'Admin Panel' },
                             ])}
@@ -184,32 +160,10 @@ export default function Sidebar() {
                     )}
                 </nav>
 
-                {/* Collapse toggle (desktop) */}
-                <div style={{ padding: '0 12px 8px', borderTop: '1px solid rgba(255, 255, 255, 0.05)', paddingTop: '12px' }}>
-                    <button
-                        className="btn btn-ghost"
-                        onClick={() => setCollapsed(!collapsed)}
-                        style={{ width: '100%', justifyContent: collapsed ? 'center' : 'flex-start', background: 'rgba(255,255,255,0.02)' }}
-                    >
-                        <ChevronLeft
-                            size={18}
-                            style={{
-                                transform: collapsed ? 'rotate(180deg)' : 'none',
-                                transition: 'transform 0.2s',
-                            }}
-                        />
-                        {!collapsed && <span>Collapse Menu</span>}
-                    </button>
-                </div>
-
-                {/* User */}
-                <div className="sidebar-footer" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.05)', background: 'rgba(0,0,0,0.1)' }}>
+                {/* User Info (Bottom) */}
+                <div className="sidebar-footer">
                     <div className="sidebar-user">
-                        <div className="sidebar-avatar" style={{ 
-                            background: 'rgba(255, 255, 255, 0.05)',
-                            border: '1px solid rgba(255, 255, 255, 0.1)',
-                            color: 'var(--color-accent)'
-                        }}>
+                        <div className="sidebar-avatar">
                             {getInitials(userProfile?.displayName || currentUser?.displayName)}
                         </div>
                         {!collapsed && (
@@ -223,10 +177,9 @@ export default function Sidebar() {
                             </div>
                         )}
                     </div>
-                    <div style={{ display: 'flex', gap: '4px', padding: '0 12px 12px' }}>
+                    <div className="sidebar-actions">
                         <button
                             className="btn btn-ghost btn-icon"
-                            style={{ flex: 1, background: 'rgba(255,255,255,0.03)' }}
                             onClick={toggleTheme}
                             title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
                         >
@@ -234,7 +187,7 @@ export default function Sidebar() {
                         </button>
                         <button
                             className="btn btn-ghost btn-icon"
-                            style={{ flex: 1, background: 'rgba(255,255,255,0.03)', color: 'var(--color-danger)' }}
+                            style={{ flex: 1, background: 'var(--color-bg-glass)', color: 'var(--color-danger)' }}
                             onClick={handleLogout}
                             title="Logout"
                         >

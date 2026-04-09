@@ -7,7 +7,7 @@ import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 
 export default function AdminPanel() {
-    const { isAdmin } = useAuth();
+    const { currentUser, isAdmin } = useAuth();
     const [pendingUsers, setPendingUsers] = useState([]);
     const [approvedUsers, setApprovedUsers] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -214,11 +214,11 @@ export default function AdminPanel() {
                 </div>
             </div>
 
-            <div className="glass-panel" style={{ padding: '8px', marginBottom: 'var(--space-8)', display: 'inline-flex', gap: '8px', background: 'rgba(255, 255, 255, 0.03)' }}>
+            <div className="glass-panel" style={{ padding: '8px', marginBottom: 'var(--space-8)', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                 {[
-                    { id: 'pending', label: 'Waiting for Approval', icon: <ShieldAlert size={16} />, count: pendingUsers.length },
+                    { id: 'pending', label: 'Requests', icon: <ShieldAlert size={16} />, count: pendingUsers.length },
                     { id: 'approved', label: 'Tutors', icon: <Check size={16} />, count: approvedUsers.length },
-                    { id: 'maintenance', label: 'Data Tools', icon: <Database size={16} /> }
+                    { id: 'maintenance', label: 'Maintenance', icon: <Database size={16} /> }
                 ].map((t) => (
                     <button 
                         key={t.id}
@@ -228,15 +228,18 @@ export default function AdminPanel() {
                             padding: '10px 18px', 
                             borderRadius: '10px',
                             display: 'flex',
+                            flex: '1',
+                            justifyContent: 'center',
                             alignItems: 'center',
                             gap: '8px',
                             fontSize: '13px',
                             fontWeight: 800,
-                            background: tab === t.id ? 'var(--color-primary)' : 'transparent',
-                            color: tab === t.id ? 'white' : 'var(--color-text-muted)',
+                            background: tab === t.id ? 'var(--color-accent)' : 'transparent',
+                            color: tab === t.id ? 'white' : 'var(--color-text-secondary)',
                             border: 'none',
                             transition: 'all 0.2s ease',
-                            cursor: 'pointer'
+                            cursor: 'pointer',
+                            minWidth: '120px'
                         }}
                     >
                         {t.icon}
@@ -250,33 +253,30 @@ export default function AdminPanel() {
                     <div className="animate-fade-in">
                         {pendingUsers.length === 0 ? (
                             <div className="glass-card" style={{ padding: '80px 0', textAlign: 'center' }}>
-                                <div style={{ width: '80px', height: '80px', background: 'rgba(255,255,255,0.03)', color: 'var(--color-text-muted)', borderRadius: '50%', margin: '0 auto 24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <div style={{ width: '80px', height: '80px', background: 'var(--color-bg-elevated)', color: 'var(--color-text-muted)', borderRadius: '50%', margin: '0 auto 24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                     <Users size={32} />
                                 </div>
                                 <h3 style={{ fontSize: '20px', fontWeight: 800 }}>No Pending Requests</h3>
-                                <p style={{ color: 'var(--color-text-muted)', maxWidth: '300px', margin: '8px auto' }}>Everything is up to date.</p>
                             </div>
                         ) : (
-                            <div style={{ display: 'grid', gap: '16px' }}>
+                            <div className="responsive-grid">
                                 {pendingUsers.map((user) => (
-                                    <div key={user.id} className="glass-card hover-lift" style={{ padding: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                                            <div style={{ width: 50, height: 50, borderRadius: '14px', background: 'var(--color-primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: '18px' }}>
+                                    <div key={user.id} className="glass-card" style={{ padding: '24px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
+                                            <div style={{ width: 50, height: 50, borderRadius: '14px', background: 'var(--color-accent)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: '18px' }}>
                                                 {user.displayName?.charAt(0).toUpperCase() || '?'}
                                             </div>
                                             <div>
-                                                <div style={{ fontWeight: 800, fontSize: '17px', marginBottom: '4px' }}>{user.displayName || 'Anonymous Tutor'}</div>
-                                                <div style={{ fontSize: '13px', color: 'var(--color-text-muted)', fontWeight: 600 }}>
-                                                    {user.email} · Registered {user.createdAt?.toDate ? format(user.createdAt.toDate(), 'PPP') : 'Processing...'}
-                                                </div>
+                                                <div style={{ fontWeight: 800, fontSize: '17px', marginBottom: '4px' }}>{user.displayName || 'Anonymous'}</div>
+                                                <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', fontWeight: 600 }}>{user.email}</div>
                                             </div>
                                         </div>
                                         <div style={{ display: 'flex', gap: '12px' }}>
-                                            <button className="btn btn-primary" onClick={() => approveUser(user.id)} style={{ padding: '0 20px', height: '40px', fontSize: '12px', fontWeight: 900 }}>
-                                                <Check size={16} /> APPROVE
+                                            <button className="btn btn-primary" onClick={() => approveUser(user.id)} style={{ flex: 1, height: '40px', fontSize: '12px', fontWeight: 900 }}>
+                                                APPROVE
                                             </button>
-                                            <button className="btn btn-ghost" onClick={() => rejectUser(user.id)} style={{ color: '#ef4444', height: '40px', fontSize: '12px', fontWeight: 900 }}>
-                                                <X size={16} /> REMOVE
+                                            <button className="btn btn-ghost" onClick={() => rejectUser(user.id)} style={{ flex: 1, color: '#ef4444', height: '40px', fontSize: '12px', fontWeight: 900 }}>
+                                                REJECT
                                             </button>
                                         </div>
                                     </div>
@@ -293,22 +293,20 @@ export default function AdminPanel() {
                                 <h3 style={{ fontSize: '20px', fontWeight: 800 }}>No Active Tutors</h3>
                             </div>
                         ) : (
-                            <div style={{ display: 'grid', gap: '16px' }}>
+                            <div className="responsive-grid">
                                 {approvedUsers.map((user) => (
-                                    <div key={user.id} className="glass-card" style={{ padding: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                                            <div style={{ width: 50, height: 50, borderRadius: '14px', background: 'rgba(255,255,255,0.03)', color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: '18px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                    <div key={user.id} className="glass-card" style={{ padding: '24px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '20px' }}>
+                                            <div style={{ width: 50, height: 50, borderRadius: '14px', background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border-glass)', color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: '18px' }}>
                                                 {user.displayName?.charAt(0).toUpperCase() || '?'}
                                             </div>
                                             <div>
-                                                <div style={{ fontWeight: 800, fontSize: '17px', marginBottom: '4px' }}>{user.displayName || 'Authorized Tutor'}</div>
-                                                <div style={{ fontSize: '13px', color: 'var(--color-text-muted)', fontWeight: 600 }}>
-                                                    {user.email}
-                                                </div>
+                                                <div style={{ fontWeight: 800, fontSize: '17px', marginBottom: '4px' }}>{user.displayName || 'Tutor'}</div>
+                                                <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>{user.email}</div>
                                             </div>
                                         </div>
-                                        <button className="btn btn-ghost" onClick={() => revokeAccess(user.id)} style={{ color: '#ef4444', height: '40px', fontSize: '12px', fontWeight: 900 }}>
-                                            REMOVE ACCESS
+                                        <button className="btn btn-ghost" onClick={() => revokeAccess(user.id)} style={{ width: '100%', color: '#ef4444', height: '40px', fontSize: '12px', fontWeight: 900 }}>
+                                            REVOKE ACCESS
                                         </button>
                                     </div>
                                 ))}
@@ -319,68 +317,68 @@ export default function AdminPanel() {
 
                 {tab === 'maintenance' && (
                     <div className="animate-fade-in">
-                        <div className="glass-card" style={{ padding: '40px' }}>
+                        <div className="glass-card" style={{ padding: 'clamp(20px, 5vw, 40px)' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '32px' }}>
-                                <div style={{ background: 'rgba(59, 130, 246, 0.1)', color: 'var(--color-primary)', padding: '12px', borderRadius: '16px' }}>
+                                <div style={{ background: 'var(--color-accent-soft)', color: 'var(--color-accent)', padding: '12px', borderRadius: '16px' }}>
                                     <Database size={28} />
                                 </div>
                                 <div>
-                                    <h3 style={{ fontSize: '20px', fontWeight: 900 }}>Data Management</h3>
-                                    <p style={{ color: 'var(--color-text-muted)', fontSize: '14px' }}>Keep all records consistent and updated</p>
+                                    <h3 style={{ fontSize: '20px', fontWeight: 900 }}>System Maintenance</h3>
+                                    <p style={{ color: 'var(--color-text-secondary)', fontSize: '14px' }}>Keep all records consistent and updated</p>
                                 </div>
                             </div>
 
-                            <div className="glass-panel" style={{ padding: '32px', background: 'rgba(255, 255, 255, 0.02)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div className="glass-panel" style={{ padding: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '20px' }}>
                                 <div>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                                        <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--color-primary)' }} />
-                                        <div style={{ fontWeight: 800, fontSize: '16px' }}>Update Old Records</div>
+                                        <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--color-accent)' }} />
+                                        <div style={{ fontWeight: 800, fontSize: '16px' }}>Database Deep Scan</div>
                                     </div>
-                                    <p style={{ fontSize: '14px', color: 'var(--color-text-muted)', lineHeight: 1.5, maxWidth: '500px' }}>
-                                        Adds new features to your older records. This ensures all your batches and students have the latest settings applied.
+                                    <p style={{ fontSize: '14px', color: 'var(--color-text-secondary)', lineHeight: 1.5, maxWidth: '500px' }}>
+                                        Repairs structural inconsistencies and re-links records to the latest schema version.
                                     </p>
                                 </div>
                                 <button 
                                     className="btn btn-primary" 
                                     onClick={runInitialSync}
                                     disabled={isMigrating}
-                                    style={{ padding: '0 32px', height: '48px', fontWeight: 900, boxShadow: '0 8px 20px rgba(59, 130, 246, 0.3)' }}
+                                    style={{ padding: '0 32px', height: '48px', fontWeight: 900, boxShadow: 'var(--shadow-lg)' }}
                                 >
-                                    {isMigrating ? <span className="loading-spinner" style={{ width: 16, height: 16, borderWeight: 2 }} /> : <><Zap size={16} /> START UPDATE</>}
+                                    {isMigrating ? <span className="loading-spinner" style={{ width: 16, height: 16 }} /> : <><Zap size={16} /> RUN REPAIR</>}
                                 </button>
                             </div>
 
-                            <div style={{ marginTop: '32px', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
-                                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '16px', textAlign: 'center', border: '1px solid rgba(255,255,255,0.05)' }}>
-                                    <div style={{ fontSize: '10px', fontWeight: 900, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>Global Records</div>
+                            <div className="responsive-grid" style={{ marginTop: '32px' }}>
+                                <div className="glass-panel" style={{ padding: '20px', textAlign: 'center' }}>
+                                    <div style={{ fontSize: '10px', fontWeight: 900, color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: '8px' }}>Total Records</div>
                                     <div style={{ fontSize: '24px', fontWeight: 900 }}>{dbStats.total}</div>
                                 </div>
-                                <div style={{ background: 'rgba(16, 185, 129, 0.05)', padding: '20px', borderRadius: '16px', textAlign: 'center', border: '1px solid rgba(16, 185, 129, 0.1)' }}>
-                                    <div style={{ fontSize: '10px', fontWeight: 900, color: '#10b981', textTransform: 'uppercase', marginBottom: '8px' }}>Your Records</div>
-                                    <div style={{ fontSize: '24px', fontWeight: 900, color: '#10b981' }}>{dbStats.owned}</div>
+                                <div style={{ background: 'var(--color-success-soft)', padding: '20px', borderRadius: '16px', textAlign: 'center', border: '1px solid var(--color-success)' }}>
+                                    <div style={{ fontSize: '10px', fontWeight: 900, color: 'var(--color-success)', textTransform: 'uppercase', marginBottom: '8px' }}>Your Records</div>
+                                    <div style={{ fontSize: '24px', fontWeight: 900, color: 'var(--color-success)' }}>{dbStats.owned}</div>
                                 </div>
-                                <div style={{ background: 'rgba(239, 68, 68, 0.05)', padding: '20px', borderRadius: '16px', textAlign: 'center', border: '1px solid rgba(239, 68, 68, 0.1)' }}>
-                                    <div style={{ fontSize: '10px', fontWeight: 900, color: '#ef4444', textTransform: 'uppercase', marginBottom: '8px' }}>Other/Orphaned</div>
+                                <div style={{ background: 'var(--color-danger-soft)', padding: '20px', borderRadius: '16px', textAlign: 'center', border: '1px solid var(--color-danger)' }}>
+                                    <div style={{ fontSize: '10px', fontWeight: 900, color: '#ef4444', textTransform: 'uppercase', marginBottom: '8px' }}>Mismatched</div>
                                     <div style={{ fontSize: '24px', fontWeight: 900, color: '#ef4444' }}>{dbStats.orphans}</div>
                                 </div>
                             </div>
 
-                            <div style={{ marginTop: '32px', padding: '24px', borderRadius: '16px', background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.1)' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div style={{ marginTop: '32px', padding: '24px', borderRadius: '16px', background: 'var(--color-danger-soft)', border: '1px solid var(--color-danger)' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '20px' }}>
                                     <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
                                         <div style={{ background: '#ef4444', color: 'white', padding: '10px', borderRadius: '12px' }}>
                                             <ShieldAlert size={20} />
                                         </div>
                                         <div>
                                             <div style={{ fontWeight: 900, fontSize: '15px', color: '#ef4444', marginBottom: '2px' }}>Ownership Recovery</div>
-                                            <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', fontWeight: 600 }}>If your User ID changed, use this to re-claim all data in the system.</p>
+                                            <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)', fontWeight: 600 }}>Use this if batches belong to a different account ID.</p>
                                         </div>
                                     </div>
                                     <button 
                                         className="btn btn-primary" 
                                         onClick={claimAllData}
                                         disabled={isMigrating || dbStats.orphans === 0}
-                                        style={{ background: '#ef4444', border: 'none', boxShadow: '0 8px 20px rgba(239, 68, 68, 0.2)', padding: '0 24px', height: '44px', fontWeight: 900, fontSize: '12px' }}
+                                        style={{ background: '#ef4444', border: 'none', padding: '0 24px', height: '44px', fontWeight: 900, fontSize: '12px', flex: '1', minWidth: '200px' }}
                                     >
                                         CLAIM ALL SYSTEM DATA
                                     </button>

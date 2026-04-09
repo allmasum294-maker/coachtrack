@@ -220,7 +220,15 @@ export default function Dashboard() {
                 }
             });
 
-            const finalAtRiskList = Object.values(riskMap).sort((a,b) => b.score - a.score);
+            const finalAtRiskList = Object.values(riskMap)
+                .filter(risk => {
+                    const student = studentsMap[risk.studentId];
+                    if (!student) return false;
+                    const studentBatchIds = student.batchIds || [];
+                    // Only show student if they belong to at least one active batch
+                    return studentBatchIds.some(bid => activeBatchIds.includes(bid));
+                })
+                .sort((a,b) => b.score - a.score);
 
             setStats({
                 classesToday,
@@ -250,92 +258,93 @@ export default function Dashboard() {
     return (
         <div className="animate-fade-in">
             {/* Hero Section */}
-            <div className="glass-panel" style={{ padding: '40px', marginBottom: 'var(--space-8)', position: 'relative', overflow: 'hidden', border: 'none', background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(30, 64, 175, 0.05) 100%)' }}>
-                <div style={{ position: 'absolute', top: -100, right: -100, width: 300, height: 300, background: 'var(--color-primary)', filter: 'blur(150px)', opacity: 0.1, pointerEvents: 'none' }} />
+            <div className="glass-panel" style={{ padding: 'clamp(20px, 5vw, 40px)', marginBottom: 'var(--space-8)', position: 'relative', overflow: 'hidden' }}>
+                <div style={{ position: 'absolute', top: -100, right: -100, width: 300, height: 300, background: 'var(--color-accent)', filter: 'blur(150px)', opacity: 0.1, pointerEvents: 'none' }} />
                 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', zIndex: 1 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', zIndex: 1, flexWrap: 'wrap', gap: '20px' }}>
                     <div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-                            <div style={{ padding: '6px 12px', background: 'rgba(59, 130, 246, 0.1)', color: 'var(--color-primary)', borderRadius: '20px', fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <Crown size={12} /> Teacher Profile
+                            <div style={{ padding: '6px 12px', background: 'var(--color-accent-soft)', color: 'var(--color-accent)', borderRadius: '20px', fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <Crown size={12} /> Teacher Dashboard
                             </div>
                         </div>
-                        <h1 style={{ fontSize: 'clamp(24px, 4vw, 36px)', fontWeight: 900, marginBottom: '8px', letterSpacing: '-0.02em' }}>
-                            {greeting}, <span className="text-gradient">{userProfile?.displayName?.split(' ')[0] || 'Teacher'}</span>
+                        <h1 style={{ fontSize: 'clamp(24px, 5vw, 40px)', fontWeight: 900, marginBottom: '8px', letterSpacing: '-0.02em' }}>
+                            {greeting}, <span style={{ color: 'var(--color-accent)' }}>{userProfile?.displayName?.split(' ')[0] || 'Teacher'}</span>
                         </h1>
-                        <p style={{ color: 'var(--color-text-muted)', fontSize: '16px', fontWeight: 500, maxWidth: '500px', lineHeight: 1.6 }}>
-                            Your dashboard is up to date. You have <span style={{ color: 'var(--color-text-primary)', fontWeight: 800 }}>{stats.classesToday} classes</span> scheduled for today.
+                        <p style={{ color: 'var(--color-text-secondary)', fontSize: '16px', fontWeight: 500, maxWidth: '500px', lineHeight: 1.6 }}>
+                            You have <span style={{ color: 'var(--color-text-primary)', fontWeight: 800 }}>{stats.classesToday} classes</span> scheduled for today.
                         </p>
                     </div>
                     
-                    <div style={{ display: 'flex', gap: '16px' }}>
+                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                         <button 
                             className="btn btn-ghost" 
                             onClick={async () => {
                                 const res = await migrateBatchesIsClosed();
-                                if (res.count > 0) toast.success(`Migrated ${res.count} batches`);
-                                else toast.success('Schema up to date');
+                                if (res.count > 0) toast.success(`Updated ${res.count} records`);
+                                else toast.success('Database up to date');
                                 loadDashboardData();
                             }}
-                            style={{ fontSize: '10px', height: '32px', opacity: 0.5 }}
+                            style={{ fontSize: '11px', fontWeight: 700, opacity: 0.8 }}
                         >
-                            REFRESH DATABASE
+                            <Zap size={14} /> REFRESH
                         </button>
-                        <Link to="/attendance" className="btn btn-primary" style={{ padding: '0 28px', height: '48px', borderRadius: '14px', fontWeight: 900, boxShadow: '0 10px 30px -5px rgba(59, 130, 246, 0.4)', gap: '10px' }}>
-                            <ClipboardCheck size={20} /> TAKE ATTENDANCE
+                        <Link to="/attendance" className="btn btn-primary" style={{ padding: '0 24px', height: '48px', borderRadius: '12px', fontWeight: 900, gap: '10px' }}>
+                            <ClipboardCheck size={20} /> START CLASS
                         </Link>
                     </div>
                 </div>
             </div>
 
             {/* Quick Metrics Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px', marginBottom: 'var(--space-8)' }}>
+            <div className="responsive-grid" style={{ marginBottom: 'var(--space-8)' }}>
                 {[
                     { label: 'Classes Today', val: stats.classesToday, icon: <PlayCircle size={24} />, color: '#10b981', delay: '0s' },
                     { label: 'Attendance (Week)', val: `${stats.weekAttendance}%`, icon: <TrendingUp size={24} />, color: '#3b82f6', delay: '0.1s' },
                     { label: 'Next Exam', val: stats.nextExamDays, icon: <Clock size={24} />, color: '#f59e0b', delay: '0.2s' },
-                    { label: 'Needs Attention', val: stats.attentionNeeded, icon: <AlertTriangle size={24} />, color: '#ef4444', delay: '0.3s', isUrgent: stats.attentionNeeded > 0 }
+                    { label: 'Attention Needed', val: stats.attentionNeeded, icon: <AlertTriangle size={24} />, color: '#ef4444', delay: '0.3s', isUrgent: stats.attentionNeeded > 0 }
                 ].map((m, i) => (
-                    <div key={i} className="glass-card hover-lift animate-fade-in-up" style={{ padding: '24px', display: 'flex', alignItems: 'center', gap: '20px', animationDelay: m.delay }}>
+                    <div key={i} className="glass-card animate-fade-in-up" style={{ padding: '24px', display: 'flex', alignItems: 'center', gap: '20px', animationDelay: m.delay }}>
                         <div style={{ 
                             width: '54px', height: '54px', borderRadius: '16px', 
                             background: `${m.color}15`, color: m.color,
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            boxShadow: m.isUrgent ? `0 0 20px ${m.color}30` : 'none'
                         }}>
                             {m.icon}
                         </div>
                         <div>
-                            <div style={{ fontSize: '11px', fontWeight: 900, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>{m.label}</div>
-                            <div style={{ fontSize: '24px', fontWeight: 900, color: m.isUrgent ? m.color : 'inherit' }}>{m.val}</div>
+                            <div style={{ fontSize: '11px', fontWeight: 900, color: 'var(--color-text-secondary)', textTransform: 'uppercase', marginBottom: '4px' }}>{m.label}</div>
+                            <div style={{ fontSize: '24px', fontWeight: 900 }}>{m.val}</div>
                         </div>
                     </div>
                 ))}
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: '24px', alignItems: 'start' }}>
+            <div className="responsive-grid" style={{ gridTemplateColumns: atRiskList.length > 0 ? '1.6fr 1fr' : '1fr', alignItems: 'start' }}>
                 
                 {/* Intervention Monitor */}
-                <div className="glass-card" style={{ padding: 0, overflow: 'hidden' }}>
+                <div className="glass-panel" style={{ padding: 0, overflow: 'hidden' }}>
                     <div style={{ 
-                        padding: '24px 32px', 
-                        background: 'rgba(239, 68, 68, 0.05)',
-                        borderBottom: '1px solid rgba(255,255,255,0.05)',
+                        padding: '20px 32px', 
+                        background: 'var(--color-danger-soft)',
+                        borderBottom: '1px solid var(--color-border-glass)',
                         display: 'flex',
                         justifyContent: 'space-between',
-                        alignItems: 'center'
+                        alignItems: 'center',
+                        flexWrap: 'wrap',
+                        gap: '12px'
                     }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                            <div style={{ background: '#ef4444', color: 'white', padding: '10px', borderRadius: '12px', display: 'flex', alignItems: 'center', boxShadow: '0 0 15px rgba(239, 68, 68, 0.4)' }}>
+                            <div style={{ background: '#ef4444', color: 'white', padding: '10px', borderRadius: '12px', display: 'flex', alignItems: 'center' }}>
                                 <ShieldAlert size={20} />
                             </div>
                             <div>
-                                <h3 style={{ fontSize: '18px', fontWeight: 900, color: '#ef4444' }}>Students Needing Attention</h3>
-                                <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', fontWeight: 600 }}>Students who might need extra help or have missed classes</p>
+                                <h3 style={{ fontSize: '18px', fontWeight: 900, color: '#ef4444' }}>Priority Students</h3>
+                                <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)', fontWeight: 600 }}>Needs extra attention</p>
                             </div>
                         </div>
-                        <div style={{ padding: '6px 16px', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', borderRadius: '10px', fontSize: '11px', fontWeight: 900, textTransform: 'uppercase' }}>
-                            {atRiskList.length} STUDENTS NEED HELP
+                        <div style={{ padding: '6px 16px', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', borderRadius: '10px', fontSize: '11px', fontWeight: 900 }}>
+                            {atRiskList.length} FLAGGED
                         </div>
                     </div>
 

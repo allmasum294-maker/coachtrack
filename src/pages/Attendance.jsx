@@ -206,58 +206,58 @@ export default function Attendance() {
             </div>
 
             {/* Premium Tab Navigation */}
-            <div style={{ 
+            <div className="glass-panel" style={{ 
                 display: 'flex', 
-                gap: 'var(--space-2)', 
-                background: 'rgba(255, 255, 255, 0.03)', 
+                gap: '8px', 
                 padding: '6px', 
-                borderRadius: '16px', 
-                width: 'fit-content', 
-                marginBottom: 'var(--space-10)', 
-                border: '1px solid rgba(255, 255, 255, 0.05)',
-                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.2)'
+                marginBottom: 'var(--space-8)', 
+                flexWrap: 'wrap'
             }}>
                 <button 
-                    className={`nav-tab ${tab === 'mark' ? 'active' : ''}`} 
+                    className={`tab ${tab === 'mark' ? 'active' : ''}`} 
                     onClick={() => setTab('mark')}
                     style={{ 
-                        padding: '12px 28px', 
+                        padding: '12px 24px', 
                         borderRadius: '12px', 
                         fontSize: '14px', 
                         fontWeight: 800, 
-                        background: tab === 'mark' ? 'var(--color-primary)' : 'transparent',
-                        color: tab === 'mark' ? 'white' : 'var(--color-text-muted)',
+                        background: tab === 'mark' ? 'var(--color-accent)' : 'transparent',
+                        color: tab === 'mark' ? 'white' : 'var(--color-text-secondary)',
                         border: 'none', 
                         cursor: 'pointer', 
-                        transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                        transition: 'all 0.3s ease',
                         display: 'flex', 
                         alignItems: 'center', 
                         gap: '10px',
-                        boxShadow: tab === 'mark' ? '0 8px 15px -3px rgba(59, 130, 246, 0.4)' : 'none'
+                        flex: '1',
+                        minWidth: '160px',
+                        justifyContent: 'center'
                     }}
                 >
                     <LayoutGrid size={18} /> Mark Attendance
                 </button>
                 <button 
-                    className={`nav-tab ${tab === 'history' ? 'active' : ''}`} 
+                    className={`tab ${tab === 'history' ? 'active' : ''}`} 
                     onClick={() => setTab('history')}
                     style={{ 
-                        padding: '12px 28px', 
+                        padding: '12px 24px', 
                         borderRadius: '12px', 
                         fontSize: '14px', 
                         fontWeight: 800, 
-                        background: tab === 'history' ? 'var(--color-primary)' : 'transparent',
-                        color: tab === 'history' ? 'white' : 'var(--color-text-muted)',
+                        background: tab === 'history' ? 'var(--color-accent)' : 'transparent',
+                        color: tab === 'history' ? 'white' : 'var(--color-text-secondary)',
                         border: 'none', 
                         cursor: 'pointer', 
-                        transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                        transition: 'all 0.3s ease',
                         display: 'flex', 
                         alignItems: 'center', 
                         gap: '10px',
-                        boxShadow: tab === 'history' ? '0 8px 15px -3px rgba(59, 130, 246, 0.4)' : 'none'
+                        flex: '1',
+                        minWidth: '160px',
+                        justifyContent: 'center'
                     }}
                 >
-                    <History size={18} /> Past Attendance
+                    <History size={18} /> Past Records
                 </button>
             </div>
 

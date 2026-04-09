@@ -13,10 +13,29 @@ export default function AdminPanel() {
     const [loading, setLoading] = useState(true);
     const [tab, setTab] = useState('pending');
     const [isMigrating, setIsMigrating] = useState(false);
+    const [dbStats, setDbStats] = useState({ total: 0, owned: 0, orphans: 0 });
 
     useEffect(() => {
         loadUsers();
-    }, []);
+        if (isAdmin) loadDiagnostics();
+    }, [currentUser]);
+
+    async function loadDiagnostics() {
+        try {
+            const batchSnap = await getDocs(collection(db, 'batches'));
+            const all = batchSnap.docs.map(d => d.data());
+            const owned = all.filter(b => b.teacherId === currentUser.uid).length;
+            const nested = all.filter(b => !b.teacherId && b.studentIds?.teacherId === currentUser.uid).length;
+            
+            setDbStats({
+                total: all.length,
+                owned: owned + nested,
+                orphans: all.length - (owned + nested)
+            });
+        } catch (err) {
+            console.error('Diag Error:', err);
+        }
+    }
 
     async function loadUsers() {
         try {
@@ -123,9 +142,45 @@ export default function AdminPanel() {
             }
 
             toast.success(`Scan Complete: ${batchCount} batches fixed, ${orphanedCount} orphaned records restored.`, { id: toastId });
+            loadDiagnostics();
         } catch (err) {
             console.error('Deep Sync Error:', err);
             toast.error('Repair process failed. See console for details.', { id: toastId });
+        } finally {
+            setIsMigrating(false);
+        }
+    }
+
+    async function claimAllData() {
+        const msg = `WARNING: This will re-assign ALL ${dbStats.orphans} records in the system to your current ID (${currentUser.uid}). \n\nOnly do this if you are the owner and your ID has changed. Continue?`;
+        if (!confirm(msg)) return;
+        
+        setIsMigrating(true);
+        const toastId = toast.loading('Re-assigning ownership...');
+        try {
+            let count = 0;
+            const collections = ['batches', 'students', 'exams', 'attendance', 'homeworks', 'lessons', 'schedules', 'sessionLogs'];
+            
+            for (const collName of collections) {
+                const snap = await getDocs(query(collection(db, collName)));
+                for (const d of snap.docs) {
+                    const data = d.data();
+                    // If it's not mine, OR it has nested teacherId that is mine but not top level
+                    if (data.teacherId !== currentUser.uid || (!data.teacherId && data.studentIds?.teacherId === currentUser.uid)) {
+                        await updateDoc(doc(db, collName, d.id), { 
+                            teacherId: currentUser.uid,
+                            // Also fix nested subject/etc if in batches
+                            ...(collName === 'batches' && !data.subject && data.studentIds?.subject ? { subject: data.studentIds.subject } : {})
+                        });
+                        count++;
+                    }
+                }
+            }
+            toast.success(`Success! ${count} records are now assigned to you.`, { id: toastId });
+            loadDiagnostics();
+        } catch (err) {
+            console.error('Claim Error:', err);
+            toast.error('Ownership transfer failed');
         } finally {
             setIsMigrating(false);
         }
@@ -295,11 +350,40 @@ export default function AdminPanel() {
                                 </button>
                             </div>
 
-                            <div style={{ marginTop: '32px', padding: '20px', borderRadius: '12px', background: 'rgba(239, 68, 68, 0.05)', display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
-                                <ShieldAlert size={20} style={{ color: '#ef4444', marginTop: '2px' }} />
-                                <div>
-                                    <div style={{ fontWeight: 900, fontSize: '14px', color: '#ef4444', marginBottom: '4px' }}>DANGER ZONE</div>
-                                    <p style={{ fontSize: '13px', color: '#ef4444', opacity: 0.8, fontWeight: 600 }}>This operation changes many records at once. Make sure you don't have other windows open while running this to avoid errors.</p>
+                            <div style={{ marginTop: '32px', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+                                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '16px', textAlign: 'center', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                    <div style={{ fontSize: '10px', fontWeight: 900, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>Global Records</div>
+                                    <div style={{ fontSize: '24px', fontWeight: 900 }}>{dbStats.total}</div>
+                                </div>
+                                <div style={{ background: 'rgba(16, 185, 129, 0.05)', padding: '20px', borderRadius: '16px', textAlign: 'center', border: '1px solid rgba(16, 185, 129, 0.1)' }}>
+                                    <div style={{ fontSize: '10px', fontWeight: 900, color: '#10b981', textTransform: 'uppercase', marginBottom: '8px' }}>Your Records</div>
+                                    <div style={{ fontSize: '24px', fontWeight: 900, color: '#10b981' }}>{dbStats.owned}</div>
+                                </div>
+                                <div style={{ background: 'rgba(239, 68, 68, 0.05)', padding: '20px', borderRadius: '16px', textAlign: 'center', border: '1px solid rgba(239, 68, 68, 0.1)' }}>
+                                    <div style={{ fontSize: '10px', fontWeight: 900, color: '#ef4444', textTransform: 'uppercase', marginBottom: '8px' }}>Other/Orphaned</div>
+                                    <div style={{ fontSize: '24px', fontWeight: 900, color: '#ef4444' }}>{dbStats.orphans}</div>
+                                </div>
+                            </div>
+
+                            <div style={{ marginTop: '32px', padding: '24px', borderRadius: '16px', background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.1)' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                                        <div style={{ background: '#ef4444', color: 'white', padding: '10px', borderRadius: '12px' }}>
+                                            <ShieldAlert size={20} />
+                                        </div>
+                                        <div>
+                                            <div style={{ fontWeight: 900, fontSize: '15px', color: '#ef4444', marginBottom: '2px' }}>Ownership Recovery</div>
+                                            <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', fontWeight: 600 }}>If your User ID changed, use this to re-claim all data in the system.</p>
+                                        </div>
+                                    </div>
+                                    <button 
+                                        className="btn btn-primary" 
+                                        onClick={claimAllData}
+                                        disabled={isMigrating || dbStats.orphans === 0}
+                                        style={{ background: '#ef4444', border: 'none', boxShadow: '0 8px 20px rgba(239, 68, 68, 0.2)', padding: '0 24px', height: '44px', fontWeight: 900, fontSize: '12px' }}
+                                    >
+                                        CLAIM ALL SYSTEM DATA
+                                    </button>
                                 </div>
                             </div>
                         </div>

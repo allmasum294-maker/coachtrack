@@ -114,22 +114,13 @@ export default function Sidebar({ mobileOpen, setMobileOpen }) {
 
             <aside
                 className={`sidebar ${collapsed ? 'collapsed' : ''} ${mobileOpen ? 'mobile-open' : ''}`}
-                style={{ 
-                    background: 'rgba(15, 23, 42, 0.3)', 
-                    backdropFilter: 'blur(30px)',
-                    borderRight: '1px solid rgba(255, 255, 255, 0.05)'
-                }}
             >
                 {/* Brand */}
-                <div className="sidebar-brand" style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)', padding: '24px 20px' }}>
-                    <div className="sidebar-brand-logo" style={{ 
-                        background: 'linear-gradient(135deg, var(--color-accent), #0f766e)',
-                        boxShadow: '0 0 20px rgba(20, 184, 166, 0.4)',
-                        width: '40px', height: '40px', borderRadius: '12px'
-                    }}>CT</div>
+                <div className="sidebar-brand">
+                    <div className="sidebar-brand-logo">CT</div>
                     {!collapsed && (
-                        <div className="sidebar-brand-text" style={{ fontSize: '20px', letterSpacing: '-0.02em' }}>
-                            Coach<span style={{ color: 'var(--color-accent)' }}>Track</span>
+                        <div className="sidebar-brand-text">
+                            Coach<span>Track</span>
                         </div>
                     )}
                     {/* Mobile close button */}
@@ -167,11 +158,11 @@ export default function Sidebar({ mobileOpen, setMobileOpen }) {
                             {getInitials(userProfile?.displayName || currentUser?.displayName)}
                         </div>
                         {!collapsed && (
-                            <div className="sidebar-user-info" style={{ flex: 1, minWidth: 0 }}>
-                                <div className="sidebar-user-name" style={{ fontWeight: 700 }}>
+                            <div className="sidebar-user-info">
+                                <div className="sidebar-user-name">
                                     {userProfile?.displayName || currentUser?.displayName || 'User'}
                                 </div>
-                                <div className="sidebar-user-role" style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-accent)', fontWeight: 800 }}>
+                                <div className="sidebar-user-role">
                                     {userProfile?.role === 'admin' ? 'Administrator' : 'Teacher'}
                                 </div>
                             </div>
@@ -187,7 +178,7 @@ export default function Sidebar({ mobileOpen, setMobileOpen }) {
                         </button>
                         <button
                             className="btn btn-ghost btn-icon"
-                            style={{ flex: 1, background: 'var(--color-bg-glass)', color: 'var(--color-danger)' }}
+                            style={{ flex: 1, background: 'rgba(255, 255, 255, 0.05)', color: 'var(--color-danger)' }}
                             onClick={handleLogout}
                             title="Logout"
                         >

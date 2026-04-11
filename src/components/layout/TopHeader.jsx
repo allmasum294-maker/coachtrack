@@ -17,40 +17,35 @@ export default function TopHeader({ onMenuClick }) {
     };
 
     return (
-        <header className="app-header" style={{ 
-            borderBottom: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: 0,
-            background: 'rgba(15, 23, 42, 0.3)',
-            backdropFilter: 'blur(30px)',
-            position: 'sticky', top: 0, zIndex: 90
-        }}>
+        <header className="app-header">
             <div className="header-left">
                 <button 
                     className="sidebar-toggle btn btn-ghost btn-icon" 
                     onClick={onMenuClick}
-                    style={{ marginRight: '12px' }}
                 >
                     <Menu size={22} />
                 </button>
                 <div className="header-breadcrumb">
                     <span>App</span>
-                    <span style={{ opacity: 0.5 }}>/</span>
+                    <span style={{ opacity: 0.3 }}>/</span>
                     <span style={{ fontWeight: 800, color: 'var(--color-text-primary)' }}>{getTitle(location.pathname)}</span>
                 </div>
             </div>
 
             <div className="header-right">
-                <div className="desktop-only" style={{ position: 'relative', marginRight: '16px' }}>
-                    <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', opacity: 0.4 }} />
+                <div className="desktop-only" style={{ position: 'relative', marginRight: 'var(--space-4)' }}>
+                    <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', opacity: 0.4 }} />
                     <input 
                         type="text" 
-                        placeholder="Search..." 
+                        placeholder="Search Command..." 
                         style={{ 
-                            padding: '8px 12px 8px 36px', 
-                            background: 'rgba(255,255,255,0.05)', 
-                            border: '1px solid var(--color-border)',
-                            borderRadius: '10px',
+                            padding: '10px 12px 10px 38px', 
+                            background: 'rgba(255,255,255,0.03)', 
+                            border: '1px solid rgba(255,255,255,0.08)',
+                            borderRadius: '12px',
                             fontSize: '13px',
-                            width: '200px'
+                            width: '240px',
+                            color: 'white'
                         }} 
                     />
                 </div>
@@ -64,12 +59,13 @@ export default function TopHeader({ onMenuClick }) {
                     <span style={{ 
                         position: 'absolute', top: '8px', right: '8px', 
                         width: '8px', height: '8px', background: 'var(--color-danger)', 
-                        borderRadius: '50%', border: '2px solid var(--color-bg-secondary)' 
+                        borderRadius: '50%', border: '2px solid rgba(15, 23, 42, 1)',
+                        boxShadow: '0 0 10px rgba(239, 68, 68, 0.4)'
                     }} />
                 </button>
 
-                <div className="mobile-only" style={{ marginLeft: '8px' }}>
-                    <div className="sidebar-avatar" style={{ width: '32px', height: '32px', fontSize: '12px' }}>
+                <div className="mobile-only" style={{ marginLeft: 'var(--space-2)' }}>
+                    <div className="sidebar-avatar" style={{ width: '32px', height: '32px', fontSize: '11px' }}>
                         {userProfile?.display_name?.charAt(0) || 'U'}
                     </div>
                 </div>

@@ -32,11 +32,10 @@ export default function Homework() {
     const [editingAssignment, setEditingAssignment] = useState(null);
     const [form, setForm] = useState({
         title: '',
-        description: '',
         batchId: '',
-        targetSchoolId: '',
         dueDate: format(new Date(), 'yyyy-MM-dd'),
         sessionLogId: '',
+        variants: [{ schoolId: '', description: '' }]
     });
 
     const [trackingAssignment, setTrackingAssignment] = useState(null);
@@ -94,8 +93,9 @@ export default function Homework() {
     function openCreate() {
         setEditingAssignment(null);
         setForm({
-            title: '', description: '', batchId: filterBatch, targetSchoolId: '',
+            title: '', batchId: filterBatch, 
             dueDate: format(new Date(), 'yyyy-MM-dd'), sessionLogId: '',
+            variants: [{ schoolId: '', description: '' }]
         });
         setShowModal(true);
     }
@@ -104,11 +104,10 @@ export default function Homework() {
         setEditingAssignment(hw);
         setForm({
             title: hw.title || '',
-            description: hw.description || '',
             batchId: hw.batch_id || '',
-            targetSchoolId: hw.target_school_id || '',
             dueDate: hw.due_date || '',
             sessionLogId: hw.session_log_id || '',
+            variants: [{ schoolId: hw.target_school_id || '', description: hw.description || '' }]
         });
         setShowModal(true);
     }
@@ -116,23 +115,41 @@ export default function Homework() {
     async function handleSave(e) {
         e.preventDefault();
         try {
-            const data = {
-                title: form.title,
-                description: form.description,
-                batch_id: form.batchId,
-                target_school_id: form.targetSchoolId || null,
-                due_date: form.dueDate,
-                session_log_id: form.sessionLogId || null,
-                teacher_id: userProfile.id,
-            };
-
             if (editingAssignment) {
-                data.id = editingAssignment.id;
+                // For editing, we only update the single currently opened card
+                const variant = form.variants[0];
+                const data = {
+                    id: editingAssignment.id,
+                    title: form.title,
+                    description: variant.description,
+                    batch_id: form.batchId,
+                    target_school_id: variant.schoolId || null,
+                    due_date: form.dueDate,
+                    session_log_id: form.sessionLogId || null,
+                    teacher_id: userProfile.id,
+                };
                 await homeworkService.saveHomework(data);
                 toast.success('Assignment updated!');
             } else {
-                await homeworkService.saveHomework(data);
-                toast.success('Assignment created!');
+                // For new assignments, loop through variants and create separate records
+                const baseData = {
+                    title: form.title,
+                    batch_id: form.batchId,
+                    due_date: form.dueDate,
+                    session_log_id: form.sessionLogId || null,
+                    teacher_id: userProfile.id,
+                };
+
+                const promises = form.variants.map(v => 
+                    homeworkService.saveHomework({
+                        ...baseData,
+                        description: v.description,
+                        target_school_id: v.schoolId || null
+                    })
+                );
+
+                await Promise.all(promises);
+                toast.success(`Created ${form.variants.length} assignment variants!`);
             }
             setShowModal(false);
             loadData();
@@ -212,7 +229,7 @@ export default function Homework() {
             </div>
 
             <div className="glass-card" style={{ padding: 'var(--space-5)', marginBottom: 'var(--space-8)', display: 'flex', gap: 'var(--space-3)', alignItems: 'center' }}>
-                <div style={{ padding: '8px', background: 'var(--color-primary-light)', borderRadius: '10px', color: 'var(--color-primary)' }}>
+                <div style={{ padding: '8px', background: 'var(--color-accent-soft)', borderRadius: '10px', color: 'var(--color-accent)' }}>
                     <Filter size={18} />
                 </div>
                 <div style={{ flex: 1, maxWidth: '300px' }}>
@@ -235,10 +252,10 @@ export default function Homework() {
             ) : (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 'var(--space-6)' }}>
                     {filteredAssignments.map(hw => {
-                        const status = getDueDateStatus(hw.dueDate);
+                        const status = getDueDateStatus(hw.due_date);
                         const stats = getSubmissionStats(hw);
                         const progPerc = stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0;
-                        const linkedLog = getSessionLogInfo(hw.sessionLogId);
+                        const linkedLog = getSessionLogInfo(hw.session_log_id);
 
                         return (
                             <div key={hw.id} className="glass-card" style={{ padding: 'var(--space-6)', display: 'flex', flexDirection: 'column' }}>
@@ -253,13 +270,13 @@ export default function Homework() {
                                     </div>
                                 </div>
 
-                                <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '4px', color: 'var(--color-text)' }}>{hw.title}</h3>
+                                <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '4px', color: 'var(--color-text-primary)' }}>{hw.title}</h3>
                                 <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-4)', fontWeight: 500 }}>
-                                    {getBatchName(hw.batchId)}
+                                    {getBatchName(hw.batch_id)}
                                 </div>
 
                                 {linkedLog && (
-                                    <div style={{ fontSize: '12px', color: 'var(--color-primary)', background: 'var(--color-primary-light)', padding: '8px 12px', borderRadius: '8px', marginBottom: 'var(--space-4)', display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                                    <div style={{ fontSize: '12px', color: 'var(--color-accent)', background: 'rgba(20, 184, 166, 0.1)', padding: '8px 12px', borderRadius: '8px', marginBottom: 'var(--space-4)', display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
                                         <FileEdit size={14} style={{ marginTop: '1px' }} />
                                         <span>
                                             Linked to class: <strong>{linkedLog.topicsCovered}</strong>
@@ -268,7 +285,7 @@ export default function Homework() {
                                 )}
 
                                 {hw.description && (
-                                    <p style={{ color: 'var(--color-text-muted)', fontSize: '14px', marginBottom: 'var(--space-6)', flex: 1, lineHeight: 1.5 }}>
+                                    <p style={{ color: 'var(--color-text-secondary)', fontSize: '14px', marginBottom: 'var(--space-6)', flex: 1, lineHeight: 1.5 }}>
                                         {hw.description}
                                     </p>
                                 )}
@@ -284,7 +301,7 @@ export default function Homework() {
                                             <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Late</div>
                                         </div>
                                         <div>
-                                            <div style={{ fontSize: '16px', fontWeight: 800, color: 'var(--color-primary)' }}>{stats.partial}</div>
+                                            <div style={{ fontSize: '16px', fontWeight: 800, color: 'var(--color-accent)' }}>{stats.partial}</div>
                                             <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Part</div>
                                         </div>
                                         <div>
@@ -297,12 +314,12 @@ export default function Homework() {
                                 <div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: 600, marginBottom: '8px' }}>
                                         <span style={{ color: 'var(--color-text-secondary)' }}>Class Progress</span>
-                                        <span style={{ color: 'var(--color-text)' }}>{stats.completed}/{stats.total} students</span>
+                                        <span style={{ color: 'var(--color-text-primary)' }}>{stats.completed}/{stats.total} students</span>
                                     </div>
                                     <div className="progress-bar" style={{ height: 10, background: 'rgba(255,255,255,0.05)', marginBottom: 'var(--space-6)' }}>
                                         <div className="progress-bar-fill" style={{ 
                                             width: `${progPerc}%`, 
-                                            background: progPerc === 100 ? 'var(--color-success)' : 'var(--color-primary)',
+                                            background: progPerc === 100 ? 'var(--color-success)' : 'var(--color-accent)',
                                             boxShadow: progPerc > 0 ? '0 0 10px rgba(20, 184, 166, 0.3)' : 'none'
                                         }} />
                                     </div>
@@ -329,7 +346,7 @@ export default function Homework() {
                         <input className="form-input" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} required placeholder="e.g. Chapter 4 Exercises" />
                     </div>
                     
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-4)', marginBottom: 'var(--space-4)' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)', marginBottom: 'var(--space-4)' }}>
                         <div className="form-group">
                             <label className="form-label">Batch <span style={{ color: 'var(--color-danger)' }}>*</span></label>
                             <select className="form-select" value={form.batchId} onChange={e => setForm({ ...form, batchId: e.target.value, sessionLogId: '' })} required>
@@ -338,27 +355,84 @@ export default function Homework() {
                             </select>
                         </div>
                         <div className="form-group">
-                            <label className="form-label">Target School</label>
-                            <select className="form-select" value={form.targetSchoolId} onChange={e => setForm({ ...form, targetSchoolId: e.target.value })}>
-                                <option value="">All Schools</option>
-                                {schools.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                            </select>
-                            <span style={{ fontSize: '9px', color: 'var(--color-text-muted)' }}>Optional filter</span>
-                        </div>
-                        <div className="form-group">
                             <label className="form-label">Due Date <span style={{ color: 'var(--color-danger)' }}>*</span></label>
                             <input type="date" className="form-input" value={form.dueDate} onChange={e => setForm({ ...form, dueDate: e.target.value })} required />
                         </div>
                     </div>
 
+                    {/* Unified Multi-Target Variant List */}
+                    <div style={{ marginBottom: 'var(--space-6)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                            <label className="form-label" style={{ marginBottom: 0 }}>School Tasks & Targeting</label>
+                            {!editingAssignment && (
+                                <button 
+                                    type="button" 
+                                    onClick={() => setForm(f => ({ ...f, variants: [...f.variants, { schoolId: '', description: '' }] }))}
+                                    style={{ fontSize: '11px', color: 'var(--color-accent)', background: 'rgba(20, 184, 166, 0.1)', border: 'none', padding: '4px 8px', borderRadius: '6px', cursor: 'pointer', fontWeight: 700 }}
+                                >
+                                    + ADD SCHOOL VARIANT
+                                </button>
+                            )}
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            {form.variants.map((v, idx) => (
+                                <div key={idx} className="glass-panel" style={{ padding: '16px', background: 'rgba(255,255,255,0.02)', borderStyle: 'dashed' }}>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '12px', marginBottom: '12px' }}>
+                                        <div className="form-group">
+                                            <label className="form-label" style={{ fontSize: '10px' }}>Target School</label>
+                                            <select 
+                                                className="form-select" 
+                                                value={v.schoolId} 
+                                                onChange={e => {
+                                                    const next = [...form.variants];
+                                                    next[idx].schoolId = e.target.value;
+                                                    setForm({ ...form, variants: next });
+                                                }}
+                                                style={{ height: '38px', fontSize: '12px' }}
+                                            >
+                                                <option value="">{form.variants.length > 1 ? 'Select School' : 'All Schools'}</option>
+                                                {schools.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                            </select>
+                                        </div>
+                                        {!editingAssignment && form.variants.length > 1 && (
+                                            <button 
+                                                type="button" 
+                                                className="btn btn-ghost btn-icon" 
+                                                onClick={() => setForm(f => ({ ...f, variants: f.variants.filter((_, i) => i !== idx) }))}
+                                                style={{ marginTop: '20px', color: 'var(--color-danger)' }}
+                                            >
+                                                <X size={14} />
+                                            </button>
+                                        )}
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label" style={{ fontSize: '10px' }}>Instructions for this target</label>
+                                        <textarea 
+                                            className="form-textarea" 
+                                            rows={2} 
+                                            value={v.description} 
+                                            onChange={e => {
+                                                const next = [...form.variants];
+                                                next[idx].description = e.target.value;
+                                                setForm({ ...form, variants: next });
+                                            }}
+                                            placeholder="What should this specific group do?"
+                                            style={{ fontSize: '13px' }}
+                                        />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
                     {form.batchId && (
-                        <div className="form-group" style={{ marginBottom: 'var(--space-4)' }}>
+                        <div className="form-group" style={{ marginBottom: 'var(--space-6)' }}>
                             <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <FileEdit size={14} className="text-primary" /> 
                                 Link to Class Session
-                                <span style={{ fontSize: '10px', fontWeight: 500, color: 'var(--color-text-muted)', marginLeft: 'auto' }}>Optional</span>
                             </label>
-                            <select className="form-select" value={form.sessionLogId} onChange={e => setForm({ ...form, sessionLogId: e.target.value })} style={{ borderStyle: 'dashed' }}>
+                            <select className="form-select" value={form.sessionLogId} onChange={e => setForm({ ...form, sessionLogId: e.target.value })} style={{ borderStyle: 'dashed', fontSize: '13px' }}>
                                 <option value="">— No session link —</option>
                                 {sessionLogs
                                     .filter(l => l.batchId === form.batchId)
@@ -379,15 +453,10 @@ export default function Homework() {
                         </div>
                     )}
 
-                    <div className="form-group" style={{ marginBottom: 'var(--space-6)' }}>
-                        <label className="form-label">Description / Instructions</label>
-                        <textarea className="form-textarea" rows={3} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Write down what exactly needs to be done..." />
-                    </div>
-
                     <div style={{ display: 'flex', gap: '12px' }}>
                         <button type="button" className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setShowModal(false)}>Cancel</button>
                         <button type="submit" className="btn btn-primary" style={{ flex: 2, boxShadow: 'var(--shadow-primary)' }}>
-                            {editingAssignment ? 'Update Assignment' : 'Create Assignment'}
+                            {editingAssignment ? 'Update Details' : 'Deploy Multi-Target Assignment'}
                         </button>
                     </div>
                 </form>
@@ -403,11 +472,11 @@ export default function Homework() {
                 {trackingAssignment && (
                     <div style={{ padding: '4px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: 'var(--space-6)', padding: '12px', background: 'var(--color-bg-elevated)', borderRadius: '12px' }}>
-                            <div style={{ width: '40px', height: '40px', background: 'var(--color-primary-light)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-primary)' }}>
+                            <div style={{ width: '40px', height: '40px', background: 'var(--color-accent-soft)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-accent)' }}>
                                 <Users size={20} />
                             </div>
                             <div>
-                                <div style={{ fontSize: '14px', fontWeight: 700 }}>{getBatchName(trackingAssignment.batchId)}</div>
+                                <div style={{ fontSize: '14px', fontWeight: 700 }}>{getBatchName(trackingAssignment.batch_id)}</div>
                                 <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>Work status for students in this batch</div>
                             </div>
                         </div>

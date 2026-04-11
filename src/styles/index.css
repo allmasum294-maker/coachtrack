@@ -5,23 +5,27 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 
 :root {
-  /* Colors — Dark Navy + Teal/Gold Theme */
-  --color-bg-primary: #0a0f1e;
-  --color-bg-secondary: #111827;
-  --color-bg-card: #1a2235;
-  --color-bg-card-hover: #1f2a40;
-  --color-bg-elevated: #243049;
-  --color-bg-input: #1e293b;
-  --color-bg-overlay: rgba(0, 0, 0, 0.6);
+  /* Colors — Aurora Midnight Theme */
+  --color-bg-primary: #020617;
+  --color-bg-secondary: #0f172a;
+  --color-bg-card: rgba(15, 23, 42, 0.4);
+  --color-bg-card-hover: rgba(30, 41, 59, 0.6);
+  --color-bg-elevated: #1e293b;
+  --color-bg-input: rgba(15, 23, 42, 0.6);
+  --color-bg-overlay: rgba(2, 6, 23, 0.85);
 
   --color-accent: #14b8a6;
   --color-accent-hover: #0d9488;
-  --color-accent-soft: rgba(20, 184, 166, 0.15);
-  --color-accent-glow: rgba(20, 184, 166, 0.4);
+  --color-accent-soft: rgba(20, 184, 166, 0.1);
+  --color-accent-glow: rgba(20, 184, 166, 0.5);
+
+  --color-aurora-teal: #14b8a6;
+  --color-aurora-indigo: #6366f1;
+  --color-aurora-purple: #a855f7;
 
   --color-gold: #f59e0b;
   --color-gold-hover: #d97706;
-  --color-gold-soft: rgba(245, 158, 11, 0.15);
+  --color-gold-soft: rgba(245, 158, 11, 0.1);
 
   --color-text-primary: #f1f5f9;
   --color-text-secondary: #94a3b8;
@@ -42,9 +46,9 @@
   --color-info-soft: rgba(59, 130, 246, 0.15);
 
   /* Glassmorphism Variables — Dark Mode Defaults */
-  --color-bg-glass: rgba(17, 24, 39, 0.7);
-  --color-border-glass: rgba(255, 255, 255, 0.08);
-  --color-bg-glass-hover: rgba(31, 41, 55, 0.85);
+  --color-bg-glass: rgba(15, 23, 42, 0.4);
+  --color-border-glass: rgba(255, 255, 255, 0.05);
+  --color-bg-glass-hover: rgba(30, 41, 59, 0.7);
 
   /* Typography */
   --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -270,28 +274,56 @@ img {
    ============================================ */
 .glass-panel {
   background: var(--color-bg-glass);
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(40px) saturate(150%);
+  -webkit-backdrop-filter: blur(40px) saturate(150%);
   border: 1px solid var(--color-border-glass);
-  box-shadow: var(--shadow-xl);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
   border-radius: var(--radius-xl);
 }
 
 .glass-card {
   background: var(--color-bg-glass);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--color-border-glass);
-  box-shadow: var(--shadow-md);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
   transition: all var(--transition-base);
   border-radius: var(--radius-lg);
 }
 
 .glass-card:hover {
   background: var(--color-bg-glass-hover);
-  border-color: var(--color-accent);
-  box-shadow: var(--shadow-lg);
-  transform: translateY(-4px);
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4), var(--shadow-glow);
+  transform: translateY(-6px);
+}
+
+.aurora-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -10;
+  background: #020617;
+  overflow: hidden;
+}
+
+.aurora-blob {
+  position: absolute;
+  width: 60vw;
+  height: 60vw;
+  filter: blur(100px);
+  opacity: 0.15;
+  border-radius: 50%;
+  z-index: -1;
+  animation: blob-drift 20s infinite alternate;
+}
+
+.aurora-1 { background: var(--color-aurora-teal); top: -10%; left: -10%; animation-delay: 0s; }
+.aurora-2 { background: var(--color-aurora-indigo); bottom: -10%; right: -10%; animation-delay: -5s; }
+.aurora-3 { background: var(--color-aurora-purple); top: 30%; left: 40%; animation-delay: -10s; }
+
+@keyframes blob-drift {
+  from { transform: translate(0, 0) scale(1); }
+  to { transform: translate(10%, 10%) scale(1.1); }
 }
 
 .list-item-hover {
@@ -302,14 +334,16 @@ img {
   background: rgba(255, 255, 255, 0.03);
 }
 
-[data-theme="light"] .glass-panel {
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+[data-theme="light"] {
+  --color-bg-primary: #f8fafc;
+  --color-bg-glass: rgba(255, 255, 255, 0.6);
+  --color-border-glass: rgba(0, 0, 0, 0.05);
 }
 
-[data-theme="light"] .glass-card {
-  background: rgba(255, 255, 255, 0.5);
-  backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.4);
+[data-theme="light"] .aurora-bg {
+  background: #f8fafc;
+}
+
+[data-theme="light"] .aurora-blob {
+  opacity: 0.05;
 }

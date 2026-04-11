@@ -27,9 +27,9 @@
 }
 
 .btn-primary {
-    background: linear-gradient(135deg, var(--color-accent), #0d9488);
+    background: linear-gradient(135deg, var(--color-accent), #0f766e);
     color: white;
-    box-shadow: var(--shadow-sm);
+    box-shadow: 0 4px 14px 0 rgba(20, 184, 166, 0.39);
 }
 
 .btn-primary:hover:not(:disabled) {
@@ -71,13 +71,14 @@
 
 .btn-gold {
     background: linear-gradient(135deg, var(--color-gold), #d97706);
-    color: var(--color-text-inverse);
+    color: white;
+    box-shadow: 0 4px 14px 0 rgba(245, 158, 11, 0.3);
 }
 
 .btn-gold:hover:not(:disabled) {
     background: linear-gradient(135deg, #d97706, #b45309);
-    box-shadow: var(--shadow-gold-glow);
-    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(245, 158, 11, 0.5);
+    transform: translateY(-2px);
 }
 
 .btn-sm {
@@ -288,14 +289,16 @@
 }
 
 .modal {
-    background: var(--color-bg-card);
-    border: 1px solid var(--color-border-glass);
+    background: rgba(15, 23, 42, 0.8);
+    backdrop-filter: blur(32px);
+    -webkit-backdrop-filter: blur(32px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: var(--radius-xl);
     width: 100%;
     max-width: 560px;
     max-height: 90vh;
     overflow-y: auto;
-    box-shadow: var(--shadow-xl);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
     animation: scaleIn var(--transition-base) ease;
 }
 

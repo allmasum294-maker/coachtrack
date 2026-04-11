@@ -113,16 +113,23 @@ export default function Sidebar({ mobileOpen, setMobileOpen }) {
             />
 
             <aside
-                className={`sidebar ${collapsed ? 'collapsed' : ''} ${mobileOpen ? 'mobile-open' : ''} glass-panel`}
+                className={`sidebar ${collapsed ? 'collapsed' : ''} ${mobileOpen ? 'mobile-open' : ''}`}
+                style={{ 
+                    background: 'rgba(15, 23, 42, 0.3)', 
+                    backdropFilter: 'blur(30px)',
+                    borderRight: '1px solid rgba(255, 255, 255, 0.05)'
+                }}
             >
                 {/* Brand */}
-                <div className="sidebar-brand" style={{ borderBottom: '1px solid var(--color-border-glass)' }}>
+                <div className="sidebar-brand" style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)', padding: '24px 20px' }}>
                     <div className="sidebar-brand-logo" style={{ 
-                        background: 'linear-gradient(135deg, var(--color-accent), #0d9488)',
+                        background: 'linear-gradient(135deg, var(--color-accent), #0f766e)',
+                        boxShadow: '0 0 20px rgba(20, 184, 166, 0.4)',
+                        width: '40px', height: '40px', borderRadius: '12px'
                     }}>CT</div>
                     {!collapsed && (
-                        <div className="sidebar-brand-text">
-                            Coach<span>Track</span>
+                        <div className="sidebar-brand-text" style={{ fontSize: '20px', letterSpacing: '-0.02em' }}>
+                            Coach<span style={{ color: 'var(--color-accent)' }}>Track</span>
                         </div>
                     )}
                     {/* Mobile close button */}

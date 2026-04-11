@@ -27,8 +27,10 @@
 /* --- Header --- */
 .app-header {
     height: var(--header-height);
-    background: var(--color-bg-secondary);
-    border-bottom: 1px solid var(--color-border);
+    background: var(--color-bg-glass);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border-bottom: 1px solid var(--color-border-glass);
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -69,8 +71,10 @@
     top: 0;
     bottom: 0;
     width: var(--sidebar-width);
-    background: var(--color-bg-secondary);
-    border-right: 1px solid var(--color-border);
+    background: var(--color-bg-glass);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border-right: 1px solid var(--color-border-glass);
     display: flex;
     flex-direction: column;
     z-index: 100;
@@ -88,7 +92,7 @@
     align-items: center;
     gap: var(--space-3);
     padding: var(--space-5) var(--space-5);
-    border-bottom: 1px solid var(--color-border);
+    border-bottom: 1px solid var(--color-border-glass);
     min-height: var(--header-height);
 }
 
@@ -196,7 +200,7 @@
 
 .sidebar-footer {
     padding: var(--space-4) var(--space-3);
-    border-top: 1px solid var(--color-border);
+    border-top: 1px solid var(--color-border-glass);
 }
 
 .sidebar-user {

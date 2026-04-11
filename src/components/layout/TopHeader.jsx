@@ -17,10 +17,10 @@ export default function TopHeader({ onMenuClick }) {
     };
 
     return (
-        <header className="app-header glass-panel" style={{ 
-            borderLeft: 'none', borderRight: 'none', borderTop: 'none', borderRadius: 0,
-            background: 'var(--color-bg-glass)',
-            backdropFilter: 'blur(10px)',
+        <header className="app-header" style={{ 
+            borderBottom: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: 0,
+            background: 'rgba(15, 23, 42, 0.3)',
+            backdropFilter: 'blur(30px)',
             position: 'sticky', top: 0, zIndex: 90
         }}>
             <div className="header-left">

@@ -126,28 +126,63 @@ export function AuthProvider({ children }) {
     }
 
     useEffect(() => {
-        // Initial session check
-        supabase.auth.getSession().then(({ data: { session } }) => {
-            const user = session?.user ?? null;
-            setCurrentUser(user);
-            fetchUserProfile(user).finally(() => setLoading(false));
-        });
-
-        // Listen for auth changes
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-            const user = session?.user ?? null;
-            setCurrentUser(user);
-            
-            if (event === 'SIGNED_IN' || event === 'USER_UPDATED' || event === 'INITIAL_SESSION') {
-                await fetchUserProfile(user);
-            } else if (event === 'SIGNED_OUT') {
-                setUserProfile(null);
+        let isMounted = true;
+        
+        // Safety timeout to prevent infinite spinner
+        const safetyTimeout = setTimeout(() => {
+            if (isMounted) {
+                console.warn('Auth initialization taking too long, forcing loading to false');
+                setLoading(false);
             }
+        }, 3000);
+
+        async function initAuth() {
+            try {
+                // 1. Get initial session
+                const { data: { session } } = await supabase.auth.getSession();
+                const user = session?.user ?? null;
+                
+                if (isMounted) {
+                    setCurrentUser(user);
+                    if (user) {
+                        await fetchUserProfile(user);
+                    }
+                }
+            } catch (err) {
+                console.error('Auth initialization error:', err);
+            } finally {
+                if (isMounted) {
+                    setLoading(false);
+                    clearTimeout(safetyTimeout);
+                }
+            }
+        }
+
+        initAuth();
+
+        // 2. Listen for auth changes
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+            console.log('Auth event:', event);
+            const user = session?.user ?? null;
             
-            setLoading(false);
+            if (isMounted) {
+                setCurrentUser(user);
+                
+                if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
+                    await fetchUserProfile(user);
+                } else if (event === 'SIGNED_OUT') {
+                    setUserProfile(null);
+                }
+                
+                setLoading(false);
+            }
         });
 
-        return () => subscription.unsubscribe();
+        return () => {
+            isMounted = false;
+            subscription.unsubscribe();
+            clearTimeout(safetyTimeout);
+        };
     }, []);
 
     const value = {

@@ -72,9 +72,13 @@ export default function Students() {
 
     function openCreate() {
         setEditingStudent(null);
+        // Pre-fill from memory to avoid repetitive typing
+        const lastSchool = localStorage.getItem('last_used_school') || '';
+        const lastGrade = localStorage.getItem('last_used_grade') || '';
+        
         setForm({
             name: '', email: '', phone: '', guardianName: '', guardianPhone: '',
-            school: '', grade: '', address: '', notes: '', batchIds: [], unenrolledBatchIds: [],
+            school: lastSchool, grade: lastGrade, address: '', notes: '', batchIds: [], unenrolledBatchIds: [],
         });
         setShowModal(true);
     }
@@ -108,7 +112,7 @@ export default function Students() {
                 guardian_name: form.guardianName,
                 guardian_phone: form.guardianPhone,
                 school: form.school,
-                grade: parseInt(form.grade) || 0,
+                grade: form.grade, // Keep as string or handle as number based on DB
                 address: form.address,
                 notes: form.notes,
                 teacher_id: userProfile.id,
@@ -123,6 +127,7 @@ export default function Students() {
                     .update(data)
                     .eq('id', studentId);
                 if (error) throw error;
+                toast.success('Student updated');
             } else {
                 const { data: res, error } = await supabase
                     .from('students')
@@ -131,6 +136,11 @@ export default function Students() {
                     .single();
                 if (error) throw error;
                 studentId = res.id;
+                toast.success('Student added');
+                
+                // UX Improvement: Remember the school for the next entry
+                localStorage.setItem('last_used_school', form.school);
+                localStorage.setItem('last_used_grade', form.grade);
             }
 
             // Sync batches
@@ -147,10 +157,9 @@ export default function Students() {
 
             setShowModal(false);
             loadData();
-            setShowSuccessModal(true);
         } catch (err) {
             console.error('Error saving student:', err);
-            toast.error('Could not save student.');
+            toast.error(err.message || 'Could not save student.');
         }
     }
 
@@ -653,7 +662,19 @@ export default function Students() {
                     </div>
                     <div className="form-group">
                         <label className="form-label" style={{ fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', marginBottom: '8px', color: 'var(--color-text-muted)' }}>School Name</label>
-                        <input className="form-input" list="school-suggestions" value={form.school} onChange={(e) => setForm({ ...form, school: e.target.value })} placeholder="School/College name" style={{ height: '48px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)' }} />
+                        <input 
+                            className="form-input" 
+                            list="school-suggestions" 
+                            value={form.school} 
+                            onChange={(e) => setForm({ ...form, school: e.target.value })} 
+                            placeholder="Type to search or add school..." 
+                            style={{ height: '48px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)' }} 
+                        />
+                        <datalist id="school-suggestions">
+                            {schoolSuggestions.map((school, i) => (
+                                <option key={i} value={school} />
+                            ))}
+                        </datalist>
                     </div>
                     
                     <div style={{ marginTop: '12px', padding: '24px', background: 'rgba(255,255,255,0.03)', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.05)' }}>

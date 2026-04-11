@@ -83,45 +83,59 @@ export function AuthProvider({ children }) {
             setUserProfile(null);
             return;
         }
+
+        console.log('[Auth Profile] Fetching for user:', user.id);
+        
+        // Timeout for the query
+        const queryPromise = supabase
+            .from('users')
+            .select('*')
+            .eq('id', user.id)
+            .single();
+
+        const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Profile query timed out')), 5000)
+        );
+
         try {
-            const { data, error } = await supabase
-                .from('users')
-                .select('*')
-                .eq('id', user.id)
-                .single();
+            const { data, error } = await Promise.race([queryPromise, timeoutPromise]);
 
-            if (error && error.code === 'PGRST116') {
-                // Profile not found - create one for OAuth users
-                console.log('Profile missing, creating for OAuth user:', user.email);
-                const metadata = user.user_metadata || {};
-                const newProfile = {
-                    id: user.id,
-                    display_name: metadata.full_name || metadata.display_name || user.email.split('@')[0],
-                    email: user.email,
-                    role: 'tutor',
-                    is_approved: true,
-                    last_login: new Date().toISOString()
-                };
-
-                const { error: insertError } = await supabase
-                    .from('users')
-                    .upsert(newProfile);
-
-                if (insertError) {
-                    console.error('Error creating auto-profile:', insertError);
-                    setUserProfile(null);
-                } else {
+            if (error) {
+                console.error('[Auth Profile] Error:', error.message, error.details);
+                if (error.code === 'PGRST116') { // No profile found
+                    console.log('[Auth Profile] No profile found, creating one...');
+                    const newProfile = {
+                        id: user.id,
+                        email: user.email,
+                        displayName: user.user_metadata?.full_name || user.user_metadata?.name || 'Tutor',
+                        role: 'tutor',
+                        is_approved: true,
+                        created_at: new Date().toISOString()
+                    };
+                    
+                    const { error: insertError } = await supabase.from('users').upsert(newProfile);
+                    if (insertError) {
+                        console.error('[Auth Profile] Insert error:', insertError);
+                        throw insertError;
+                    }
                     setUserProfile(newProfile);
+                } else {
+                    throw error;
                 }
-            } else if (error) {
-                console.error('Error fetching user profile:', error);
-                setUserProfile(null);
             } else {
+                console.log('[Auth Profile] Profile loaded successfully');
                 setUserProfile(data);
             }
         } catch (err) {
-            console.error('Unexpected error fetching user profile:', err);
-            setUserProfile(null);
+            console.error('[Auth Profile] Unexpected error:', err.message);
+            // Fallback: Use minimal profile if DB fails but user is authenticated
+            setUserProfile({
+                id: user.id,
+                email: user.email,
+                displayName: user.user_metadata?.full_name || 'Teacher',
+                role: 'tutor',
+                is_approved: true
+            });
         }
     }
 

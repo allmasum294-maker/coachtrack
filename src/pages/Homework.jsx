@@ -8,6 +8,7 @@ import { batchService } from '../services/batchService';
 import { studentService } from '../services/studentService';
 import { homeworkService } from '../services/homeworkService';
 import { lessonPlanService } from '../services/lessonPlanService';
+import { schoolService } from '../services/schoolService';
 import Modal from '../components/Modal';
 
 const STATUSES = [

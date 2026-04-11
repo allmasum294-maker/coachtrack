@@ -9,6 +9,7 @@ import Papa from 'papaparse';
 import toast from 'react-hot-toast';
 import { studentService } from '../services/studentService';
 import { batchService } from '../services/batchService';
+import { schoolService } from '../services/schoolService';
 import Modal from '../components/Modal';
 
 export default function Students() {

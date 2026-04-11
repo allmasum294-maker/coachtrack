@@ -27,21 +27,24 @@ export function AuthProvider({ children }) {
 
         if (error) throw error;
 
-        // Note: Supabase trigger might handle profile creation, 
-        // but we'll do it manually here if not set up in DB.
+        // Create the profile record immediately
         const profile = {
             id: data.user.id,
             display_name: displayName,
             email: email,
             role: 'tutor',
             is_approved: true,
+            created_at: new Date().toISOString()
         };
 
         const { error: profileError } = await supabase
             .from('users')
             .upsert(profile);
 
-        if (profileError) console.error('Error creating profile:', profileError);
+        if (profileError) {
+            console.error('[Auth Register] Profile creation failed:', profileError);
+            // We don't throw here to avoid blocking registration if the table is still missing
+        }
 
         setUserProfile(profile);
         return data;
@@ -86,7 +89,6 @@ export function AuthProvider({ children }) {
 
         console.log('[Auth Profile] Fetching for user:', user.id);
         
-        // Timeout for the query
         const queryPromise = supabase
             .from('users')
             .select('*')
@@ -101,24 +103,21 @@ export function AuthProvider({ children }) {
             const { data, error } = await Promise.race([queryPromise, timeoutPromise]);
 
             if (error) {
-                console.error('[Auth Profile] Error:', error.message, error.details);
+                console.error('[Auth Profile] Error:', error.message);
                 if (error.code === 'PGRST116') { // No profile found
-                    console.log('[Auth Profile] No profile found, creating one...');
-                    const newProfile = {
+                    console.log('[Auth Profile] No profile, attempting to create...');
+                    const profileData = {
                         id: user.id,
                         email: user.email,
-                        displayName: user.user_metadata?.full_name || user.user_metadata?.name || 'Tutor',
+                        display_name: user.user_metadata?.display_name || user.user_metadata?.full_name || 'Tutor',
                         role: 'tutor',
                         is_approved: true,
                         created_at: new Date().toISOString()
                     };
                     
-                    const { error: insertError } = await supabase.from('users').upsert(newProfile);
-                    if (insertError) {
-                        console.error('[Auth Profile] Insert error:', insertError);
-                        throw insertError;
-                    }
-                    setUserProfile(newProfile);
+                    const { error: insertError } = await supabase.from('users').upsert(profileData);
+                    if (insertError) throw insertError;
+                    setUserProfile(profileData);
                 } else {
                     throw error;
                 }
@@ -127,12 +126,11 @@ export function AuthProvider({ children }) {
                 setUserProfile(data);
             }
         } catch (err) {
-            console.error('[Auth Profile] Unexpected error:', err.message);
-            // Fallback: Use minimal profile if DB fails but user is authenticated
+            console.error('[Auth Profile] Fallback triggered:', err.message);
             setUserProfile({
                 id: user.id,
                 email: user.email,
-                displayName: user.user_metadata?.full_name || 'Teacher',
+                display_name: user.user_metadata?.display_name || user.user_metadata?.full_name || 'Teacher',
                 role: 'tutor',
                 is_approved: true
             });

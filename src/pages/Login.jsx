@@ -33,12 +33,17 @@ export default function Login() {
             navigate('/dashboard');
         } catch (err) {
             console.error('Authentication Error:', err);
-            if (err.code === 'auth/invalid-credential') {
-                setError('Email or password was incorrect.');
-            } else if (err.code === 'auth/too-many-requests') {
-                setError('Too many failed attempts. Please try again later.');
+            // Supabase AuthApiErrors usually have a message property
+            const message = err.message || '';
+            
+            if (message.toLowerCase().includes('invalid login credentials')) {
+                setError('Email or password was incorrect. Please check your details.');
+            } else if (message.toLowerCase().includes('too many requests')) {
+                setError('Too many failed attempts. Please try again in a few minutes.');
+            } else if (message.toLowerCase().includes('email not confirmed')) {
+                setError('Please check your email and confirm your account before logging in.');
             } else {
-                setError('Login failed. Please check your details and try again.');
+                setError(message || 'Login failed. Please check your connection and try again.');
             }
         } finally {
             setIsSubmitting(false);

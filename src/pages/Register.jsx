@@ -44,14 +44,19 @@ export default function Register() {
         try {
             await register(email, password, displayName);
             setSuccess(true);
+            toast.success('Registration successful!');
         } catch (err) {
             console.error('Registration Error:', err);
-            if (err.code === 'auth/email-already-in-use') {
-                setError('This email is already in use.');
-            } else if (err.code === 'auth/invalid-email') {
+            const message = err.message || '';
+            
+            if (message.toLowerCase().includes('user already registered')) {
+                setError('This email is already registered. Try logging in.');
+            } else if (message.toLowerCase().includes('invalid format')) {
                 setError('Please check your email format.');
+            } else if (message.toLowerCase().includes('weak-password')) {
+                setError('Password is too weak. Please use a stronger one.');
             } else {
-                setError('Failed to create account. Please try again.');
+                setError(message || 'Failed to create account. Please try again.');
             }
         } finally {
             setIsSubmitting(false);

@@ -26,27 +26,11 @@ export function AuthProvider({ children }) {
         });
 
         if (error) throw error;
+        
+        // We no longer manually upsert here.
+        // The 'handle_new_user' trigger in the database handles this automatically
+        // and safely bypasses RLS during registration.
 
-        // Create the profile record immediately
-        const profile = {
-            id: data.user.id,
-            display_name: displayName,
-            email: email,
-            role: 'tutor',
-            is_approved: true,
-            created_at: new Date().toISOString()
-        };
-
-        const { error: profileError } = await supabase
-            .from('users')
-            .upsert(profile);
-
-        if (profileError) {
-            console.error('[Auth Register] Profile creation failed:', profileError);
-            // We don't throw here to avoid blocking registration if the table is still missing
-        }
-
-        setUserProfile(profile);
         return data;
     }
 

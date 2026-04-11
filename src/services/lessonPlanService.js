@@ -1,32 +1,50 @@
-import { collection, query, where, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from './firebase';
-
-/**
- * Fetch lesson plans for a batch.
- */
-export async function getBatchLessons(batchId) {
-  const q = query(
-    collection(db, 'lessons'),
-    where('batchId', '==', batchId)
-  );
-  const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
-}
-
-/**
- * Log a new session/lesson log.
- */
-export async function logSession(data) {
-  const res = await addDoc(collection(db, 'sessionLogs'), {
-    ...data,
-    createdAt: serverTimestamp()
-  });
-  return res.id;
-}
+import { supabase } from './supabaseClient';
 
 export const lessonPlanService = {
-  getBatchLessons,
-  logSession
+  /**
+   * Fetch lesson plans (session logs) for a batch.
+   */
+  async getBatchLessons(batchId) {
+    const { data, error } = await supabase
+      .from('session_logs')
+      .select('*')
+      .eq('batch_id', batchId)
+      .order('date', { ascending: false });
+
+    if (error) throw error;
+    return data;
+  },
+
+  /**
+   * Log a new session/lesson log.
+   */
+  async logSession(data) {
+    const { data: res, error } = await supabase
+      .from('session_logs')
+      .insert({
+        teacher_id: data.teacherId,
+        batch_id: data.batchId,
+        schedule_id: data.scheduleId,
+        date: data.date || new Date().toISOString().split('T')[0],
+        topics_covered: data.topicsCovered,
+        homework_assigned: data.homeworkAssigned,
+        notes: data.notes
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return res.id;
+  },
+
+  async getLessonsByTeacher(teacherId) {
+    const { data, error } = await supabase
+      .from('session_logs')
+      .select('*')
+      .eq('teacher_id', teacherId);
+    if (error) throw error;
+    return data;
+  }
 };
 
 export default lessonPlanService;

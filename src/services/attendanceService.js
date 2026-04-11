@@ -1,58 +1,104 @@
-import { collection, query, where, getDocs, addDoc, updateDoc, doc, serverTimestamp, Timestamp } from 'firebase/firestore';
-import { db } from './firebase';
-import { format } from 'date-fns';
-
-/**
- * Fetch all attendance records for a batch.
- */
-export async function getBatchAttendance(batchId) {
-  const q = query(
-    collection(db, 'attendance'),
-    where('batchId', '==', batchId)
-  );
-  const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
-}
-
-/**
- * Save or update attendance for a specific date.
- */
-export async function saveAttendance(teacherId, batchId, dateStr, records) {
-  const snap = await getDocs(
-    query(
-      collection(db, 'attendance'),
-      where('teacherId', '==', teacherId),
-      where('batchId', '==', batchId)
-    )
-  );
-  
-  const existing = snap.docs.find(d => {
-    const data = d.data();
-    const dVal = data.date?.toDate ? format(data.date.toDate(), 'yyyy-MM-dd') : data.date;
-    return dVal === dateStr;
-  });
-
-  const data = {
-    batchId,
-    teacherId,
-    date: Timestamp.fromDate(new Date(dateStr)),
-    records: Object.entries(records).map(([studentId, status]) => ({ studentId, status })),
-    updatedAt: serverTimestamp()
-  };
-
-  if (existing) {
-    await updateDoc(doc(db, 'attendance', existing.id), data);
-    return existing.id;
-  } else {
-    data.createdAt = serverTimestamp();
-    const res = await addDoc(collection(db, 'attendance'), data);
-    return res.id;
-  }
-}
+import { supabase } from './supabaseClient';
 
 export const attendanceService = {
-  getBatchAttendance,
-  saveAttendance
+  /**
+   * Fetch all attendance records for a batch.
+   */
+  async getBatchAttendance(batchId) {
+    const { data, error } = await supabase
+      .from('attendance_records')
+      .select(`
+        *,
+        attendance_log (
+          student_id,
+          status
+        )
+      `)
+      .eq('batch_id', batchId)
+      .order('date', { ascending: false });
+
+    if (error) throw error;
+    return data;
+  },
+
+  /**
+   * Save or update attendance for a specific date.
+   */
+  async saveAttendance(teacherId, batchId, dateStr, records) {
+    // 1. Check if record exists for this date/batch/teacher
+    const { data: existing, error: fetchError } = await supabase
+      .from('attendance_records')
+      .select('id')
+      .eq('teacher_id', teacherId)
+      .eq('batch_id', batchId)
+      .eq('date', dateStr)
+      .maybeSingle();
+
+    if (fetchError) throw fetchError;
+
+    let recordId;
+
+    if (existing) {
+      recordId = existing.id;
+      // Update the updated_at timestamp
+      await supabase
+        .from('attendance_records')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('id', recordId);
+        
+      // Delete existing logs for this record to "overwrite"
+      await supabase
+        .from('attendance_log')
+        .delete()
+        .eq('attendance_record_id', recordId);
+    } else {
+      // Create new record
+      const { data: newRecord, error: insertError } = await supabase
+        .from('attendance_records')
+        .insert({
+          teacher_id: teacherId,
+          batch_id: batchId,
+          date: dateStr
+        })
+        .select()
+        .single();
+
+      if (insertError) throw insertError;
+      recordId = newRecord.id;
+    }
+
+    // 2. Insert new logs
+    const logs = Object.entries(records).map(([studentId, status]) => ({
+      attendance_record_id: recordId,
+      student_id: studentId,
+      status: status
+    }));
+
+    const { error: logsError } = await supabase
+      .from('attendance_log')
+      .insert(logs);
+
+    if (logsError) throw logsError;
+
+    return recordId;
+  },
+
+  async getAttendanceByTeacher(teacherId) {
+    const { data, error } = await supabase
+      .from('attendance_records')
+      .select('*, attendance_log(student_id, status)')
+      .eq('teacher_id', teacherId);
+    
+    if (error) throw error;
+    
+    return data.map(record => ({
+      ...record,
+      records: record.attendance_log?.map(log => ({
+        studentId: log.student_id,
+        status: log.status
+      })) || []
+    }));
+  }
 };
 
 export default attendanceService;

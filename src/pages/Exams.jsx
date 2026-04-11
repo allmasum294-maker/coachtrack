@@ -1,18 +1,18 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Link } from 'react-router-dom';
-import {
-    collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, Timestamp,
-} from 'firebase/firestore';
-import { db } from '../services/firebase';
+import { supabase } from '../services/supabaseClient';
 import { FileText, Plus, Edit2, Trash2, X, Eye, Trophy, TrendingUp, Users, ClipboardCheck, PlusCircle, Filter, Calendar, Clock, BarChart2 } from 'lucide-react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import { batchService } from '../services/batchService';
+import { studentService } from '../services/studentService';
+import { examService } from '../services/examService';
+import { attendanceService } from '../services/attendanceService';
 import Modal from '../components/Modal';
 
 export default function Exams() {
-    const { currentUser } = useAuth();
+    const { userProfile } = useAuth();
     const [exams, setExams] = useState([]);
     const [batches, setBatches] = useState([]);
     const [students, setStudents] = useState([]);
@@ -36,20 +36,20 @@ export default function Exams() {
     const [newTopicMarks, setNewTopicMarks] = useState('');
 
     useEffect(() => {
-        if (currentUser) loadData();
-    }, [currentUser]);
+        if (userProfile?.id) loadData();
+    }, [userProfile]);
 
     async function loadData() {
         try {
-            const uid = currentUser.uid;
-            const [examSnap, activeBatches, studentSnap] = await Promise.all([
-                getDocs(query(collection(db, 'exams'), where('teacherId', '==', uid))),
-                batchService.getBatches(uid, false),
-                getDocs(query(collection(db, 'students'), where('teacherId', '==', uid), where('status', '==', 'enrolled'))),
+            const uid = userProfile.id;
+            const [examsList, activeBatches, allStudents] = await Promise.all([
+                examService.getExams(uid),
+                batchService.getBatches(uid, true),
+                studentService.getStudentsByTeacher(uid)
             ]);
-            setExams(examSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
+            setExams(examsList);
             setBatches(activeBatches);
-            setStudents(studentSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
+            setStudents(allStudents.filter(s => s.status === 'enrolled'));
         } catch (err) {
             console.error('Error:', err);
         } finally {
@@ -59,12 +59,8 @@ export default function Exams() {
 
     // Helper: get topics from exam (supports both old and new format)
     function getExamTopics(exam) {
-        if (exam.topicConfig && exam.topicConfig.length > 0) {
-            return exam.topicConfig; // new format: [{name, maxMarks}]
-        }
-        // Old format: topics: ["MCQ", ...] — no maxMarks info
-        if (exam.topics && exam.topics.length > 0) {
-            return exam.topics.map(t => ({ name: t, maxMarks: null }));
+        if (exam.topic_config && exam.topic_config.length > 0) {
+            return exam.topic_config; // structured format: [{name, maxMarks}]
         }
         return [];
     }
@@ -83,11 +79,10 @@ export default function Exams() {
 
     function openEdit(exam) {
         setEditingExam(exam);
-        const dateVal = exam.date?.toDate ? format(exam.date.toDate(), 'yyyy-MM-dd') : exam.date || '';
         setForm({
-            title: exam.title, batchId: exam.batchId, date: dateVal,
-            startTime: exam.startTime || '09:00', endTime: exam.endTime || '10:00',
-            totalMarks: exam.totalMarks || 100,
+            title: exam.title, batchId: exam.batch_id, date: exam.date,
+            startTime: exam.start_time || '09:00', endTime: exam.end_time || '10:00',
+            totalMarks: exam.total_marks || 100,
         });
         setTopicConfig(getExamTopics(exam));
         setNewTopicName('');
@@ -114,7 +109,7 @@ export default function Exams() {
     function openAttendance(exam) {
         setScoringExam(exam);
         const records = {};
-        const studentsInBatch = students.filter(s => (s.batchIds || []).includes(exam.batchId));
+        const studentsInBatch = students.filter(s => (s.batchIds || []).includes(exam.batch_id));
         studentsInBatch.forEach(s => {
             records[s.id] = (exam.attendance || {})[s.id] || 'present';
         });
@@ -125,51 +120,19 @@ export default function Exams() {
     async function handleSaveAttendance(e) {
         e.preventDefault();
         try {
-            await updateDoc(doc(db, 'exams', scoringExam.id), {
-                attendance: attendanceRecords
-            });
+            // 1. Update Attendance in Exam (for filtering present students)
+            await supabase
+                .from('exams')
+                .update({ attendance: attendanceRecords })
+                .eq('id', scoringExam.id);
 
-            const dateVal = scoringExam.date?.toDate ? format(scoringExam.date.toDate(), 'yyyy-MM-dd') : scoringExam.date;
-            const snap = await getDocs(
-                query(
-                    collection(db, 'attendance'),
-                    where('teacherId', '==', currentUser.uid),
-                    where('batchId', '==', scoringExam.batchId),
-                )
+            // 2. Sync with main attendance system
+            await attendanceService.saveAttendance(
+                userProfile.id,
+                scoringExam.batch_id,
+                scoringExam.date,
+                attendanceRecords
             );
-
-            const existing = snap.docs.find((d) => {
-                const data = d.data();
-                const dDate = data.date?.toDate ? format(data.date.toDate(), 'yyyy-MM-dd') : data.date;
-                return dDate === dateVal;
-            });
-
-            if (existing) {
-                const data = existing.data();
-                const updatedRecords = [...(data.records || [])];
-                Object.entries(attendanceRecords).forEach(([studentId, status]) => {
-                    const idx = updatedRecords.findIndex(r => r.studentId === studentId);
-                    if (idx > -1) {
-                        if (status === 'present') updatedRecords[idx].status = 'present';
-                    } else {
-                        if (status === 'present') updatedRecords.push({ studentId, status: 'present' });
-                    }
-                });
-                await updateDoc(doc(db, 'attendance', existing.id), { records: updatedRecords });
-            } else {
-                const batchStudents = students.filter(s => (s.batchIds || []).includes(scoringExam.batchId));
-                const recordsArray = batchStudents.map(s => ({
-                    studentId: s.id,
-                    status: attendanceRecords[s.id] || 'present'
-                }));
-                await addDoc(collection(db, 'attendance'), {
-                    batchId: scoringExam.batchId,
-                    teacherId: currentUser.uid,
-                    date: scoringExam.date,
-                    records: recordsArray,
-                    createdAt: serverTimestamp()
-                });
-            }
 
             setShowAttendanceModal(false);
             loadData();
@@ -183,7 +146,7 @@ export default function Exams() {
     function openScores(exam) {
         setScoringExam(exam);
         const presentStudents = students.filter(s => {
-            const inBatch = (s.batchIds || []).includes(exam.batchId);
+            const inBatch = (s.batchIds || []).includes(exam.batch_id);
             const attended = exam.attendance?.[s.id] === 'present' || !exam.attendance;
             return inBatch && attended;
         });
@@ -205,32 +168,26 @@ export default function Exams() {
     async function handleSave(e) {
         e.preventDefault();
         try {
-            // If topics are defined, validate total
             const hasTopics = topicConfig.length > 0;
             const computedTotal = hasTopics ? getTopicTotal() : parseFloat(form.totalMarks) || 100;
 
             const data = {
                 title: form.title,
-                date: Timestamp.fromDate(new Date(form.date)),
-                startTime: form.startTime || '00:00',
-                endTime: form.endTime || '00:00',
-                batchId: form.batchId,
-                batchName: batches.find((b) => b.id === form.batchId)?.name || '',
-                totalMarks: computedTotal,
-                // New structured format
-                topicConfig: topicConfig,
-                // Keep old format for backward compat
-                topics: topicConfig.map(t => t.name),
-                teacherId: currentUser.uid,
+                date: form.date,
+                start_time: form.startTime || '00:00',
+                end_time: form.endTime || '00:00',
+                batch_id: form.batchId,
+                total_marks: computedTotal,
+                topic_config: topicConfig,
+                teacher_id: userProfile.id,
             };
+
             if (editingExam) {
-                await updateDoc(doc(db, 'exams', editingExam.id), data);
-            } else {
-                data.createdAt = serverTimestamp();
-                data.scores = [];
-                data.attendance = {};
-                await addDoc(collection(db, 'exams'), data);
+                data.id = editingExam.id;
             }
+            
+            await examService.saveExam(data);
+            
             setShowModal(false);
             loadData();
             toast.success('Exam saved!');
@@ -268,7 +225,9 @@ export default function Exams() {
                         remarks: v.remarks || '',
                     };
                 });
-            await updateDoc(doc(db, 'exams', scoringExam.id), { scores: scoresArray });
+            
+            await examService.saveResults(scoringExam.id, scoresArray);
+            
             setShowScoresModal(false);
             loadData();
             toast.success('Scores saved!');
@@ -281,7 +240,7 @@ export default function Exams() {
     async function handleDelete(examId) {
         if (!confirm('Delete this exam?')) return;
         try {
-            await deleteDoc(doc(db, 'exams', examId));
+            await examService.deleteExam(examId);
             loadData();
         } catch (err) {
             console.error('Error:', err);

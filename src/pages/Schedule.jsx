@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import {
-    collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, Timestamp,
-} from 'firebase/firestore';
-import { db } from '../services/firebase';
+import { supabase } from '../services/supabaseClient';
 import { batchService } from '../services/batchService';
+import { studentService } from '../services/studentService';
+import { examService } from '../services/examService';
+import { homeworkService } from '../services/homeworkService';
+import { lessonPlanService } from '../services/lessonPlanService';
+import { attendanceService } from '../services/attendanceService';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
@@ -19,7 +21,7 @@ import { format, eachDayOfInterval, getDay } from 'date-fns';
 import toast from 'react-hot-toast';
 
 export default function Schedule() {
-    const { currentUser } = useAuth();
+    const { userProfile } = useAuth();
     const navigate = useNavigate();
     const [schedules, setSchedules] = useState([]);
     const [exams, setExams] = useState([]);
@@ -50,28 +52,34 @@ export default function Schedule() {
     ];
 
     useEffect(() => {
-        if (currentUser) loadData();
-    }, [currentUser]);
+        if (userProfile?.id) loadData();
+    }, [userProfile]);
 
     async function loadData() {
         try {
-            // Only load active batches for the calendar view
-            const activeBatches = await batchService.getBatches(currentUser.uid, false);
-            setBatches(activeBatches);
-
-            const [schedSnap, studentSnap, examSnap, sessionLogSnap, hwSnap] = await Promise.all([
-                getDocs(query(collection(db, 'schedules'), where('teacherId', '==', currentUser.uid))),
-                getDocs(query(collection(db, 'students'), where('teacherId', '==', currentUser.uid), where('status', '==', 'enrolled'))),
-                getDocs(query(collection(db, 'exams'), where('teacherId', '==', currentUser.uid))),
-                getDocs(query(collection(db, 'sessionLogs'), where('teacherId', '==', currentUser.uid))),
-                getDocs(query(collection(db, 'homeworks'), where('teacherId', '==', currentUser.uid))),
+            const uid = userProfile.id;
+            const [
+                activeBatches,
+                schedResult,
+                studentResult,
+                examResult,
+                logResult,
+                hwResult
+            ] = await Promise.all([
+                batchService.getBatches(uid, true),
+                supabase.from('schedules').select('*').eq('teacher_id', uid),
+                studentService.getStudentsByTeacher(uid),
+                examService.getExams(uid),
+                lessonPlanService.getLessonsByTeacher(uid),
+                homeworkService.getHomeworkByTeacher(uid)
             ]);
 
-            setSchedules(schedSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
-            setStudents(studentSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
-            setExams(examSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
-            setSessionLogs(sessionLogSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
-            setHomeworks(hwSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
+            setBatches(activeBatches);
+            setSchedules(schedResult.data || []);
+            setStudents(studentResult.filter(s => s.status === 'enrolled'));
+            setExams(examResult);
+            setSessionLogs(logResult);
+            setHomeworks(hwResult);
         } catch (err) {
             console.error('Error loading schedules:', err);
         } finally {
@@ -80,12 +88,11 @@ export default function Schedule() {
     }
 
     function getCalendarEvents() {
-        const loggedScheduleIds = new Set(sessionLogs.filter(l => l.scheduleId).map(l => l.scheduleId));
+        const loggedScheduleIds = new Set(sessionLogs.filter(l => l.schedule_id).map(l => l.schedule_id));
 
         const classEvents = schedules
-            .filter(s => !filterBatch || s.batchId === filterBatch)
+            .filter(s => !filterBatch || s.batch_id === filterBatch)
             .map((s) => {
-                const dateStr = s.date?.toDate ? format(s.date.toDate(), 'yyyy-MM-dd') : s.date;
                 let color = '#3b82f6'; 
                 if (s.status === 'completed') color = '#14b8a6'; 
                 if (s.status === 'cancelled') color = '#ef4444'; 
@@ -93,9 +100,9 @@ export default function Schedule() {
 
                 return {
                     id: s.id,
-                    title: `${s.batchName || ''}: ${s.title}`,
-                    start: `${dateStr}T${s.startTime || '00:00:00'}`,
-                    end: `${dateStr}T${s.endTime || '23:59:59'}`,
+                    title: `${s.batch_name || ''}: ${s.title}`,
+                    start: `${s.date}T${s.start_time || '00:00:00'}`,
+                    end: `${s.date}T${s.end_time || '23:59:59'}`,
                     backgroundColor: color,
                     borderColor: 'transparent',
                     extendedProps: { schedule: s, type: 'class' },
@@ -103,16 +110,15 @@ export default function Schedule() {
             });
 
         const examEvents = exams
-            .filter(e => !filterBatch || e.batchId === filterBatch)
+            .filter(e => !filterBatch || e.batch_id === filterBatch)
             .map((e) => {
-                const dateStr = e.date?.toDate ? format(e.date.toDate(), 'yyyy-MM-dd') : e.date;
                 const color = '#8b5cf6'; 
 
                 return {
                     id: `exam-${e.id}`,
                     title: `EXAM: ${e.title}`,
-                    start: `${dateStr}T${e.startTime || '00:00:00'}`,
-                    end: `${dateStr}T${e.endTime || '23:59:59'}`,
+                    start: `${e.date}T${e.start_time || '00:00:00'}`,
+                    end: `${e.date}T${e.end_time || '23:59:59'}`,
                     backgroundColor: color,
                     borderColor: 'transparent',
                     extendedProps: { exam: e, type: 'exam' },
@@ -120,16 +126,15 @@ export default function Schedule() {
             });
 
         const sessionLogEvents = sessionLogs
-            .filter(l => !filterBatch || l.batchId === filterBatch)
-            .filter(l => !l.scheduleId || !loggedScheduleIds.has(l.scheduleId))
+            .filter(l => !filterBatch || l.batch_id === filterBatch)
+            .filter(l => !l.schedule_id || !loggedScheduleIds.has(l.schedule_id))
             .map((l) => {
-                const dateStr = l.date?.toDate ? format(l.date.toDate(), 'yyyy-MM-dd') : l.date;
                 const color = '#f97316'; 
                 return {
                     id: `log-${l.id}`,
-                    title: `LOG: ${l.batchName || ''} — ${l.topicsCovered || 'Session'}`,
-                    start: `${dateStr}T00:00:00`,
-                    end: `${dateStr}T23:59:59`,
+                    title: `LOG: ${l.batch_name || ''} — ${l.topics_covered || 'Session'}`,
+                    start: `${l.date}T00:00:00`,
+                    end: `${l.date}T23:59:59`,
                     backgroundColor: color,
                     borderColor: 'transparent',
                     extendedProps: { sessionLog: l, type: 'sessionLog' },
@@ -137,16 +142,15 @@ export default function Schedule() {
             });
 
         const homeworkEvents = homeworks
-            .filter(hw => !filterBatch || hw.batchId === filterBatch)
-            .filter(hw => hw.dueDate)
+            .filter(hw => !filterBatch || hw.batch_id === filterBatch)
+            .filter(hw => hw.due_date)
             .map((hw) => {
-                const dateStr = hw.dueDate?.toDate ? format(hw.dueDate.toDate(), 'yyyy-MM-dd') : hw.dueDate;
-                const batchMsg = batches.find(b => b.id === hw.batchId)?.name || '';
+                const batchMsg = batches.find(b => b.id === hw.batch_id)?.name || '';
                 const color = '#ec4899'; 
                 return {
                     id: `hw-${hw.id}`,
                     title: `HW DUE: ${hw.title}`,
-                    start: `${dateStr}T23:59:59`,
+                    start: `${hw.due_date}T23:59:59`,
                     allDay: true,
                     backgroundColor: color,
                     borderColor: 'transparent',
@@ -184,23 +188,24 @@ export default function Schedule() {
             const allDays = eachDayOfInterval({ start, end });
             const matchDays = allDays.filter(d => recurringForm.days.includes(getDay(d)));
 
-            const promises = matchDays.map(date => {
-                const data = {
-                    title: recurringForm.title || batch?.name || 'Class',
-                    batchId: recurringForm.batchId,
-                    batchName: batch?.name || '',
-                    date: Timestamp.fromDate(date),
-                    startTime: recurringForm.startTime,
-                    endTime: recurringForm.endTime,
-                    status: 'scheduled',
-                    notes: recurringForm.notes,
-                    teacherId: currentUser.uid,
-                    createdAt: serverTimestamp(),
-                };
-                return addDoc(collection(db, 'schedules'), data);
-            });
+            const newSchedules = matchDays.map(date => ({
+                title: recurringForm.title || batch?.name || 'Class',
+                batch_id: recurringForm.batchId,
+                batch_name: batch?.name || '',
+                date: format(date, 'yyyy-MM-dd'),
+                start_time: recurringForm.startTime,
+                end_time: recurringForm.endTime,
+                status: 'scheduled',
+                notes: recurringForm.notes,
+                teacher_id: userProfile.id
+            }));
 
-            await Promise.all(promises);
+            const { error } = await supabase
+                .from('schedules')
+                .insert(newSchedules);
+
+            if (error) throw error;
+
             setShowRecurringModal(false);
             loadData();
             toast.success(`Scheduled ${matchDays.length} classes!`);
@@ -220,14 +225,13 @@ export default function Schedule() {
     }
 
     function openEdit(schedule) {
-        const dateVal = schedule.date?.toDate ? schedule.date.toDate() : new Date(schedule.date);
         setEditingSchedule(schedule);
         setForm({
             title: schedule.title || '',
-            batchId: schedule.batchId || '',
-            date: format(dateVal, 'yyyy-MM-dd'),
-            startTime: schedule.startTime || '',
-            endTime: schedule.endTime || '',
+            batchId: schedule.batch_id || '',
+            date: schedule.date,
+            startTime: schedule.start_time || '',
+            endTime: schedule.end_time || '',
             status: schedule.status || 'scheduled',
             notes: schedule.notes || '',
         });
@@ -240,21 +244,27 @@ export default function Schedule() {
             const batch = batches.find((b) => b.id === form.batchId);
             const data = {
                 title: form.title || batch?.name || 'Class',
-                batchId: form.batchId,
-                batchName: batch?.name || '',
-                date: Timestamp.fromDate(new Date(form.date)),
-                startTime: form.startTime,
-                endTime: form.endTime,
+                batch_id: form.batchId,
+                batch_name: batch?.name || '',
+                date: form.date,
+                start_time: form.startTime,
+                end_time: form.endTime,
                 status: form.status,
                 notes: form.notes,
-                teacherId: currentUser.uid,
+                teacher_id: userProfile.id,
             };
 
             if (editingSchedule) {
-                await updateDoc(doc(db, 'schedules', editingSchedule.id), data);
+                const { error } = await supabase
+                    .from('schedules')
+                    .update(data)
+                    .eq('id', editingSchedule.id);
+                if (error) throw error;
             } else {
-                data.createdAt = serverTimestamp();
-                await addDoc(collection(db, 'schedules'), data);
+                const { error } = await supabase
+                    .from('schedules')
+                    .insert(data);
+                if (error) throw error;
             }
             setShowModal(false);
             loadData();
@@ -268,7 +278,11 @@ export default function Schedule() {
     async function handleDelete() {
         if (!editingSchedule || !confirm('Delete this scheduled class?')) return;
         try {
-            await deleteDoc(doc(db, 'schedules', editingSchedule.id));
+            const { error } = await supabase
+                .from('schedules')
+                .delete()
+                .eq('id', editingSchedule.id);
+            if (error) throw error;
             setShowModal(false);
             loadData();
             toast.success('Schedule deleted');
@@ -281,7 +295,7 @@ export default function Schedule() {
         if (!editingSchedule) return;
         setCompleteForm({ topicsCovered: '', notes: '', homeworkAssigned: '' });
         const recs = {};
-        students.filter(s => (s.batchIds || []).includes(editingSchedule.batchId)).forEach(s => {
+        students.filter(s => (s.batchIds || []).includes(editingSchedule.batch_id)).forEach(s => {
             recs[s.id] = 'present';
         });
         setAttendanceRecords(recs);
@@ -292,51 +306,48 @@ export default function Schedule() {
     async function handleSaveCompleteSession(e) {
         e.preventDefault();
         try {
-            const batch = batches.find(b => b.id === editingSchedule.batchId);
+            const batch = batches.find(b => b.id === editingSchedule.batch_id);
             const dateVal = editingSchedule.date;
 
             const sessionData = {
-                batchId: editingSchedule.batchId,
+                batchId: editingSchedule.batch_id,
                 batchName: batch?.name || '',
                 scheduleId: editingSchedule.id,
                 date: dateVal,
                 topicsCovered: completeForm.topicsCovered,
                 notes: completeForm.notes,
                 homeworkAssigned: completeForm.homeworkAssigned,
-                teacherId: currentUser.uid,
-                createdAt: serverTimestamp()
+                teacherId: userProfile.id
             };
-            const logRef = await addDoc(collection(db, 'sessionLogs'), sessionData);
+            
+            const logId = await lessonPlanService.logSession(sessionData);
 
             if (completeForm.homeworkAssigned && completeForm.homeworkAssigned.trim()) {
-                const baseDate = dateVal?.toDate ? dateVal.toDate() : new Date(dateVal);
+                const baseDate = new Date(dateVal);
                 const dueDate = new Date(baseDate);
                 dueDate.setDate(dueDate.getDate() + 3);
                 
-                await addDoc(collection(db, 'homeworks'), {
+                await homeworkService.saveHomework({
                     title: completeForm.homeworkAssigned.substring(0, 80),
                     description: completeForm.homeworkAssigned,
-                    batchId: editingSchedule.batchId,
-                    dueDate: Timestamp.fromDate(dueDate),
-                    teacherId: currentUser.uid,
-                    completedBy: [],
-                    submissions: {},
-                    sessionLogId: logRef.id,
-                    createdAt: serverTimestamp(),
+                    batch_id: editingSchedule.batch_id,
+                    due_date: format(dueDate, 'yyyy-MM-dd'),
+                    teacher_id: userProfile.id,
+                    session_log_id: logId
                 });
             }
 
-            const recordsArray = Object.entries(attendanceRecords).map(([studentId, status]) => ({ studentId, status }));
-            const attData = {
-                batchId: editingSchedule.batchId,
-                teacherId: currentUser.uid,
-                date: dateVal,
-                records: recordsArray,
-                createdAt: serverTimestamp()
-            };
-            await addDoc(collection(db, 'attendance'), attData);
+            await attendanceService.saveAttendance(
+                userProfile.id,
+                editingSchedule.batch_id,
+                dateVal,
+                attendanceRecords
+            );
 
-            await updateDoc(doc(db, 'schedules', editingSchedule.id), { status: 'completed' });
+            await supabase
+                .from('schedules')
+                .update({ status: 'completed' })
+                .eq('id', editingSchedule.id);
 
             setShowCompleteModal(false);
             loadData();
@@ -354,22 +365,22 @@ export default function Schedule() {
         try {
             const newDate = event.start;
             let updateData = {
-                date: Timestamp.fromDate(new Date(format(newDate, 'yyyy-MM-dd')))
+                date: format(newDate, 'yyyy-MM-dd')
             };
             
             if (!event.allDay) {
-                updateData.startTime = format(newDate, 'HH:mm');
+                updateData.start_time = format(newDate, 'HH:mm');
                 if (event.end) {
-                    updateData.endTime = format(event.end, 'HH:mm');
+                    updateData.end_time = format(event.end, 'HH:mm');
                 }
             }
             
             if (props.type === 'class') {
-                await updateDoc(doc(db, 'schedules', props.schedule.id), updateData);
+                await supabase.from('schedules').update(updateData).eq('id', props.schedule.id);
                 toast.success('Schedule updated!');
                 loadData();
             } else if (props.type === 'exam') {
-                await updateDoc(doc(db, 'exams', props.exam.id), updateData);
+                await supabase.from('exams').update(updateData).eq('id', props.exam.id);
                 toast.success('Exam updated!');
                 loadData();
             } else {
@@ -390,15 +401,15 @@ export default function Schedule() {
 
         try {
             if (props.type === 'class') {
-                await updateDoc(doc(db, 'schedules', props.schedule.id), {
-                    endTime: format(event.end, 'HH:mm')
-                });
+                await supabase.from('schedules').update({
+                    end_time: format(event.end, 'HH:mm')
+                }).eq('id', props.schedule.id);
                 toast.success('Schedule duration updated!');
                 loadData();
             } else if (props.type === 'exam') {
-                await updateDoc(doc(db, 'exams', props.exam.id), {
-                    endTime: format(event.end, 'HH:mm')
-                });
+                await supabase.from('exams').update({
+                    end_time: format(event.end, 'HH:mm')
+                }).eq('id', props.exam.id);
                 toast.success('Exam duration updated!');
                 loadData();
             } else {

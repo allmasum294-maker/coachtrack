@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from '../services/firebase';
+import { supabase } from '../services/supabaseClient';
 import { 
     BrainCircuit, Loader2, Sparkles, BookOpen, 
     Target, Clock, CheckCircle2, Calendar,
@@ -9,9 +8,10 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { batchService } from '../services/batchService';
+import { studentService } from '../services/studentService';
 
 export default function StudyPlans() {
-    const { currentUser } = useAuth();
+    const { userProfile } = useAuth();
     const [students, setStudents] = useState([]);
     const [batches, setBatches] = useState([]);
     const [exams, setExams] = useState([]);
@@ -24,24 +24,21 @@ export default function StudyPlans() {
     const [studyPlan, setStudyPlan] = useState(null);
 
     useEffect(() => {
-        if (currentUser) loadData();
-    }, [currentUser]);
+        if (userProfile?.id) loadData();
+    }, [userProfile]);
 
     async function loadData() {
         try {
-            const uid = currentUser.uid;
-            const [studentSnap, activeBatches, examSnap] = await Promise.all([
-                getDocs(query(
-                    collection(db, 'students'), 
-                    where('teacherId', '==', uid),
-                    where('status', '==', 'enrolled')
-                )),
+            const uid = userProfile.id;
+            const [allStudents, activeBatches, examsData] = await Promise.all([
+                studentService.getStudentsByTeacher(uid),
                 batchService.getBatches(uid, true),
-                getDocs(query(collection(db, 'exams'), where('teacherId', '==', uid))),
+                supabase.from('exams').select('*').eq('teacher_id', uid)
             ]);
-            setStudents(studentSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
+            
+            setStudents(allStudents);
             setBatches(activeBatches);
-            setExams(examSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
+            setExams(examsData.data || []);
         } catch (err) {
             console.error('Error loading academic landscape:', err);
         } finally {

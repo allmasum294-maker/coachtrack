@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from '../services/firebase';
+import { supabase } from '../services/supabaseClient';
 import { 
     Clock, User, Calendar, FileText, BookOpen, 
     CheckSquare, Filter, XCircle, AlertTriangle,
@@ -9,9 +8,13 @@ import {
 } from 'lucide-react';
 import { format, startOfDay, endOfDay } from 'date-fns';
 import { batchService } from '../services/batchService';
+import { studentService } from '../services/studentService';
+import { attendanceService } from '../services/attendanceService';
+import { examService } from '../services/examService';
+import { homeworkService } from '../services/homeworkService';
 
 export default function StudentTimeline() {
-    const { currentUser } = useAuth();
+    const { userProfile } = useAuth();
     const [students, setStudents] = useState([]);
     const [batches, setBatches] = useState([]);
     const [attendance, setAttendance] = useState([]);
@@ -26,30 +29,26 @@ export default function StudentTimeline() {
     const [filterType, setFilterType] = useState('all');
 
     useEffect(() => {
-        if (currentUser) loadData();
-    }, [currentUser]);
+        if (userProfile?.id) loadData();
+    }, [userProfile]);
 
     async function loadData() {
         try {
-            const uid = currentUser.uid;
-            const [studentSnap, activeBatches, attSnap, examSnap, sessionSnap, hwSnap] = await Promise.all([
-                getDocs(query(
-                    collection(db, 'students'), 
-                    where('teacherId', '==', uid),
-                    where('status', '==', 'enrolled')
-                )),
+            const uid = userProfile.id;
+            const [allStudents, activeBatches, allAttendance, allExams, sessionRes, allHomeworks] = await Promise.all([
+                studentService.getStudentsByTeacher(uid),
                 batchService.getBatches(uid, true),
-                getDocs(query(collection(db, 'attendance'), where('teacherId', '==', uid))),
-                getDocs(query(collection(db, 'exams'), where('teacherId', '==', uid))),
-                getDocs(query(collection(db, 'sessionLogs'), where('teacherId', '==', uid))),
-                getDocs(query(collection(db, 'homeworks'), where('teacherId', '==', uid))),
+                attendanceService.getAttendanceByTeacher(uid),
+                examService.getExams(uid),
+                supabase.from('session_logs').select('*').eq('teacher_id', uid),
+                homeworkService.getHomeworkByTeacher(uid),
             ]);
-            setStudents(studentSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+            setStudents(allStudents.filter(s => s.status === 'enrolled'));
             setBatches(activeBatches);
-            setAttendance(attSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-            setExams(examSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-            setSessionLogs(sessionSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-            setHomeworks(hwSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+            setAttendance(allAttendance);
+            setExams(allExams);
+            setSessionLogs(sessionRes.data || []);
+            setHomeworks(allHomeworks);
         } catch (err) {
             console.error('Error loading student history:', err);
         } finally {
@@ -59,7 +58,7 @@ export default function StudentTimeline() {
 
     function toDate(val) {
         if (!val) return new Date(0);
-        return val.toDate ? val.toDate() : new Date(val);
+        return new Date(val);
     }
 
     function isInDateRange(d) {
@@ -72,7 +71,7 @@ export default function StudentTimeline() {
     const filteredStudents = useMemo(() => {
         let list = students.filter(s => s.status === 'enrolled');
         if (filterBatch) {
-            list = list.filter(s => s.batchIds?.includes(filterBatch));
+            list = list.filter(s => s.batch_ids?.includes(filterBatch));
         }
         return list;
     }, [students, filterBatch]);
@@ -90,8 +89,8 @@ export default function StudentTimeline() {
         const evts = [];
 
         // Student added history
-        if (selectedStudent.createdAt) {
-            const d = toDate(selectedStudent.createdAt);
+        if (selectedStudent.created_at) {
+            const d = toDate(selectedStudent.created_at);
             if (isInDateRange(d)) {
                 evts.push({
                     date: d,
@@ -107,12 +106,12 @@ export default function StudentTimeline() {
 
         // Attendance records
         attendance.forEach(a => {
-            if (!selectedStudent.batchIds?.includes(a.batchId)) return;
+            if (!selectedStudent.batch_ids?.includes(a.batch_id)) return;
             const rec = (a.records || []).find(r => r.studentId === selectedStudent.id);
             if (!rec) return;
             const d = toDate(a.date);
             if (!isInDateRange(d)) return;
-            const batchName = batches.find(b => b.id === a.batchId)?.name || 'Standard Batch';
+            const batchName = batches.find(b => b.id === a.batch_id)?.name || 'Standard Batch';
             
             let statusColor = '#10b981'; // Present
             if (rec.status === 'late') statusColor = '#f59e0b'; // Late
@@ -131,7 +130,7 @@ export default function StudentTimeline() {
 
         // Exam result logs
         exams.forEach(e => {
-            if (!selectedStudent.batchIds?.includes(e.batchId)) return;
+            if (!selectedStudent.batch_ids?.includes(e.batch_id)) return;
             const d = toDate(e.date);
             if (!isInDateRange(d)) return;
             const s = (e.scores || []).find(sc => sc.studentId === selectedStudent.id);
@@ -151,17 +150,17 @@ export default function StudentTimeline() {
 
         // Lessons taught
         sessionLogs.forEach(l => {
-            if (!selectedStudent.batchIds?.includes(l.batchId)) return;
+            if (!selectedStudent.batch_ids?.includes(l.batch_id)) return;
             const d = toDate(l.date);
             if (!isInDateRange(d)) return;
-            if (l.homeworkAssigned) {
+            if (l.homework_assigned) {
                 evts.push({
                     date: d,
                     type: 'homework_assigned',
                     icon: <Layers size={16} />,
                     color: '#f59e0b',
                     title: 'Homework Given',
-                    detail: l.homeworkAssigned.substring(0, 100) + (l.homeworkAssigned.length > 100 ? '...' : ''),
+                    detail: l.homework_assigned.substring(0, 100) + (l.homework_assigned.length > 100 ? '...' : ''),
                     category: 'Homework'
                 });
             }
@@ -169,32 +168,23 @@ export default function StudentTimeline() {
 
         // Homework progress
         homeworks.forEach(hw => {
-            if (!selectedStudent.batchIds?.includes(hw.batchId)) return;
-            const dueDate = hw.dueDate ? toDate(hw.dueDate) : null;
-            const sub = hw.submissions?.[selectedStudent.id];
-            const completedByOld = (hw.completedBy || []).includes(selectedStudent.id);
+            if (!selectedStudent.batch_ids?.includes(hw.batch_id)) return;
+            const dueDate = hw.due_date ? toDate(hw.due_date) : null;
+            const submissions = hw.submissions || [];
+            const sub = submissions.find(s => s.student_id === selectedStudent.id);
 
             if (sub) {
-                const d = sub.date ? new Date(sub.date) : (dueDate || toDate(hw.createdAt));
+                const d = sub.date ? new Date(sub.date) : (dueDate || toDate(hw.created_at));
                 if (!isInDateRange(d)) return;
-                if (sub.status === 'completed') {
+                if (sub.status === 'completed' || sub.status === 'late') {
+                    const isLate = sub.status === 'late';
                     evts.push({
                         date: d,
                         type: 'homework_completed',
-                        icon: <CheckSquare size={16} />,
-                        color: '#10b981',
-                        title: `Homework Done: ${hw.title}`,
-                        detail: 'Completed on time.',
-                        category: 'Homework'
-                    });
-                } else if (sub.status === 'late') {
-                    evts.push({
-                        date: d,
-                        type: 'homework_completed',
-                        icon: <AlertTriangle size={16} />,
-                        color: '#f59e0b',
-                        title: `Late Homework: ${hw.title}`,
-                        detail: 'Finished after the deadline.',
+                        icon: isLate ? <AlertTriangle size={16} /> : <CheckSquare size={16} />,
+                        color: isLate ? '#f59e0b' : '#10b981',
+                        title: `${isLate ? 'Late' : 'Done'} Homework: ${hw.title}`,
+                        detail: isLate ? 'Finished after the deadline.' : 'Completed on time.',
                         category: 'Homework'
                     });
                 } else if (sub.status === 'not_submitted' && dueDate && dueDate < new Date()) {
@@ -206,19 +196,6 @@ export default function StudentTimeline() {
                         title: `Missing Homework: ${hw.title}`,
                         detail: `Deadline was on ${format(dueDate, 'MMM d')}. Not submitted.`,
                         category: 'Homework'
-                    });
-                }
-            } else if (completedByOld) {
-                const d = dueDate || toDate(hw.createdAt);
-                if (isInDateRange(d)) {
-                    evts.push({
-                        date: d,
-                        type: 'homework_completed',
-                        icon: <CheckSquare size={16} />,
-                        color: '#10b981',
-                        title: `Task Finalized: ${hw.title}`,
-                        detail: 'Completed.',
-                        category: 'Curriculum'
                     });
                 }
             } else if (dueDate && dueDate < new Date()) {

@@ -1,13 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { collection, query, where, getDocs, updateDoc, doc, deleteDoc } from 'firebase/firestore';
-import { db } from '../services/firebase';
+import { supabase } from '../services/supabaseClient';
 import { ShieldCheck, Check, X, Trash2, Users, Database, ShieldAlert, Zap, Lock, Unlock } from 'lucide-react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 
 export default function AdminPanel() {
-    const { currentUser, isAdmin } = useAuth();
+    const { userProfile, isAdmin } = useAuth();
     const [pendingUsers, setPendingUsers] = useState([]);
     const [approvedUsers, setApprovedUsers] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -18,19 +17,23 @@ export default function AdminPanel() {
     useEffect(() => {
         loadUsers();
         if (isAdmin) loadDiagnostics();
-    }, [currentUser]);
+    }, [userProfile]);
 
     async function loadDiagnostics() {
         try {
-            const batchSnap = await getDocs(collection(db, 'batches'));
-            const all = batchSnap.docs.map(d => d.data());
-            const owned = all.filter(b => b.teacherId === currentUser.uid).length;
-            const nested = all.filter(b => !b.teacherId && b.studentIds?.teacherId === currentUser.uid).length;
+            const { data: allBatches, error } = await supabase
+                .from('batches')
+                .select('id, teacher_id');
+            
+            if (error) throw error;
+            
+            const owned = allBatches.filter(b => b.teacher_id === userProfile.id).length;
+            const orphans = allBatches.filter(b => !b.teacher_id).length;
             
             setDbStats({
-                total: all.length,
-                owned: owned + nested,
-                orphans: all.length - (owned + nested)
+                total: allBatches.length,
+                owned: owned,
+                orphans: orphans
             });
         } catch (err) {
             console.error('Diag Error:', err);
@@ -39,10 +42,14 @@ export default function AdminPanel() {
 
     async function loadUsers() {
         try {
-            const snap = await getDocs(collection(db, 'users'));
-            const users = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-            setPendingUsers(users.filter((u) => !u.isApproved && u.role !== 'admin'));
-            setApprovedUsers(users.filter((u) => u.isApproved && u.role !== 'admin'));
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('*');
+            
+            if (error) throw error;
+            
+            setPendingUsers(data.filter((u) => u.role === 'pending' && u.role !== 'admin'));
+            setApprovedUsers(data.filter((u) => u.role === 'teacher' && u.role !== 'admin'));
         } catch (err) {
             console.error('Error loading users:', err);
         } finally {
@@ -52,7 +59,12 @@ export default function AdminPanel() {
 
     async function approveUser(userId) {
         try {
-            await updateDoc(doc(db, 'users', userId), { isApproved: true });
+            const { error } = await supabase
+                .from('profiles')
+                .update({ role: 'teacher' })
+                .eq('id', userId);
+            
+            if (error) throw error;
             loadUsers();
             toast.success('Access Granted');
         } catch (err) {
@@ -62,9 +74,14 @@ export default function AdminPanel() {
     }
 
     async function rejectUser(userId) {
-        if (!confirm('Delete this registration request?')) return;
+        if (!confirm('Delete this registration request? (Note: This only removes the profile, not the Auth user)')) return;
         try {
-            await deleteDoc(doc(db, 'users', userId));
+            const { error } = await supabase
+                .from('profiles')
+                .delete()
+                .eq('id', userId);
+            
+            if (error) throw error;
             loadUsers();
             toast.success('Request deleted');
         } catch (err) {
@@ -75,7 +92,12 @@ export default function AdminPanel() {
     async function revokeAccess(userId) {
         if (!confirm('Remove access for this tutor?')) return;
         try {
-            await updateDoc(doc(db, 'users', userId), { isApproved: false });
+            const { error } = await supabase
+                .from('profiles')
+                .update({ role: 'pending' })
+                .eq('id', userId);
+            
+            if (error) throw error;
             loadUsers();
             toast.success('Access removed');
         } catch (err) {
@@ -92,56 +114,40 @@ export default function AdminPanel() {
             let studentCount = 0;
             let orphanedCount = 0;
 
-            // 1. Load batches and fix top-level fields (including nested teacherId)
-            const batchSnap = await getDocs(collection(db, 'batches'));
-            const batchMap = {}; // To find teacherId for linked records
-
-            for (const d of batchSnap.docs) {
-                const data = d.data();
-                const updatePatch = {};
-                let needsUpdate = false;
-
-                // FIX: Move teacherId out of nested maps if it got stuck there (e.g. inside studentIds)
-                if (!data.teacherId && data.studentIds?.teacherId) {
-                    updatePatch.teacherId = data.studentIds.teacherId;
-                    needsUpdate = true;
-                }
-                
-                // FIX: Simple consistency fields
-                if (data.isClosed === undefined) { updatePatch.isClosed = false; needsUpdate = true; }
-                if (!data.subject && data.studentIds?.subject) { updatePatch.subject = data.studentIds.subject; needsUpdate = true; }
-
-                if (needsUpdate) {
-                    await updateDoc(doc(db, 'batches', d.id), updatePatch);
-                    batchCount++;
-                }
-                batchMap[d.id] = (updatePatch.teacherId || data.teacherId);
+            // 1. Fetch batches
+            const { data: batches, error: batchError } = await supabase.from('batches').select('*');
+            if (batchError) throw batchError;
+            
+            const batchMap = {};
+            for (const b of batches) {
+                batchMap[b.id] = b.teacher_id;
             }
 
-            // 2. Fix students (consistency)
-            const studentSnap = await getDocs(collection(db, 'students'));
-            for (const d of studentSnap.docs) {
-                const data = d.data();
-                if (data.status === undefined) {
-                    await updateDoc(doc(db, 'students', d.id), { status: 'enrolled' });
+            // 2. Fix students (ensure status)
+            const { data: students, error: studentError } = await supabase.from('students').select('*');
+            if (studentError) throw studentError;
+            for (const s of students) {
+                if (!s.status) {
+                    await supabase.from('students').update({ status: 'enrolled' }).eq('id', s.id);
                     studentCount++;
                 }
             }
 
-            // 3. Fix Orphaned Records (Exams, Attendance, Homework, etc. missing teacherId)
-            const collectionsToFix = ['exams', 'attendance', 'homeworks', 'lessons', 'schedules', 'sessionLogs'];
-            for (const collName of collectionsToFix) {
-                const collSnap = await getDocs(collection(db, collName));
-                for (const d of collSnap.docs) {
-                    const data = d.data();
-                    if (!data.teacherId && data.batchId && batchMap[data.batchId]) {
-                        await updateDoc(doc(db, collName, d.id), { teacherId: batchMap[data.batchId] });
+            // 3. Fix Orphaned Records (Exams, Attendance, Homework, etc. missing teacher_id)
+            const tablesToFix = ['exams', 'attendance_records', 'homeworks', 'lessons', 'schedules', 'session_logs'];
+            for (const tableName of tablesToFix) {
+                const { data: records, error: recError } = await supabase.from(tableName).select('*');
+                if (recError) continue;
+                
+                for (const r of records) {
+                    if (!r.teacher_id && r.batch_id && batchMap[r.batch_id]) {
+                        await supabase.from(tableName).update({ teacher_id: batchMap[r.batch_id] }).eq('id', r.id);
                         orphanedCount++;
                     }
                 }
             }
 
-            toast.success(`Scan Complete: ${batchCount} batches fixed, ${orphanedCount} orphaned records restored.`, { id: toastId });
+            toast.success(`Scan Complete: ${studentCount} students fixed, ${orphanedCount} orphaned records restored.`, { id: toastId });
             loadDiagnostics();
         } catch (err) {
             console.error('Deep Sync Error:', err);
@@ -152,26 +158,22 @@ export default function AdminPanel() {
     }
 
     async function claimAllData() {
-        const msg = `WARNING: This will re-assign ALL ${dbStats.orphans} records in the system to your current ID (${currentUser.uid}). \n\nOnly do this if you are the owner and your ID has changed. Continue?`;
+        const msg = `WARNING: This will re-assign ALL ${dbStats.orphans} records in the system to your current ID (${userProfile.id}). \n\nOnly do this if you are the owner and your ID has changed. Continue?`;
         if (!confirm(msg)) return;
         
         setIsMigrating(true);
         const toastId = toast.loading('Re-assigning ownership...');
         try {
             let count = 0;
-            const collections = ['batches', 'students', 'exams', 'attendance', 'homeworks', 'lessons', 'schedules', 'sessionLogs'];
+            const tables = ['batches', 'students', 'exams', 'attendance_records', 'homeworks', 'lessons', 'schedules', 'session_logs'];
             
-            for (const collName of collections) {
-                const snap = await getDocs(query(collection(db, collName)));
-                for (const d of snap.docs) {
-                    const data = d.data();
-                    // If it's not mine, OR it has nested teacherId that is mine but not top level
-                    if (data.teacherId !== currentUser.uid || (!data.teacherId && data.studentIds?.teacherId === currentUser.uid)) {
-                        await updateDoc(doc(db, collName, d.id), { 
-                            teacherId: currentUser.uid,
-                            // Also fix nested subject/etc if in batches
-                            ...(collName === 'batches' && !data.subject && data.studentIds?.subject ? { subject: data.studentIds.subject } : {})
-                        });
+            for (const tableName of tables) {
+                const { data: records, error: recError } = await supabase.from(tableName).select('*');
+                if (recError) continue;
+                
+                for (const r of records) {
+                    if (r.teacher_id !== userProfile.id) {
+                        await supabase.from(tableName).update({ teacher_id: userProfile.id }).eq('id', r.id);
                         count++;
                     }
                 }

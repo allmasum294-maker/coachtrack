@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from '../services/firebase';
+import { supabase } from '../services/supabaseClient';
 import { batchService } from '../services/batchService';
+import { studentService } from '../services/studentService';
+import { attendanceService } from '../services/attendanceService';
+import { examService } from '../services/examService';
 import { Download, FileSpreadsheet, FileText, ClipboardCheck, BookOpen, BarChart3, UserCheck, Filter, ArrowRight } from 'lucide-react';
 import { format, isWithinInterval } from 'date-fns';
 import Papa from 'papaparse';
@@ -18,7 +20,7 @@ const EXPORT_TYPES = [
 ];
 
 export default function Export() {
-    const { currentUser } = useAuth();
+    const { userProfile } = useAuth();
     const [selectedType, setSelectedType] = useState('attendance');
     const [selectedBatch, setSelectedBatch] = useState('');
     const [dateFrom, setDateFrom] = useState('');
@@ -29,13 +31,13 @@ export default function Export() {
     const [exporting, setExporting] = useState(false);
 
     useEffect(() => {
-        if (currentUser) loadBatches();
-    }, [currentUser]);
+        if (userProfile?.id) loadBatches();
+    }, [userProfile]);
 
     async function loadBatches() {
         try {
             // Only export data for active batches by default
-            const activeBatches = await batchService.getBatches(currentUser.uid, true);
+            const activeBatches = await batchService.getBatches(userProfile.id, true);
             setBatches(activeBatches);
         } catch (err) { 
             console.error('Error loading batches:', err); 
@@ -58,19 +60,17 @@ export default function Export() {
         setExporting(true);
         const toastId = toast.loading('Preparing export...');
         try {
-            const uid = currentUser.uid;
+            const uid = userProfile.id;
             let rows = [];
             let title = '';
 
             // Strictly filter for enrolled students for all clinical data exports
-            const [enrolledSnap] = await Promise.all([
-                getDocs(query(collection(db, 'students'), where('teacherId', '==', uid), where('status', '==', 'enrolled')))
-            ]);
+            const enrolledStudents = await studentService.getStudentsByTeacher(uid);
             const studentMap = {};
             const enrolledStudentIds = new Set();
-            enrolledSnap.docs.forEach((d) => { 
-                studentMap[d.id] = d.data().name; 
-                enrolledStudentIds.add(d.id);
+            enrolledStudents.forEach((s) => { 
+                studentMap[s.id] = s.name; 
+                enrolledStudentIds.add(s.id);
             });
 
             const batchMap = {};
@@ -78,12 +78,11 @@ export default function Export() {
 
             if (selectedType === 'attendance') {
                 title = 'Attendance Records';
-                const attSnap = await getDocs(query(collection(db, 'attendance'), where('teacherId', '==', uid)));
+                const attendance = await attendanceService.getAttendanceByTeacher(uid);
                 
-                attSnap.docs.forEach((d) => {
-                    const data = d.data();
-                    if (selectedBatch && data.batchId !== selectedBatch) return;
-                    const dateVal = data.date?.toDate ? data.date.toDate() : new Date(data.date);
+                attendance.forEach((data) => {
+                    if (selectedBatch && data.batch_id !== selectedBatch) return;
+                    const dateVal = new Date(data.date);
                     if (!isInDateRange(dateVal)) return;
 
                     (data.records || []).forEach((r) => {
@@ -92,7 +91,7 @@ export default function Export() {
                         
                         rows.push({
                             Date: format(dateVal, 'yyyy-MM-dd'),
-                            Batch: batchMap[data.batchId] || data.batchId,
+                            Batch: batchMap[data.batch_id] || data.batch_id,
                             Student: studentMap[r.studentId] || r.studentId,
                             Status: r.status,
                         });
@@ -100,28 +99,31 @@ export default function Export() {
                 });
             } else if (selectedType === 'lessons') {
                 title = 'Syllabus Coverage';
-                const lessonSnap = await getDocs(query(collection(db, 'lessons'), where('teacherId', '==', uid)));
+                const { data: lessons, error } = await supabase
+                    .from('lessons')
+                    .select('*')
+                    .eq('teacher_id', uid);
 
-                lessonSnap.docs.forEach((d) => {
-                    const data = d.data();
-                    if (selectedBatch && data.batchId !== selectedBatch) return;
+                if (error) throw error;
+
+                lessons.forEach((data) => {
+                    if (selectedBatch && data.batch_id !== selectedBatch) return;
                     rows.push({
-                        Batch: batchMap[data.batchId] || data.batchId,
+                        Batch: batchMap[data.batch_id] || data.batch_id,
                         'Topic #': data.order || '',
                         Title: data.title,
                         Status: data.status,
-                        'Covered On': data.coveredOn || '—',
+                        'Covered On': data.covered_on || '—',
                         Description: data.description || '',
                     });
                 });
             } else if (selectedType === 'exams') {
                 title = 'Exam Performance';
-                const examSnap = await getDocs(query(collection(db, 'exams'), where('teacherId', '==', uid)));
+                const exams = await examService.getExams(uid);
 
-                examSnap.docs.forEach((d) => {
-                    const data = d.data();
-                    if (selectedBatch && data.batchId !== selectedBatch) return;
-                    const dateVal = data.date?.toDate ? data.date.toDate() : new Date(data.date);
+                exams.forEach((data) => {
+                    if (selectedBatch && data.batch_id !== selectedBatch) return;
+                    const dateVal = new Date(data.date);
                     if (!isInDateRange(dateVal)) return;
 
                     (data.scores || []).forEach((s) => {
@@ -131,7 +133,7 @@ export default function Export() {
                         rows.push({
                             Exam: data.title,
                             Date: format(dateVal, 'yyyy-MM-dd'),
-                            Batch: batchMap[data.batchId] || data.batchId,
+                            Batch: batchMap[data.batch_id] || data.batch_id,
                             Student: studentMap[s.studentId] || s.studentId,
                             'Marks Obtained': s.marksObtained,
                             'Total Marks': data.totalMarks,
@@ -142,20 +144,18 @@ export default function Export() {
                 });
             } else if (selectedType === 'students') {
                 title = 'Enrolled Students';
-                // students data comes from enrolledSnap directly
-                enrolledSnap.docs.forEach((d) => {
-                    const data = d.data();
-                    if (selectedBatch && !(data.batchIds || []).includes(selectedBatch)) return;
+                enrolledStudents.forEach((data) => {
+                    if (selectedBatch && !(data.batch_ids || []).includes(selectedBatch)) return;
                     rows.push({
-                        'Student ID': data.studentId || '',
+                        'Student ID': data.student_id || '',
                         Name: data.name,
                         Grade: data.grade || '',
                         School: data.school || '',
                         Email: data.email || '',
                         Phone: data.phone || '',
-                        Guardian: data.guardianName || '',
-                        'Guardian Phone': data.guardianPhone || '',
-                        Batches: (data.batchIds || []).map((id) => batchMap[id] || id).join(', '),
+                        Guardian: data.guardian_name || '',
+                        'Guardian Phone': data.guardian_phone || '',
+                        Batches: (data.batch_ids || []).map((id) => batchMap[id] || id).join(', '),
                     });
                 });
             }

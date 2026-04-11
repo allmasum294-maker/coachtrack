@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, Timestamp } from 'firebase/firestore';
-import { db } from '../services/firebase';
-import { BookOpen, Plus, Edit2, Trash2, X, CheckSquare, Square, Calendar, Clock, AlertTriangle, FileEdit, Filter, ChevronRight, Info } from 'lucide-react';
+import { supabase } from '../services/supabaseClient';
+import { BookOpen, Plus, Edit2, Trash2, X, CheckSquare, Square, Calendar, Clock, AlertTriangle, FileEdit, Filter, ChevronRight, Info, Users } from 'lucide-react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import { batchService } from '../services/batchService';
+import { studentService } from '../services/studentService';
+import { homeworkService } from '../services/homeworkService';
+import { lessonPlanService } from '../services/lessonPlanService';
 import Modal from '../components/Modal';
 
 const STATUSES = [
@@ -16,7 +18,7 @@ const STATUSES = [
 ];
 
 export default function Homework() {
-    const { currentUser } = useAuth();
+    const { userProfile } = useAuth();
     const [assignments, setAssignments] = useState([]);
     const [batches, setBatches] = useState([]);
     const [students, setStudents] = useState([]);
@@ -37,22 +39,22 @@ export default function Homework() {
     const [trackingAssignment, setTrackingAssignment] = useState(null);
 
     useEffect(() => {
-        if (currentUser) loadData();
-    }, [currentUser]);
+        if (userProfile?.id) loadData();
+    }, [userProfile]);
 
     async function loadData() {
         try {
-            const uid = currentUser.uid;
-            const [hwSnap, activeBatches, studentSnap, sessionSnap] = await Promise.all([
-                getDocs(query(collection(db, 'homeworks'), where('teacherId', '==', uid))),
-                batchService.getBatches(uid, false),
-                getDocs(query(collection(db, 'students'), where('teacherId', '==', uid), where('status', '==', 'enrolled'))),
-                getDocs(query(collection(db, 'sessionLogs'), where('teacherId', '==', uid))),
+            const uid = userProfile.id;
+            const [hwList, activeBatches, allStudents, logs] = await Promise.all([
+                homeworkService.getHomeworkByTeacher(uid),
+                batchService.getBatches(uid, true),
+                studentService.getStudentsByTeacher(uid),
+                lessonPlanService.getLessonsByTeacher(uid)
             ]);
-            setAssignments(hwSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+            setAssignments(hwList);
             setBatches(activeBatches);
-            setStudents(studentSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-            setSessionLogs(sessionSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+            setStudents(allStudents.filter(s => s.status === 'enrolled'));
+            setSessionLogs(logs);
         } catch (err) {
             console.error(err);
         } finally {
@@ -60,23 +62,13 @@ export default function Homework() {
         }
     }
 
-    // Get submissions map — supports both old completedBy array and new submissions object
+    // Get submissions map — already transformed by the service to { student_id: { status } }
     function getSubmissions(hw) {
-        if (hw.submissions && typeof hw.submissions === 'object' && Object.keys(hw.submissions).length > 0) {
-            return hw.submissions;
-        }
-        // Migrate old completedBy array
-        const subs = {};
-        if (hw.completedBy && Array.isArray(hw.completedBy)) {
-            hw.completedBy.forEach(id => {
-                subs[id] = { status: 'completed' };
-            });
-        }
-        return subs;
+        return hw.submissions || {};
     }
 
     function getSubmissionStats(hw) {
-        const assignedStudents = students.filter(s => s.batchIds?.includes(hw.batchId));
+        const assignedStudents = students.filter(s => (s.batchIds || []).includes(hw.batch_id));
         const total = assignedStudents.length;
         const subs = getSubmissions(hw);
         let completed = 0, late = 0, partial = 0, notSubmitted = 0;
@@ -101,13 +93,12 @@ export default function Homework() {
 
     function openEdit(hw) {
         setEditingAssignment(hw);
-        const dateVal = hw.dueDate?.toDate ? format(hw.dueDate.toDate(), 'yyyy-MM-dd') : hw.dueDate || '';
         setForm({
             title: hw.title || '',
             description: hw.description || '',
-            batchId: hw.batchId || '',
-            dueDate: dateVal,
-            sessionLogId: hw.sessionLogId || '',
+            batchId: hw.batch_id || '',
+            dueDate: hw.due_date || '',
+            sessionLogId: hw.session_log_id || '',
         });
         setShowModal(true);
     }
@@ -118,20 +109,18 @@ export default function Homework() {
             const data = {
                 title: form.title,
                 description: form.description,
-                batchId: form.batchId,
-                dueDate: Timestamp.fromDate(new Date(form.dueDate)),
-                sessionLogId: form.sessionLogId,
-                teacherId: currentUser.uid,
+                batch_id: form.batchId,
+                due_date: form.dueDate,
+                session_log_id: form.sessionLogId || null,
+                teacher_id: userProfile.id,
             };
 
             if (editingAssignment) {
-                await updateDoc(doc(db, 'homeworks', editingAssignment.id), data);
+                data.id = editingAssignment.id;
+                await homeworkService.saveHomework(data);
                 toast.success('Assignment updated!');
             } else {
-                data.createdAt = serverTimestamp();
-                data.completedBy = [];
-                data.submissions = {};
-                await addDoc(collection(db, 'homeworks'), data);
+                await homeworkService.saveHomework(data);
                 toast.success('Assignment created!');
             }
             setShowModal(false);
@@ -145,7 +134,7 @@ export default function Homework() {
     async function handleDelete(id) {
         if (!confirm('Delete this assignment?')) return;
         try {
-            await deleteDoc(doc(db, 'homeworks', id));
+            await homeworkService.deleteHomework(id);
             loadData();
             toast.success('Deleted successfully');
         } catch (err) {
@@ -157,27 +146,16 @@ export default function Homework() {
     async function setStudentSubmissionStatus(studentId, status) {
         if (!trackingAssignment) return;
         try {
-            const currentSubs = getSubmissions(trackingAssignment);
-            const newSubs = {
-                ...currentSubs,
-                [studentId]: { status, date: new Date().toISOString() }
-            };
+            await homeworkService.setHomeworkStatus(trackingAssignment.id, studentId, status);
+            
+            // Re-load list to get updated submissions
+            const hwList = await homeworkService.getHomeworkByTeacher(userProfile.id);
+            setAssignments(hwList);
 
-            // Also update completedBy for backward compat
-            const completedBy = Object.entries(newSubs)
-                .filter(([_, v]) => v.status === 'completed')
-                .map(([k]) => k);
-
-            await updateDoc(doc(db, 'homeworks', trackingAssignment.id), {
-                submissions: newSubs,
-                completedBy,
-            });
-
-            const updatedHw = { ...trackingAssignment, submissions: newSubs, completedBy };
-            setTrackingAssignment(updatedHw);
-            setAssignments(assignments.map(a =>
-                a.id === trackingAssignment.id ? updatedHw : a
-            ));
+            // Update tracking assignment in modal
+            const updated = hwList.find(a => a.id === trackingAssignment.id);
+            if (updated) setTrackingAssignment(updated);
+            
         } catch (err) {
             console.error(err);
             toast.error('Failed to update status');
@@ -194,7 +172,7 @@ export default function Homework() {
     }
 
     function getDueDateStatus(date) {
-        const d = date?.toDate ? date.toDate() : new Date(date);
+        const d = new Date(date);
         d.setHours(0, 0, 0, 0);
         const today = new Date();
         today.setHours(0, 0, 0, 0);
@@ -205,12 +183,8 @@ export default function Homework() {
     }
 
     const filteredAssignments = assignments
-        .filter(a => !filterBatch || a.batchId === filterBatch)
-        .sort((a, b) => {
-            const da = a.dueDate?.toDate ? a.dueDate.toDate() : new Date(a.dueDate);
-            const db2 = b.dueDate?.toDate ? b.dueDate.toDate() : new Date(b.dueDate);
-            return db2 - da;
-        });
+        .filter(a => !filterBatch || a.batch_id === filterBatch)
+        .sort((a, b) => new Date(b.due_date) - new Date(a.due_date));
 
     if (loading) return <div className="loading-page"><div className="loading-spinner" /></div>;
 

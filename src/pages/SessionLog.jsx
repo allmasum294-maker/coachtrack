@@ -1,18 +1,17 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useSearchParams } from 'react-router-dom';
-import {
-    collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, Timestamp
-} from 'firebase/firestore';
-import { db } from '../services/firebase';
+import { supabase } from '../services/supabaseClient';
 import { FileEdit, Plus, Edit2, Trash2, X, Clock, Link2, Filter, BookOpen, Calendar, ChevronRight, Info } from 'lucide-react';
 import { format, addDays } from 'date-fns';
 import toast from 'react-hot-toast';
 import { batchService } from '../services/batchService';
+import { lessonPlanService } from '../services/lessonPlanService';
+import { homeworkService } from '../services/homeworkService';
 import Modal from '../components/Modal';
 
 export default function SessionLog() {
-    const { currentUser } = useAuth();
+    const { userProfile } = useAuth();
     const [searchParams] = useSearchParams();
     const defaultBatchId = searchParams.get('batchId') || '';
     const defaultScheduleId = searchParams.get('scheduleId') || '';
@@ -35,20 +34,20 @@ export default function SessionLog() {
     });
 
     useEffect(() => {
-        if (currentUser) loadData();
-    }, [currentUser]);
+        if (userProfile?.id) loadData();
+    }, [userProfile]);
 
     async function loadData() {
         try {
-            const uid = currentUser.uid;
-            const [logSnap, activeBatches, schedSnap] = await Promise.all([
-                getDocs(query(collection(db, 'sessionLogs'), where('teacherId', '==', uid))),
+            const uid = userProfile.id;
+            const [logList, activeBatches, schedResult] = await Promise.all([
+                lessonPlanService.getLessonsByTeacher(uid),
                 batchService.getBatches(uid, true),
-                getDocs(query(collection(db, 'schedules'), where('teacherId', '==', uid))),
+                supabase.from('schedules').select('*').eq('teacher_id', uid),
             ]);
-            setLogs(logSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
+            setLogs(logList || []);
             setBatches(activeBatches);
-            setSchedules(schedSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
+            setSchedules(schedResult.data || []);
         } catch (err) {
             console.error('Error:', err);
         } finally {
@@ -59,14 +58,10 @@ export default function SessionLog() {
     // Get unlinked schedules for a batch (status != completed, and no session log already linked)
     function getAvailableSchedules(batchId) {
         if (!batchId) return [];
-        const linkedScheduleIds = new Set(logs.filter(l => l.scheduleId).map(l => l.scheduleId));
+        const linkedScheduleIds = new Set(logs.filter(l => l.schedule_id).map(l => l.schedule_id));
         return schedules
-            .filter(s => s.batchId === batchId && s.status !== 'completed' && s.status !== 'cancelled' && !linkedScheduleIds.has(s.id))
-            .sort((a, b) => {
-                const da = a.date?.toDate ? a.date.toDate() : new Date(a.date);
-                const db2 = b.date?.toDate ? b.date.toDate() : new Date(b.date);
-                return da - db2;
-            });
+            .filter(s => s.batch_id === batchId && s.status !== 'completed' && s.status !== 'cancelled' && !linkedScheduleIds.has(s.id))
+            .sort((a, b) => new Date(a.date) - new Date(b.date));
     }
 
     // Get schedule info for a log
@@ -86,14 +81,13 @@ export default function SessionLog() {
 
     function openEdit(log) {
         setEditingLog(log);
-        const dateVal = log.date?.toDate ? format(log.date.toDate(), 'yyyy-MM-dd') : log.date || '';
         setForm({
-            batchId: log.batchId || '',
-            scheduleId: log.scheduleId || '',
-            date: dateVal,
-            topicsCovered: log.topicsCovered || '',
+            batchId: log.batch_id || '',
+            scheduleId: log.schedule_id || '',
+            date: log.date,
+            topicsCovered: log.topics_covered || '',
             notes: log.notes || '',
-            homeworkAssigned: log.homeworkAssigned || ''
+            homeworkAssigned: log.homework_assigned || ''
         });
         setShowModal(true);
     }
@@ -102,8 +96,7 @@ export default function SessionLog() {
     function handleScheduleSelect(scheduleId) {
         const schedule = schedules.find(s => s.id === scheduleId);
         if (schedule) {
-            const dateVal = schedule.date?.toDate ? format(schedule.date.toDate(), 'yyyy-MM-dd') : schedule.date;
-            setForm(prev => ({ ...prev, scheduleId, date: dateVal }));
+            setForm(prev => ({ ...prev, scheduleId, date: schedule.date }));
         } else {
             setForm(prev => ({ ...prev, scheduleId }));
         }
@@ -115,36 +108,49 @@ export default function SessionLog() {
             const data = {
                 batchId: form.batchId,
                 batchName: batches.find((b) => b.id === form.batchId)?.name || '',
-                scheduleId: form.scheduleId,
-                date: Timestamp.fromDate(new Date(form.date)),
+                scheduleId: form.scheduleId || null,
+                date: form.date,
                 topicsCovered: form.topicsCovered,
                 notes: form.notes,
                 homeworkAssigned: form.homeworkAssigned,
-                teacherId: currentUser.uid,
+                teacherId: userProfile.id,
             };
 
             if (editingLog) {
-                await updateDoc(doc(db, 'sessionLogs', editingLog.id), data);
+                const { error } = await supabase
+                    .from('session_logs')
+                    .update({
+                        batch_id: data.batchId,
+                        batch_name: data.batchName,
+                        schedule_id: data.scheduleId,
+                        date: data.date,
+                        topics_covered: data.topicsCovered,
+                        notes: data.notes,
+                        homework_assigned: data.homeworkAssigned
+                    })
+                    .eq('id', editingLog.id);
+                if (error) throw error;
             } else {
-                data.createdAt = serverTimestamp();
-                const logRef = await addDoc(collection(db, 'sessionLogs'), data);
+                const logId = await lessonPlanService.logSession(data);
+                
                 // Mark the schedule as completed
                 if (form.scheduleId) {
-                    await updateDoc(doc(db, 'schedules', form.scheduleId), { status: 'completed' });
+                    await supabase
+                        .from('schedules')
+                        .update({ status: 'completed' })
+                        .eq('id', form.scheduleId);
                 }
+                
                 // Auto-create homework if homeworkAssigned is filled
                 if (form.homeworkAssigned && form.homeworkAssigned.trim()) {
                     const dueDate = addDays(new Date(form.date), 3);
-                    await addDoc(collection(db, 'homeworks'), {
+                    await homeworkService.saveHomework({
                         title: form.homeworkAssigned.substring(0, 80),
                         description: form.homeworkAssigned,
-                        batchId: form.batchId,
-                        dueDate: Timestamp.fromDate(dueDate),
-                        teacherId: currentUser.uid,
-                        completedBy: [],
-                        submissions: {},
-                        sessionLogId: logRef.id, // properly linked!
-                        createdAt: serverTimestamp(),
+                        batch_id: form.batchId,
+                        due_date: format(dueDate, 'yyyy-MM-dd'),
+                        teacher_id: userProfile.id,
+                        session_log_id: logId
                     });
                 }
             }
@@ -160,7 +166,11 @@ export default function SessionLog() {
     async function handleDelete(logId) {
         if (!confirm('Delete this session log?')) return;
         try {
-            await deleteDoc(doc(db, 'sessionLogs', logId));
+            const { error } = await supabase
+                .from('session_logs')
+                .delete()
+                .eq('id', logId);
+            if (error) throw error;
             loadData();
             toast.success('Log deleted');
         } catch (err) {
@@ -170,12 +180,8 @@ export default function SessionLog() {
     }
 
     const filteredLogs = logs
-        .filter((l) => !filterBatch || l.batchId === filterBatch)
-        .sort((a, b) => {
-            const da = a.date?.toDate ? a.date.toDate() : new Date(a.date);
-            const db2 = b.date?.toDate ? b.date.toDate() : new Date(b.date);
-            return db2 - da;
-        });
+        .filter((l) => !filterBatch || l.batch_id === filterBatch)
+        .sort((a, b) => new Date(b.date) - new Date(a.date));
 
     if (loading) {
         return <div className="loading-page"><div className="loading-spinner" /></div>;

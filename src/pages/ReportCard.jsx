@@ -1,7 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from '../services/firebase';
 import { 
     User, FileSignature, Printer, Search, 
     Award, TrendingUp, BarChart3, BookOpen,
@@ -10,9 +8,13 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { batchService } from '../services/batchService';
+import { studentService } from '../services/studentService';
+import { attendanceService } from '../services/attendanceService';
+import { examService } from '../services/examService';
+import { homeworkService } from '../services/homeworkService';
 
 export default function ReportCard() {
-    const { currentUser, userProfile } = useAuth();
+    const { userProfile } = useAuth();
     const [students, setStudents] = useState([]);
     const [batches, setBatches] = useState([]);
     const [attendance, setAttendance] = useState([]);
@@ -24,28 +26,24 @@ export default function ReportCard() {
     const [remarks, setRemarks] = useState('');
 
     useEffect(() => {
-        if (currentUser) loadData();
-    }, [currentUser]);
+        if (userProfile?.id) loadData();
+    }, [userProfile]);
 
     async function loadData() {
         try {
-            const uid = currentUser.uid;
-            const [studentSnap, activeBatches, attSnap, examSnap, hwSnap] = await Promise.all([
-                getDocs(query(
-                    collection(db, 'students'), 
-                    where('teacherId', '==', uid),
-                    where('status', '==', 'enrolled')
-                )),
+            const uid = userProfile.id;
+            const [allStudents, activeBatches, allAttendance, allExams, allHomeworks] = await Promise.all([
+                studentService.getStudentsByTeacher(uid),
                 batchService.getBatches(uid, true),
-                getDocs(query(collection(db, 'attendance'), where('teacherId', '==', uid))),
-                getDocs(query(collection(db, 'exams'), where('teacherId', '==', uid))),
-                getDocs(query(collection(db, 'homeworks'), where('teacherId', '==', uid))),
+                attendanceService.getAttendanceByTeacher(uid),
+                examService.getExams(uid),
+                homeworkService.getHomeworkByTeacher(uid),
             ]);
-            setStudents(studentSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
+            setStudents(allStudents.filter(s => s.status === 'enrolled'));
             setBatches(activeBatches);
-            setAttendance(attSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
-            setExams(examSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
-            setHomework(hwSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
+            setAttendance(allAttendance);
+            setExams(allExams);
+            setHomework(allHomeworks);
         } catch (err) {
             console.error('Error loading student data:', err);
         } finally {
@@ -56,7 +54,7 @@ export default function ReportCard() {
     const filteredStudents = useMemo(() => {
         let list = students.filter(s => s.status === 'enrolled');
         if (selectedBatchId) {
-            list = list.filter(s => s.batchIds?.includes(selectedBatchId));
+            list = list.filter(s => s.batch_ids?.includes(selectedBatchId));
         }
         return list;
     }, [students, selectedBatchId]);
@@ -76,7 +74,7 @@ export default function ReportCard() {
         let presentClasses = 0;
 
         attendance.forEach((a) => {
-            if (selectedStudent.batchIds?.includes(a.batchId)) {
+            if (selectedStudent.batch_ids?.includes(a.batch_id)) {
                 (a.records || []).forEach(r => {
                     if (r.studentId === selectedStudent.id) {
                         totalClasses++;
@@ -93,13 +91,13 @@ export default function ReportCard() {
         let totalMarksEarned = 0;
 
         exams.forEach(e => {
-            if (selectedStudent.batchIds?.includes(e.batchId)) {
+            if (selectedStudent.batch_ids?.includes(e.batch_id)) {
                 const sScore = (e.scores || []).find(sc => sc.studentId === selectedStudent.id);
                 if (sScore) {
                     const perc = e.totalMarks > 0 ? Math.round((sScore.marksObtained / e.totalMarks) * 100) : 0;
                     studentExams.push({
                         title: e.title,
-                        date: e.date?.toDate ? format(e.date.toDate(), 'MMM d, yyyy') : 'No Date',
+                        date: e.date ? format(new Date(e.date), 'MMM d, yyyy') : 'No Date',
                         marks: sScore.marksObtained,
                         total: e.totalMarks,
                         percent: perc
@@ -116,9 +114,11 @@ export default function ReportCard() {
         let completedHomework = 0;
 
         homework.forEach(hw => {
-            if (selectedStudent.batchIds?.includes(hw.batchId)) {
+            if (selectedStudent.batch_ids?.includes(hw.batch_id)) {
                 totalHomework++;
-                if ((hw.completedBy || []).includes(selectedStudent.id)) {
+                const submissions = hw.submissions || [];
+                const sub = submissions.find(s => s.student_id === selectedStudent.id);
+                if (sub && (sub.status === 'completed' || sub.status === 'late')) {
                     completedHomework++;
                 }
             }

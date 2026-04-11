@@ -1,20 +1,18 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
-import {
-    collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp,
-} from 'firebase/firestore';
-import { db } from '../services/firebase';
+import { supabase } from '../services/supabaseClient';
 import {
     Users, Plus, Edit2, Trash2, Search, X, Eye, Phone, Mail, School, MapPin, BookOpen, User, Calendar, Upload, Download, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Activity, Award, CheckCircle, Shield, Sparkles, Filter, Check
 } from 'lucide-react';
 import { format } from 'date-fns';
 import Papa from 'papaparse';
 import toast from 'react-hot-toast';
-import { setStudentStatus } from '../services/studentService';
+import { studentService } from '../services/studentService';
+import { batchService } from '../services/batchService';
 import Modal from '../components/Modal';
 
 export default function Students() {
-    const { currentUser } = useAuth();
+    const { userProfile } = useAuth();
     const [students, setStudents] = useState([]);
     const [batches, setBatches] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -42,29 +40,29 @@ export default function Students() {
     });
 
     useEffect(() => {
-        if (currentUser) loadData();
-    }, [currentUser]);
+        if (userProfile?.id) loadData();
+    }, [userProfile]);
 
     async function loadData() {
         try {
-            const uid = currentUser.uid;
-            const [studentSnap, batchSnap, attSnap, examSnap, hwSnap] = await Promise.all([
-                getDocs(query(collection(db, 'students'), where('teacherId', '==', uid))),
-                getDocs(query(collection(db, 'batches'), where('teacherId', '==', uid))),
-                getDocs(query(collection(db, 'attendance'), where('teacherId', '==', uid))),
-                getDocs(query(collection(db, 'exams'), where('teacherId', '==', uid))),
-                getDocs(query(collection(db, 'homeworks'), where('teacherId', '==', uid))),
+            const uid = userProfile.id;
+            const [studentData, allBatches, attSnap, examSnap, hwSnap] = await Promise.all([
+                studentService.getStudentsByTeacher(uid),
+                batchService.getBatches(uid),
+                supabase.from('attendance_records').select('*').eq('teacher_id', uid),
+                supabase.from('exams').select('*').eq('teacher_id', uid),
+                supabase.from('homeworks').select('*').eq('teacher_id', uid),
             ]);
-            const studentData = studentSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+            
             setStudents(studentData);
 
             const schools = [...new Set(studentData.map(s => s.school).filter(Boolean))];
             setSchoolList(schools);
 
-            setBatches(batchSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
-            setAttendance(attSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
-            setExams(examSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
-            setHomeworks(hwSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
+            setBatches(allBatches);
+            setAttendance(attSnap.data || []);
+            setExams(examSnap.data || []);
+            setHomeworks(hwSnap.data || []);
         } catch (err) {
             console.error('Error loading students:', err);
         } finally {
@@ -104,18 +102,49 @@ export default function Students() {
         e.preventDefault();
         try {
             const data = {
-                ...form,
+                name: form.name,
+                email: form.email,
+                phone: form.phone,
+                guardian_name: form.guardianName,
+                guardian_phone: form.guardianPhone,
+                school: form.school,
                 grade: parseInt(form.grade) || 0,
-                teacherId: currentUser.uid,
+                address: form.address,
+                notes: form.notes,
+                teacher_id: userProfile.id,
                 status: form.status || 'enrolled'
             };
+            
+            let studentId;
             if (editingStudent) {
-                await updateDoc(doc(db, 'students', editingStudent.id), data);
+                studentId = editingStudent.id;
+                const { error } = await supabase
+                    .from('students')
+                    .update(data)
+                    .eq('id', studentId);
+                if (error) throw error;
             } else {
-                data.createdAt = serverTimestamp();
-                data.status = 'enrolled';
-                await addDoc(collection(db, 'students'), data);
+                const { data: res, error } = await supabase
+                    .from('students')
+                    .insert(data)
+                    .select()
+                    .single();
+                if (error) throw error;
+                studentId = res.id;
             }
+
+            // Sync batches
+            const oldBatchIds = editingStudent?.batchIds || [];
+            const newBatchIds = form.batchIds || [];
+            
+            const toEnroll = newBatchIds.filter(id => !oldBatchIds.includes(id));
+            const toUnenroll = oldBatchIds.filter(id => !newBatchIds.includes(id));
+
+            await Promise.all([
+                ...toEnroll.map(bid => studentService.enrollStudentInBatch(studentId, bid)),
+                ...toUnenroll.map(bid => studentService.unenrollStudentFromBatch(studentId, bid))
+            ]);
+
             setShowModal(false);
             loadData();
             setShowSuccessModal(true);
@@ -128,7 +157,11 @@ export default function Students() {
     async function handleDelete(studentId) {
         if (!confirm('Are you sure you want to remove this student?')) return;
         try {
-            await deleteDoc(doc(db, 'students', studentId));
+            const { error } = await supabase
+                .from('students')
+                .delete()
+                .eq('id', studentId);
+            if (error) throw error;
             loadData();
             toast.success('Student removed');
         } catch (err) {
@@ -172,8 +205,8 @@ export default function Students() {
         if (sortConfig !== null) {
             sortable.sort((a, b) => {
                 if (sortConfig.key === 'createdAt') {
-                    const aTime = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
-                    const bTime = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
+                    const aTime = new Date(a.created_at || 0).getTime();
+                    const bTime = new Date(b.created_at || 0).getTime();
                     return sortConfig.direction === 'asc' ? aTime - bTime : bTime - aTime;
                 }
                 const aVal = String(a[sortConfig.key] || '').toLowerCase();
@@ -316,27 +349,33 @@ export default function Students() {
         if (csvPreview.length === 0) return toast.error('No student data found');
         setIsImporting(true);
         try {
-            const promises = csvPreview.map(row => {
-                if (!row.name) return Promise.resolve();
+            for (const row of csvPreview) {
+                if (!row.name) continue;
                 const data = {
                     name: row.name || '',
                     email: row.email || '',
                     phone: row.phone || '',
-                    guardianName: row.guardianName || '',
-                    guardianPhone: row.guardianPhone || '',
+                    guardian_name: row.guardianName || '',
+                    guardian_phone: row.guardianPhone || '',
                     school: row.school || '',
                     grade: parseInt(row.grade) || 0,
                     address: row.address || '',
                     notes: row.notes || '',
-                    batchIds: filterBatch ? [filterBatch] : [],
-                    unenrolledBatchIds: [],
-                    teacherId: currentUser.uid,
-                    createdAt: serverTimestamp(),
+                    teacher_id: userProfile.id,
                     status: 'enrolled'
                 };
-                return addDoc(collection(db, 'students'), data);
-            });
-            await Promise.all(promises);
+                const { data: res, error } = await supabase
+                    .from('students')
+                    .insert(data)
+                    .select()
+                    .single();
+                
+                if (error) throw error;
+
+                if (filterBatch) {
+                    await studentService.enrollStudentInBatch(res.id, filterBatch);
+                }
+            }
             toast.success(`Success: ${csvPreview.length} students added.`);
             setShowImportModal(false);
             setCsvPreview([]);
@@ -505,7 +544,7 @@ export default function Students() {
                                         </td>
                                         <td>
                                             <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 600 }}>
-                                                {student.createdAt?.toDate ? format(student.createdAt.toDate(), 'MMM d, yyyy') : '—'}
+                                                {student.created_at ? format(new Date(student.created_at), 'MMM d, yyyy') : '—'}
                                             </div>
                                         </td>
                                         <td style={{ paddingRight: '20px' }}>

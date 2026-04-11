@@ -1,10 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
-import {
-    collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, Timestamp,
-} from 'firebase/firestore';
+import { supabase } from '../services/supabaseClient';
 import React from 'react';
-import { db } from '../services/firebase';
 import { 
     ClipboardCheck, Check, X as XIcon, Clock, Save, 
     Trash2, Edit2, ChevronDown, ChevronUp, UserCheck, 
@@ -13,9 +10,11 @@ import {
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import { batchService } from '../services/batchService';
+import { studentService } from '../services/studentService';
+import { attendanceService } from '../services/attendanceService';
 
 export default function Attendance() {
-    const { currentUser } = useAuth();
+    const { userProfile } = useAuth();
     const [batches, setBatches] = useState([]);
     const [students, setStudents] = useState([]);
     const [selectedBatch, setSelectedBatch] = useState('');
@@ -29,8 +28,8 @@ export default function Attendance() {
     const [expandedId, setExpandedId] = useState(null);
 
     useEffect(() => {
-        if (currentUser) loadData();
-    }, [currentUser]);
+        if (userProfile?.id) loadData();
+    }, [userProfile]);
 
     useEffect(() => {
         if (selectedBatch && selectedDate) loadAttendanceForDate();
@@ -38,17 +37,13 @@ export default function Attendance() {
 
     async function loadData() {
         try {
-            const uid = currentUser.uid;
-            const [activeBatches, studentSnap] = await Promise.all([
-                batchService.getBatches(uid, false),
-                getDocs(query(
-                    collection(db, 'students'), 
-                    where('teacherId', '==', uid),
-                    where('status', '==', 'enrolled')
-                )),
+            const uid = userProfile.id;
+            const [activeBatches, allStudents] = await Promise.all([
+                batchService.getBatches(uid, true),
+                studentService.getStudentsByTeacher(uid)
             ]);
             setBatches(activeBatches);
-            setStudents(studentSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
+            setStudents(allStudents.filter(s => s.status === 'enrolled'));
         } catch (err) {
             console.error('Error loading students:', err);
             toast.error('Failed to load students');
@@ -59,39 +54,26 @@ export default function Attendance() {
 
     async function loadAttendanceForDate() {
         try {
-            const snap = await getDocs(
-                query(
-                    collection(db, 'attendance'),
-                    where('teacherId', '==', currentUser.uid),
-                    where('batchId', '==', selectedBatch),
-                )
-            );
-            const existing = snap.docs.find((d) => {
-                const data = d.data();
-                const dateVal = data.date?.toDate ? format(data.date.toDate(), 'yyyy-MM-dd') : data.date;
-                return dateVal === selectedDate;
-            });
+            const data = await attendanceService.getBatchAttendance(selectedBatch);
+            
+            const existing = data.find((d) => d.date === selectedDate);
 
             if (existing) {
-                setExistingAttendance({ id: existing.id, ...existing.data() });
+                setExistingAttendance(existing);
                 const recs = {};
-                (existing.data().records || []).forEach((r) => {
-                    recs[r.studentId] = r.status;
+                (existing.attendance_log || []).forEach((log) => {
+                    recs[log.student_id] = log.status;
                 });
                 setRecords(recs);
             } else {
                 setExistingAttendance(null);
-                const batchStudents = students.filter((s) => (s.batchIds || []).includes(selectedBatch));
+                const enrolledInBatch = students.filter((s) => (s.batchIds || []).includes(selectedBatch));
                 const recs = {};
-                batchStudents.forEach((s) => { recs[s.id] = 'present'; });
+                enrolledInBatch.forEach((s) => { recs[s.id] = 'present'; });
                 setRecords(recs);
             }
 
-            setHistory(snap.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => {
-                const da = a.date?.toDate ? a.date.toDate() : new Date(a.date);
-                const db2 = b.date?.toDate ? b.date.toDate() : new Date(b.date);
-                return db2 - da;
-            }));
+            setHistory(data);
         } catch (err) {
             console.error('Error loading attendance history:', err);
         }
@@ -99,8 +81,8 @@ export default function Attendance() {
 
     const batchStudents = useMemo(() => {
         const enrolled = students.filter((s) => (s.batchIds || []).includes(selectedBatch));
-        if (existingAttendance?.records) {
-            const historicalIds = existingAttendance.records.map((r) => r.studentId);
+        if (existingAttendance?.attendance_log) {
+            const historicalIds = existingAttendance.attendance_log.map((log) => log.student_id);
             const historicalStudents = students.filter(
                 (s) => historicalIds.includes(s.id) && !enrolled.some((e) => e.id === s.id)
             );
@@ -118,40 +100,29 @@ export default function Attendance() {
         setSaving(true);
         const toastId = toast.loading('Saving attendance...');
         try {
-            const recordsArray = Object.entries(records).map(([studentId, status]) => ({
-                studentId, status,
-            }));
-
-            const data = {
-                batchId: selectedBatch,
-                teacherId: currentUser.uid,
-                date: Timestamp.fromDate(new Date(selectedDate)),
-                records: recordsArray,
-            };
-
-            if (existingAttendance) {
-                await updateDoc(doc(db, 'attendance', existingAttendance.id), data);
-            } else {
-                data.createdAt = serverTimestamp();
-                await addDoc(collection(db, 'attendance'), data);
-            }
+            await attendanceService.saveAttendance(
+                userProfile.id,
+                selectedBatch,
+                selectedDate,
+                records
+            );
 
             // Sync with Schedule
-            const schedSnap = await getDocs(query(
-                collection(db, 'schedules'),
-                where('teacherId', '==', currentUser.uid),
-                where('batchId', '==', selectedBatch)
-            ));
+            const { data: schedules } = await supabase
+                .from('schedules')
+                .select('id')
+                .eq('teacher_id', userProfile.id)
+                .eq('batch_id', selectedBatch)
+                .eq('date', selectedDate)
+                .eq('status', 'scheduled');
             
-            const updatePromises = [];
-            schedSnap.docs.forEach((d) => {
-                const sData = d.data();
-                const sDateVal = sData.date?.toDate ? format(sData.date.toDate(), 'yyyy-MM-dd') : sData.date;
-                if (sDateVal === selectedDate && sData.status === 'scheduled') {
-                    updatePromises.push(updateDoc(doc(db, 'schedules', d.id), { status: 'completed' }));
-                }
-            });
-            await Promise.all(updatePromises);
+            if (schedules && schedules.length > 0) {
+                await supabase
+                    .from('schedules')
+                    .update({ status: 'completed' })
+                    .in('id', schedules.map(s => s.id));
+            }
+
             toast.success('Attendance saved!', { id: toastId });
             loadAttendanceForDate();
         } catch (err) {
@@ -165,7 +136,11 @@ export default function Attendance() {
     async function handleDelete(id) {
         if (!confirm('This will permanently delete this record. Proceed?')) return;
         try {
-            await deleteDoc(doc(db, 'attendance', id));
+            const { error } = await supabase
+                .from('attendance_records')
+                .delete()
+                .eq('id', id);
+            if (error) throw error;
             toast.success('Record deleted');
             loadAttendanceForDate();
         } catch (err) {
@@ -175,8 +150,8 @@ export default function Attendance() {
     }
 
     function handleEdit(att) {
-        setSelectedBatch(att.batchId);
-        setSelectedDate(att.date?.toDate ? format(att.date.toDate(), 'yyyy-MM-dd') : att.date);
+        setSelectedBatch(att.batch_id);
+        setSelectedDate(att.date);
         setTab('mark');
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }

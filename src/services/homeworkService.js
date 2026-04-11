@@ -1,41 +1,78 @@
-import { collection, query, where, getDocs, addDoc, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
-import { db } from './firebase';
-
-/**
- * Fetch homeworks for a batch.
- */
-export async function getBatchHomeworks(batchId) {
-  const q = query(
-    collection(db, 'homeworks'),
-    where('batchId', '==', batchId)
-  );
-  const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
-}
-
-/**
- * Toggle homework completion for a student.
- */
-export async function toggleHomeworkCompletion(homeworkId, studentId, isCompleted) {
-  const hwRef = doc(db, 'homeworks', homeworkId);
-  const snap = await getDocs(query(collection(db, 'homeworks'), where('__name__', '==', homeworkId)));
-  if (snap.empty) return;
-  
-  const data = snap.docs[0].data();
-  let completedBy = data.completedBy || [];
-  
-  if (isCompleted) {
-    if (!completedBy.includes(studentId)) completedBy.push(studentId);
-  } else {
-    completedBy = completedBy.filter(id => id !== studentId);
-  }
-  
-  await updateDoc(hwRef, { completedBy });
-}
+import { supabase } from './supabaseClient';
 
 export const homeworkService = {
-  getBatchHomeworks,
-  toggleHomeworkCompletion
+  async getHomeworkByTeacher(teacherId) {
+    const { data, error } = await supabase
+      .from('homeworks')
+      .select('*, homework_completions(student_id, status)')
+      .eq('teacher_id', teacherId);
+    
+    if (error) throw error;
+
+    // Transform to include submissions object for backward compatibility in UI
+    return data.map(hw => {
+      const submissions = {};
+      (hw.homework_completions || []).forEach(c => {
+        submissions[c.student_id] = { status: c.status };
+      });
+      return {
+        ...hw,
+        submissions,
+        completedBy: (hw.homework_completions || [])
+          .filter(c => c.status === 'completed')
+          .map(c => c.student_id)
+      };
+    });
+  },
+
+  async setHomeworkStatus(homeworkId, studentId, status) {
+    if (status === 'not_submitted') {
+      const { error } = await supabase
+        .from('homework_completions')
+        .delete()
+        .eq('homework_id', homeworkId)
+        .eq('student_id', studentId);
+      if (error) throw error;
+    } else {
+      const { error } = await supabase
+        .from('homework_completions')
+        .upsert({
+          homework_id: homeworkId,
+          student_id: studentId,
+          status: status,
+          completed_at: new Date().toISOString()
+        }, { onConflict: 'homework_id,student_id' });
+      if (error) throw error;
+    }
+  },
+
+  async saveHomework(hwData) {
+    const { id, ...data } = hwData;
+    if (id) {
+      const { error } = await supabase
+        .from('homeworks')
+        .update(data)
+        .eq('id', id);
+      if (error) throw error;
+      return id;
+    } else {
+      const { data: newHw, error } = await supabase
+        .from('homeworks')
+        .insert(data)
+        .select()
+        .single();
+      if (error) throw error;
+      return newHw.id;
+    }
+  },
+
+  async deleteHomework(id) {
+    const { error } = await supabase
+      .from('homeworks')
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
+  }
 };
 
 export default homeworkService;

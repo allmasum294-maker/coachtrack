@@ -1,30 +1,19 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import {
-    collection, query, where, getDocs,
-} from 'firebase/firestore';
-import { db } from '../services/firebase';
+import { supabase } from '../services/supabaseClient';
 import {
     Users, Calendar, TrendingUp, ClipboardCheck, BookOpen, 
     ArrowRight, Clock, AlertTriangle, PlayCircle, 
     Crown, Activity, Zap, ChevronRight, ShieldAlert
 } from 'lucide-react';
-import { format, isToday, isTomorrow, startOfWeek, endOfWeek, differenceInDays, parseISO, isValid } from 'date-fns';
+import { format, isToday, startOfWeek, endOfWeek, differenceInDays } from 'date-fns';
 import { batchService } from '../services/batchService';
-import { migrateBatchesIsClosed } from '../migrations/addIsClosedToBatches';
+import { studentService } from '../services/studentService';
 import toast from 'react-hot-toast';
 
-// Helper for safe date conversion from Firestore or String
-const safeToDate = (dateVal) => {
-    if (!dateVal) return null;
-    if (typeof dateVal.toDate === 'function') return dateVal.toDate();
-    const d = new Date(dateVal);
-    return isValid(d) ? d : null;
-};
-
 export default function Dashboard() {
-    const { currentUser, userProfile } = useAuth();
+    const { userProfile } = useAuth();
     const [stats, setStats] = useState({
         classesToday: 0,
         weekAttendance: 0,
@@ -36,59 +25,59 @@ export default function Dashboard() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (!currentUser) return;
+        if (!userProfile?.id) return;
         loadDashboardData();
-    }, [currentUser]);
+    }, [userProfile]);
 
     async function loadDashboardData() {
         try {
-            const uid = currentUser.uid;
+            const uid = userProfile.id;
             const now = new Date();
             const weekStart = startOfWeek(now, { weekStartsOn: 0 });
             const weekEnd = endOfWeek(now, { weekStartsOn: 0 });
 
-            // 1. Fetch ENROLLED Students
-            const studentSnap = await getDocs(query(
-                collection(db, 'students'), 
-                where('teacherId', '==', uid),
-                where('status', '==', 'enrolled')
-            ));
-            const studentIds = studentSnap.docs.map(d => d.id);
+            // 1. Fetch Students and ignore status for mapping (filtering later)
+            const allStudents = await studentService.getStudentsByTeacher(uid);
+            const studentIds = allStudents.filter(s => s.status === 'enrolled').map(s => s.id);
             const studentsMap = {};
-            studentSnap.docs.forEach(d => {
-                studentsMap[d.id] = { id: d.id, ...d.data() };
-            });
+            allStudents.forEach(s => { studentsMap[s.id] = s; });
 
             // 2. Fetch ACTIVE Batches
-            const activeBatches = await batchService.getBatches(uid, false);
+            const activeBatches = await batchService.getBatches(uid, true);
             const activeBatchIds = activeBatches.map(b => b.id);
             const activeBatchMap = {};
             activeBatches.forEach(b => { activeBatchMap[b.id] = b; });
 
-            // 3. Fetch Schedules and filter by active batches
-            const scheduleSnap = await getDocs(query(collection(db, 'schedules'), where('teacherId', '==', uid)));
-            const schedules = scheduleSnap.docs
-                .map(d => ({ id: d.id, ...d.data() }))
-                .filter(s => activeBatchIds.includes(s.batchId));
+            // 3. Fetch Schedules for active batches
+            const { data: schedulesData } = await supabase
+                .from('schedules')
+                .select('*')
+                .eq('teacher_id', uid)
+                .in('batch_id', activeBatchIds);
+            
+            const schedules = schedulesData || [];
             
             let classesToday = 0;
             const upcoming = schedules
                 .filter((s) => {
                     if (!s.date || s.status === 'cancelled') return false;
-                    const d = safeToDate(s.date);
-                    if (!d) return false;
+                    const d = new Date(s.date);
                     if (isToday(d)) classesToday++;
                     return d >= now;
                 })
-                .sort((a, b) => {
-                    const da = safeToDate(a.date) || new Date(0);
-                    const db2 = safeToDate(b.date) || new Date(0);
-                    return da - db2;
-                })
-                .slice(0, 5);
+                .sort((a, b) => new Date(a.date) - new Date(b.date))
+                .slice(0, 5)
+                .map(s => ({
+                    ...s,
+                    batchName: activeBatchMap[s.batch_id]?.name || 'Unknown Batch'
+                }));
 
-            // 4. Fetch Attendance audit
-            const attendanceSnap = await getDocs(query(collection(db, 'attendance'), where('teacherId', '==', uid)));
+            // 4. Fetch Attendance and Log
+            const { data: attendanceData } = await supabase
+                .from('attendance_records')
+                .select('*, attendance_log(*)')
+                .eq('teacher_id', uid);
+            
             let weekRecords = 0;
             let weekPresent = 0;
             const studentAttendance = {};
@@ -98,24 +87,22 @@ export default function Dashboard() {
                 studentAttendance[id] = { studentId: id, total: 0, present: 0 };
             });
 
-            attendanceSnap.docs.forEach((dSnapshot) => {
-                const data = dSnapshot.data();
-                const recordDate = safeToDate(data.date);
-                if (!recordDate) return;
+            (attendanceData || []).forEach((record) => {
+                const recordDate = new Date(record.date);
                 const isThisWeek = recordDate >= weekStart && recordDate <= weekEnd;
                 
-                if (data.records) {
-                    data.records.forEach((r) => {
-                        if (studentAttendance[r.studentId]) {
+                if (record.attendance_log) {
+                    record.attendance_log.forEach((log) => {
+                        if (studentAttendance[log.student_id]) {
                             if (isThisWeek) {
                                 weekRecords++;
-                                if (r.status === 'present') weekPresent++;
+                                if (log.status === 'present') weekPresent++;
                             }
-                            studentAttendance[r.studentId].total++;
-                            if (r.status === 'present') {
-                                studentAttendance[r.studentId].present++;
-                                if (!lastAttendDate[r.studentId] || recordDate > lastAttendDate[r.studentId]) {
-                                    lastAttendDate[r.studentId] = recordDate;
+                            studentAttendance[log.student_id].total++;
+                            if (log.status === 'present') {
+                                studentAttendance[log.student_id].present++;
+                                if (!lastAttendDate[log.student_id] || recordDate > lastAttendDate[log.student_id]) {
+                                    lastAttendDate[log.student_id] = recordDate;
                                 }
                             }
                         }
@@ -161,59 +148,54 @@ export default function Dashboard() {
             });
 
             // 5. Fetch Exam Performance
-            const examSnap = await getDocs(query(collection(db, 'exams'), where('teacherId', '==', uid)));
+            const { data: examsData } = await supabase
+                .from('exams')
+                .select('*')
+                .eq('teacher_id', uid);
+            
             let nextExamDays = null;
-            const examsData = examSnap.docs.map(e => ({ id: e.id, ...e.data() }));
+            const examsList = examsData || [];
 
-            const upcomingExams = examsData
+            const upcomingExams = examsList
                 .filter(e => {
-                    const ed = safeToDate(e.date);
-                    if (!ed) return false;
+                    const ed = new Date(e.date);
                     ed.setHours(0,0,0,0);
-                    const today = new Date();
-                    today.setHours(0,0,0,0);
-                    return ed >= today;
+                    const t = new Date();
+                    t.setHours(0,0,0,0);
+                    return ed >= t;
                 })
-                .sort((a, b) => {
-                    const da = safeToDate(a.date) || new Date(0);
-                    const db2 = safeToDate(b.date) || new Date(0);
-                    return da - db2;
-                });
+                .sort((a, b) => new Date(a.date) - new Date(b.date));
 
             if (upcomingExams.length > 0) {
-                const earliestExamDate = safeToDate(upcomingExams[0].date);
-                if (earliestExamDate) {
-                    nextExamDays = differenceInDays(earliestExamDate, new Date());
-                    if (nextExamDays < 0) nextExamDays = 0;
-                }
+                const earliestExamDate = new Date(upcomingExams[0].date);
+                nextExamDays = differenceInDays(earliestExamDate, new Date());
+                if (nextExamDays < 0) nextExamDays = 0;
             }
 
-            const pastExams = examsData
-                .filter(e => e.date && !upcomingExams.find(ue => ue.id === e.id))
-                .sort((a, b) => {
-                    const da = safeToDate(a.date) || new Date(0);
-                    const db2 = safeToDate(b.date) || new Date(0);
-                    return da - db2;
-                });
+            // Past exams for risk analysis (marks drop)
+            // Note: In Supabase schema, scores are likely in exam_results table
+            const { data: resultsData } = await supabase
+                .from('exam_results')
+                .select('*, exams(date, total_marks)')
+                .in('exam_id', examsList.map(e => e.id));
 
             const studentScores = {};
-            pastExams.forEach(exam => {
-                if (exam.scores) {
-                    exam.scores.forEach(sc => {
-                        if (studentAttendance[sc.studentId]) {
-                            if (!studentScores[sc.studentId]) studentScores[sc.studentId] = [];
-                            const perc = exam.totalMarks > 0 ? (sc.marksObtained / exam.totalMarks) * 100 : 0;
-                            studentScores[sc.studentId].push(perc);
-                        }
-                    });
+            (resultsData || []).forEach(res => {
+                const examDate = new Date(res.exams.date);
+                if (examDate < now) {
+                    if (studentAttendance[res.student_id]) {
+                        if (!studentScores[res.student_id]) studentScores[res.student_id] = [];
+                        const perc = res.exams.total_marks > 0 ? (res.marks_obtained / res.exams.total_marks) * 100 : 0;
+                        studentScores[res.student_id].push({ date: examDate, perc });
+                    }
                 }
             });
 
             Object.keys(studentScores).forEach(sid => {
-                const scores = studentScores[sid];
-                if (scores.length >= 2) {
-                    const last = scores[scores.length - 1];
-                    const prev = scores[scores.length - 2];
+                const history = studentScores[sid].sort((a, b) => a.date - b.date);
+                if (history.length >= 2) {
+                    const last = history[history.length - 1].perc;
+                    const prev = history[history.length - 2].perc;
                     if (last < prev - 10) { 
                         addRisk(sid, `Scores dropped recently`, 'medium');
                     }
@@ -225,7 +207,6 @@ export default function Dashboard() {
                     const student = studentsMap[risk.studentId];
                     if (!student) return false;
                     const studentBatchIds = student.batchIds || [];
-                    // Only show student if they belong to at least one active batch
                     return studentBatchIds.some(bid => activeBatchIds.includes(bid));
                 })
                 .sort((a,b) => b.score - a.score);

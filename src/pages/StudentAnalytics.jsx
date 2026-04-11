@@ -1,25 +1,20 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from '../services/firebase';
-import batchService from '../services/batchService';
+import { supabase } from '../services/supabaseClient';
+import { batchService } from '../services/batchService';
+import { studentService } from '../services/studentService';
+import { attendanceService } from '../services/attendanceService';
+import { examService } from '../services/examService';
+import { homeworkService } from '../services/homeworkService';
 import { User, TrendingUp, TrendingDown, Calendar, AlertCircle, Filter, BookOpen, ClipboardCheck, ChevronDown, ChevronUp } from 'lucide-react';
 import {
     LineChart, Line, BarChart, Bar, AreaChart, Area,
     XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Cell
 } from 'recharts';
-import { format, startOfDay, endOfDay, isValid } from 'date-fns';
-
-// Helper for safe date conversion from Firestore or String
-const safeToDate = (dateVal) => {
-    if (!dateVal) return null;
-    if (typeof dateVal.toDate === 'function') return dateVal.toDate();
-    const d = new Date(dateVal);
-    return isValid(d) ? d : null;
-};
+import { format, startOfDay, endOfDay } from 'date-fns';
 
 export default function StudentAnalytics() {
-    const { currentUser } = useAuth();
+    const { userProfile } = useAuth();
     const [students, setStudents] = useState([]);
     const [batches, setBatches] = useState([]);
     const [attendance, setAttendance] = useState([]);
@@ -33,25 +28,25 @@ export default function StudentAnalytics() {
     const [showExamTable, setShowExamTable] = useState(false);
 
     useEffect(() => {
-        if (currentUser) loadData();
-    }, [currentUser]);
+        if (userProfile?.id) loadData();
+    }, [userProfile]);
 
     async function loadData() {
         try {
-            const uid = currentUser.uid;
-            const [activeBatches, studentSnap, attSnap, examSnap, hwSnap] = await Promise.all([
+            const uid = userProfile.id;
+            const [activeBatches, allStudents, allAttendance, allExams, allHomeworks] = await Promise.all([
                 batchService.getBatches(uid, true),
-                getDocs(query(collection(db, 'students'), where('teacherId', '==', uid), where('status', '==', 'enrolled'))),
-                getDocs(query(collection(db, 'attendance'), where('teacherId', '==', uid))),
-                getDocs(query(collection(db, 'exams'), where('teacherId', '==', uid))),
-                getDocs(query(collection(db, 'homeworks'), where('teacherId', '==', uid))),
+                studentService.getStudentsByTeacher(uid),
+                attendanceService.getAttendanceByTeacher(uid),
+                examService.getExams(uid),
+                homeworkService.getHomeworkByTeacher(uid),
             ]);
 
             setBatches(activeBatches);
-            setStudents(studentSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
-            setAttendance(attSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
-            setExams(examSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
-            setHomeworks(hwSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
+            setStudents(allStudents.filter(s => s.status === 'enrolled'));
+            setAttendance(allAttendance);
+            setExams(allExams);
+            setHomeworks(allHomeworks);
         } catch (err) {
             console.error('Error loading data:', err);
         } finally {
@@ -69,10 +64,9 @@ export default function StudentAnalytics() {
         return true;
     }
 
-
     const filteredStudents = useMemo(() => {
         return selectedBatchId
-            ? students.filter(s => s.batchIds?.includes(selectedBatchId))
+            ? students.filter(s => s.batch_ids?.includes(selectedBatchId))
             : students;
     }, [selectedBatchId, students]);
 
@@ -91,8 +85,8 @@ export default function StudentAnalytics() {
         let totalClasses = 0, presentClasses = 0, absentClasses = 0, lateClasses = 0;
 
         attendance.forEach((a) => {
-            if (!selectedStudent.batchIds?.includes(a.batchId)) return;
-            const d = safeToDate(a.date);
+            if (!selectedStudent.batch_ids?.includes(a.batch_id)) return;
+            const d = new Date(a.date);
             if (!d || !isInDateRange(d)) return;
             const record = (a.records || []).find(r => r.studentId === selectedStudent.id);
             if (record) {
@@ -108,8 +102,8 @@ export default function StudentAnalytics() {
         let totalExamMarks = 0, totalMarksEarned = 0, examsTaken = 0;
 
         exams.forEach(e => {
-            if (!selectedStudent.batchIds?.includes(e.batchId)) return;
-            const ed = safeToDate(e.date);
+            if (!selectedStudent.batch_ids?.includes(e.batch_id)) return;
+            const ed = new Date(e.date);
             if (!ed || !isInDateRange(ed)) return;
             const sScore = (e.scores || []).find(sc => sc.studentId === selectedStudent.id);
             if (sScore) {
@@ -124,19 +118,18 @@ export default function StudentAnalytics() {
         let totalHomeworks = 0, completedHomeworks = 0, lateHomeworks = 0, partialHomeworks = 0, notSubmittedHomeworks = 0;
 
         homeworks.forEach(hw => {
-            if (!selectedStudent.batchIds?.includes(hw.batchId)) return;
-            const hwDate = safeToDate(hw.dueDate) || safeToDate(hw.createdAt);
+            if (!selectedStudent.batch_ids?.includes(hw.batch_id)) return;
+            const hwDate = new Date(hw.due_date || hw.created_at);
             if (hwDate && !isInDateRange(hwDate)) return;
 
             totalHomeworks++;
-            const sub = hw.submissions?.[selectedStudent.id];
+            // Note: Homework submissions in relational schema are handled differently, but service currently wraps them.
+            const sub = (hw.submissions || []).find(s => s.student_id === selectedStudent.id);
             if (sub) {
                 if (sub.status === 'completed') completedHomeworks++;
                 else if (sub.status === 'late') lateHomeworks++;
                 else if (sub.status === 'partial') partialHomeworks++;
                 else notSubmittedHomeworks++;
-            } else if ((hw.completedBy || []).includes(selectedStudent.id)) {
-                completedHomeworks++;
             } else {
                 notSubmittedHomeworks++;
             }
@@ -156,18 +149,18 @@ export default function StudentAnalytics() {
         if (!selectedStudent) return [];
         const history = [];
         attendance
-            .filter(a => selectedStudent.batchIds?.includes(a.batchId))
+            .filter(a => selectedStudent.batch_ids?.includes(a.batch_id))
             .filter(a => {
-                const d = safeToDate(a.date);
+                const d = new Date(a.date);
                 return d && isInDateRange(d);
             })
-            .sort((a, b) => (safeToDate(a.date) || 0) - (safeToDate(b.date) || 0))
+            .sort((a, b) => new Date(a.date) - new Date(b.date))
             .forEach(a => {
                 const record = (a.records || []).find(r => r.studentId === selectedStudent.id);
                 if (record) {
-                    const d = safeToDate(a.date);
+                    const d = new Date(a.date);
                     history.push({
-                        date: d ? format(d, 'MMM d') : 'N/A',
+                        date: format(d, 'MMM d'),
                         status: record.status === 'present' ? 100 : 0,
                     });
                 }
@@ -179,12 +172,12 @@ export default function StudentAnalytics() {
         if (!selectedStudent) return [];
         const history = [];
         exams
-            .filter(e => selectedStudent.batchIds?.includes(e.batchId))
+            .filter(e => selectedStudent.batch_ids?.includes(e.batch_id))
             .filter(e => {
-                const d = safeToDate(e.date);
+                const d = new Date(e.date);
                 return d && isInDateRange(d);
             })
-            .sort((a, b) => (safeToDate(a.date) || 0) - (safeToDate(b.date) || 0))
+            .sort((a, b) => new Date(a.date) - new Date(b.date))
             .forEach(e => {
                 const sScore = (e.scores || []).find(sc => sc.studentId === selectedStudent.id);
                 if (sScore) {
@@ -204,16 +197,16 @@ export default function StudentAnalytics() {
     const hwData = useMemo(() => {
         if (!selectedStudent) return [];
         return homeworks
-            .filter(hw => selectedStudent.batchIds?.includes(hw.batchId))
+            .filter(hw => selectedStudent.batch_ids?.includes(hw.batch_id))
             .filter(hw => {
-                const d = safeToDate(hw.dueDate) || safeToDate(hw.createdAt);
-                return d ? isInDateRange(d) : true;
+                const d = new Date(hw.due_date || hw.created_at);
+                return isInDateRange(d);
             })
-            .sort((a, b) => (safeToDate(a.dueDate || a.createdAt) || 0) - (safeToDate(b.dueDate || b.createdAt) || 0))
+            .sort((a, b) => new Date(a.due_date || a.created_at) - new Date(b.due_date || b.created_at))
             .slice(-10)
             .map(hw => {
-                const sub = hw.submissions?.[selectedStudent.id];
-                const isCompleted = sub?.status === 'completed' || (!sub && (hw.completedBy || []).includes(selectedStudent.id));
+                const sub = (hw.submissions || []).find(s => s.student_id === selectedStudent.id);
+                const isCompleted = sub?.status === 'completed' || sub?.status === 'late';
                 return {
                     name: hw.title.length > 15 ? hw.title.substring(0, 15) + '...' : hw.title,
                     Status: isCompleted ? 1 : 0
@@ -225,20 +218,19 @@ export default function StudentAnalytics() {
     const examTableData = useMemo(() => {
         if (!selectedStudent) return [];
         return exams
-            .filter(e => selectedStudent.batchIds?.includes(e.batchId))
+            .filter(e => selectedStudent.batch_ids?.includes(e.batch_id))
             .filter(e => {
-                const d = safeToDate(e.date);
+                const d = new Date(e.date);
                 return d && isInDateRange(d);
             })
-            .sort((a, b) => (safeToDate(b.date) || 0) - (safeToDate(a.date) || 0))
+            .sort((a, b) => new Date(b.date) - new Date(a.date))
             .map(e => {
                 const sScore = (e.scores || []).find(sc => sc.studentId === selectedStudent.id);
                 if (!sScore) return null;
                 const topics = e.topicConfig || (e.topics || []).map(t => ({ name: t, maxMarks: null }));
-                const d = safeToDate(e.date);
                 return {
                     title: e.title,
-                    date: d ? format(d, 'MMM d, yyyy') : 'N/A',
+                    date: format(new Date(e.date), 'MMM d, yyyy'),
                     totalMarks: e.totalMarks,
                     marksObtained: sScore.marksObtained,
                     percentage: e.totalMarks > 0 ? Math.round((sScore.marksObtained / e.totalMarks) * 100) : 0,

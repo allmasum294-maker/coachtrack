@@ -1,31 +1,29 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { collection, query, where, getDocs, updateDoc, doc } from 'firebase/firestore';
-import { db } from '../services/firebase';
+import { supabase } from '../services/supabaseClient';
 import { Bell, CheckCircle, AlertCircle, Calendar, Info, Check, Sparkles } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
 export default function Notifications() {
-    const { currentUser } = useAuth();
+    const { userProfile } = useAuth();
     const [notifications, setNotifications] = useState([]);
     const [loading, setLoading] = useState(true);
     const [tab, setTab] = useState('all');
 
     useEffect(() => {
-        if (currentUser) loadNotifications();
-    }, [currentUser]);
+        if (userProfile?.id) loadNotifications();
+    }, [userProfile]);
 
     async function loadNotifications() {
         try {
-            const snap = await getDocs(
-                query(collection(db, 'notifications'), where('teacherId', '==', currentUser.uid))
-            );
-            const data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-            setNotifications(data.sort((a, b) => {
-                const da = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
-                const db2 = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
-                return db2 - da;
-            }));
+            const { data, error } = await supabase
+                .from('notifications')
+                .select('*')
+                .eq('teacher_id', userProfile.id)
+                .order('created_at', { ascending: false });
+            
+            if (error) throw error;
+            setNotifications(data);
         } catch (err) {
             console.error('Error loading notifications:', err);
         } finally {
@@ -35,9 +33,14 @@ export default function Notifications() {
 
     async function markAsRead(notificationId) {
         try {
-            await updateDoc(doc(db, 'notifications', notificationId), { isRead: true });
+            const { error } = await supabase
+                .from('notifications')
+                .update({ is_read: true })
+                .eq('id', notificationId);
+            
+            if (error) throw error;
             setNotifications((prev) =>
-                prev.map((n) => (n.id === notificationId ? { ...n, isRead: true } : n))
+                prev.map((n) => (n.id === notificationId ? { ...n, is_read: true } : n))
             );
         } catch (err) {
             console.error('Error updating notification:', err);
@@ -46,11 +49,16 @@ export default function Notifications() {
 
     async function markAllRead() {
         try {
-            const unread = notifications.filter((n) => !n.isRead);
-            await Promise.all(
-                unread.map((n) => updateDoc(doc(db, 'notifications', n.id), { isRead: true }))
-            );
-            setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+            const unreadIds = notifications.filter((n) => !n.is_read).map(n => n.id);
+            if (unreadIds.length === 0) return;
+
+            const { error } = await supabase
+                .from('notifications')
+                .update({ is_read: true })
+                .in('id', unreadIds);
+            
+            if (error) throw error;
+            setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
         } catch (err) {
             console.error('Error resetting notifications:', err);
         }
@@ -75,10 +83,10 @@ export default function Notifications() {
     }
 
     const filteredNotifications = tab === 'unread'
-        ? notifications.filter((n) => !n.isRead)
+        ? notifications.filter((n) => !n.is_read)
         : notifications;
 
-    const unreadCount = notifications.filter((n) => !n.isRead).length;
+    const unreadCount = notifications.filter((n) => !n.is_read).length;
 
     if (loading) return <div className="loading-page"><div className="loading-spinner" /></div>;
 
@@ -122,21 +130,21 @@ export default function Notifications() {
                 <div style={{ display: 'grid', gap: '12px' }}>
                     {filteredNotifications.map((notif, i) => {
                         const accent = getThemeColor(notif.type);
-                        const timeAgo = notif.createdAt?.toDate
-                            ? formatDistanceToNow(notif.createdAt.toDate(), { addSuffix: true })
+                        const timeAgo = notif.created_at
+                            ? formatDistanceToNow(new Date(notif.created_at), { addSuffix: true })
                             : 'recently';
                         return (
                             <div
                                 key={notif.id}
-                                className={`glass-panel hover-lift animate-fade-in-up ${!notif.isRead ? 'unread' : ''}`}
-                                onClick={() => !notif.isRead && markAsRead(notif.id)}
+                                className={`glass-panel hover-lift animate-fade-in-up ${!notif.is_read ? 'unread' : ''}`}
+                                onClick={() => !notif.is_read && markAsRead(notif.id)}
                                 style={{ 
                                     padding: '24px', 
                                     display: 'flex', 
                                     gap: '24px', 
-                                    cursor: notif.isRead ? 'default' : 'pointer',
-                                    borderLeft: `5px solid ${notif.isRead ? 'transparent' : accent}`,
-                                    background: notif.isRead ? 'rgba(255,255,255,0.01)' : 'rgba(255,255,255,0.03)',
+                                    cursor: notif.is_read ? 'default' : 'pointer',
+                                    borderLeft: `5px solid ${notif.is_read ? 'transparent' : accent}`,
+                                    background: notif.is_read ? 'rgba(255,255,255,0.01)' : 'rgba(255,255,255,0.03)',
                                     animationDelay: `${i * 0.05}s`
                                 }}
                             >
@@ -150,7 +158,7 @@ export default function Notifications() {
                                 </div>
                                 <div style={{ flex: 1 }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
-                                        <div style={{ fontWeight: 800, fontSize: '16px', color: notif.isRead ? 'var(--color-text-primary)' : accent }}>
+                                        <div style={{ fontWeight: 800, fontSize: '16px', color: notif.is_read ? 'var(--color-text-primary)' : accent }}>
                                             {notif.title}
                                         </div>
                                         <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
@@ -160,7 +168,7 @@ export default function Notifications() {
                                     <div style={{ fontSize: '14px', color: 'var(--color-text-muted)', lineHeight: 1.6, fontWeight: 500 }}>
                                         {notif.message}
                                     </div>
-                                    {!notif.isRead && (
+                                    {!notif.is_read && (
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '12px', color: accent, fontSize: '11px', fontWeight: 900, textTransform: 'uppercase' }}>
                                             <Sparkles size={12} /> New
                                         </div>

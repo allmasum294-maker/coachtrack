@@ -1,44 +1,52 @@
-import { collection, query, where, getDocs, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from './firebase';
+import { supabase } from './supabaseClient';
 
 /**
  * Fetch all batches for a teacher.
  * If includeClosed is false (default), only fetches active batches.
  */
 export async function getBatches(teacherId, includeClosed = false) {
-  let q = query(
-    collection(db, 'batches'),
-    where('teacherId', '==', teacherId)
-  );
+  let query = supabase
+    .from('batches')
+    .select('*')
+    .eq('teacher_id', teacherId);
   
   if (!includeClosed) {
-    q = query(q, where('isClosed', '==', false));
+    query = query.eq('is_closed', false);
   }
   
-  const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  const { data, error } = await query;
+  if (error) throw error;
+  return data;
 }
 
 /**
  * Mark a batch as closed (completed).
  */
 export async function closeBatch(batchId) {
-  const batchRef = doc(db, 'batches', batchId);
-  await updateDoc(batchRef, {
-    isClosed: true,
-    closedAt: serverTimestamp()
-  });
+  const { error } = await supabase
+    .from('batches')
+    .update({
+      is_closed: true,
+      closed_at: new Date().toISOString()
+    })
+    .eq('id', batchId);
+
+  if (error) throw error;
 }
 
 /**
  * Reactivate a closed batch.
  */
 export async function reactivateBatch(batchId) {
-  const batchRef = doc(db, 'batches', batchId);
-  await updateDoc(batchRef, {
-    isClosed: false,
-    closedAt: null
-  });
+  const { error } = await supabase
+    .from('batches')
+    .update({
+      is_closed: false,
+      closed_at: null
+    })
+    .eq('id', batchId);
+
+  if (error) throw error;
 }
 
 export const batchService = {

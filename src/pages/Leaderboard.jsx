@@ -1,15 +1,18 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from '../services/firebase';
+import { supabase } from '../services/supabaseClient';
 import { 
     Award, Trophy, Star, Medal, ArrowUp, ArrowDown, 
-    Minus, Filter, Info, TrendingUp, Zap, Sparkles 
+    Minus, Filter, Info, TrendingUp, Zap, Sparkles, UserCheck
 } from 'lucide-react';
 import { batchService } from '../services/batchService';
+import { studentService } from '../services/studentService';
+import { attendanceService } from '../services/attendanceService';
+import { examService } from '../services/examService';
+import { homeworkService } from '../services/homeworkService';
 
 export default function Leaderboard() {
-    const { currentUser } = useAuth();
+    const { userProfile } = useAuth();
     const [students, setStudents] = useState([]);
     const [batches, setBatches] = useState([]);
     const [attendance, setAttendance] = useState([]);
@@ -19,35 +22,30 @@ export default function Leaderboard() {
     const [selectedBatchId, setSelectedBatchId] = useState('');
 
     useEffect(() => {
-        if (currentUser) loadData();
-    }, [currentUser]);
+        if (userProfile?.id) loadData();
+    }, [userProfile]);
 
     async function loadData() {
         try {
-            const uid = currentUser.uid;
-            const [activeBatches, studentSnap, attSnap, examSnap, hwSnap] = await Promise.all([
+            const uid = userProfile.id;
+            const [activeBatches, allStudents, allAttendance, allExams, allHw] = await Promise.all([
                 batchService.getBatches(uid, true),
-                getDocs(query(
-                    collection(db, 'students'), 
-                    where('teacherId', '==', uid),
-                    where('status', '==', 'enrolled')
-                )),
-                getDocs(query(collection(db, 'attendance'), where('teacherId', '==', uid))),
-                getDocs(query(collection(db, 'exams'), where('teacherId', '==', uid))),
-                getDocs(query(collection(db, 'homeworks'), where('teacherId', '==', uid))),
+                studentService.getStudentsByTeacher(uid),
+                attendanceService.getAttendanceByTeacher(uid),
+                examService.getExams(uid),
+                homeworkService.getHomeworkByTeacher(uid)
             ]);
             
-            const enrolledStudents = studentSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
-            setStudents(enrolledStudents);
+            setStudents(allStudents.filter(s => s.status === 'enrolled'));
             setBatches(activeBatches);
             
             if (activeBatches.length > 0 && !selectedBatchId) {
                 setSelectedBatchId(activeBatches[0].id);
             }
 
-            setAttendance(attSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
-            setExams(examSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
-            setHomeworks(hwSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
+            setAttendance(allAttendance);
+            setExams(allExams);
+            setHomeworks(allHw);
         } catch (err) {
             console.error('Error loading leaderboard foundation:', err);
         } finally {
@@ -58,7 +56,7 @@ export default function Leaderboard() {
     const leaderboardData = useMemo(() => {
         if (!selectedBatchId) return [];
 
-        const batchStudents = students.filter(s => s.batchIds?.includes(selectedBatchId));
+        const batchStudents = students.filter(s => (s.batch_ids || []).includes(selectedBatchId));
         
         const scores = batchStudents.map(student => {
             let totalPoints = 0;
@@ -68,7 +66,7 @@ export default function Leaderboard() {
 
             // Attendance Points (10 pts per present)
             attendance.forEach(a => {
-                if (a.batchId === selectedBatchId) {
+                if (a.batch_id === selectedBatchId) {
                     const record = (a.records || []).find(r => r.studentId === student.id);
                     if (record && record.status === 'present') attPoints += 10;
                 }
@@ -76,14 +74,14 @@ export default function Leaderboard() {
 
             // Homework Points (20 pts per completed HW)
             homeworks.forEach(hw => {
-                if (hw.batchId === selectedBatchId) {
+                if (hw.batch_id === selectedBatchId) {
                     if ((hw.completedBy || []).includes(student.id)) hwPoints += 20;
                 }
             });
 
             // Exam Points (Marks / 2)
             exams.forEach(e => {
-                if (e.batchId === selectedBatchId) {
+                if (e.batch_id === selectedBatchId) {
                     const score = (e.scores || []).find(s => s.studentId === student.id);
                     if (score && typeof score.marksObtained === 'number') {
                         examPoints += Math.round(score.marksObtained / 2);
@@ -341,4 +339,3 @@ export default function Leaderboard() {
         </div>
     );
 }
-import { UserCheck } from 'lucide-react';

@@ -1,16 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import {
-    collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp,
-} from 'firebase/firestore';
-import { db } from '../services/firebase';
+import { supabase } from '../services/supabaseClient';
 import { batchService } from '../services/batchService';
 import { BookOpen, Plus, Edit2, Trash2, Check, X, CheckCircle2, Circle, Clock } from 'lucide-react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 
 export default function Lessons() {
-    const { currentUser } = useAuth();
+    const { userProfile } = useAuth();
     const [batches, setBatches] = useState([]);
     const [lessons, setLessons] = useState([]);
     const [selectedBatch, setSelectedBatch] = useState('');
@@ -20,8 +17,8 @@ export default function Lessons() {
     const [form, setForm] = useState({ title: '', description: '', order: 1, status: 'planned', coveredOn: '' });
 
     useEffect(() => {
-        if (currentUser) loadBatches();
-    }, [currentUser]);
+        if (userProfile?.id) loadBatches();
+    }, [userProfile]);
 
     useEffect(() => {
         if (selectedBatch) loadLessons();
@@ -29,8 +26,7 @@ export default function Lessons() {
 
     async function loadBatches() {
         try {
-            // Only load active batches for curriculum tracking
-            const data = await batchService.getBatches(currentUser.uid, false);
+            const data = await batchService.getBatches(userProfile.id, true);
             setBatches(data);
             if (data.length > 0 && !selectedBatch) setSelectedBatch(data[0].id);
         } catch (err) {
@@ -42,10 +38,13 @@ export default function Lessons() {
 
     async function loadLessons() {
         try {
-            const snap = await getDocs(
-                query(collection(db, 'lessons'), where('teacherId', '==', currentUser.uid), where('batchId', '==', selectedBatch))
-            );
-            const data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+            const { data, error } = await supabase
+                .from('lessons')
+                .select('*')
+                .eq('teacher_id', userProfile.id)
+                .eq('batch_id', selectedBatch);
+            
+            if (error) throw error;
             setLessons(data.sort((a, b) => (a.order || 0) - (b.order || 0)));
         } catch (err) {
             console.error('Error loading lessons:', err);
@@ -60,10 +59,12 @@ export default function Lessons() {
 
     function openEdit(lesson) {
         setEditingLesson(lesson);
-        const coveredDate = lesson.coveredOn?.toDate ? format(lesson.coveredOn.toDate(), 'yyyy-MM-dd') : lesson.coveredOn || '';
         setForm({
-            title: lesson.title, description: lesson.description || '', order: lesson.order || 1,
-            status: lesson.status || 'planned', coveredOn: coveredDate,
+            title: lesson.title, 
+            description: lesson.description || '', 
+            order: lesson.order || 1,
+            status: lesson.status || 'planned', 
+            coveredOn: lesson.covered_on || '',
         });
         setShowModal(true);
     }
@@ -72,16 +73,26 @@ export default function Lessons() {
         e.preventDefault();
         try {
             const data = {
-                ...form,
-                batchId: selectedBatch,
-                teacherId: currentUser.uid,
+                title: form.title,
+                description: form.description,
                 order: parseInt(form.order) || 1,
+                status: form.status,
+                covered_on: form.coveredOn || null,
+                batch_id: selectedBatch,
+                teacher_id: userProfile.id,
             };
+
             if (editingLesson) {
-                await updateDoc(doc(db, 'lessons', editingLesson.id), data);
+                const { error } = await supabase
+                    .from('lessons')
+                    .update(data)
+                    .eq('id', editingLesson.id);
+                if (error) throw error;
             } else {
-                data.createdAt = serverTimestamp();
-                await addDoc(collection(db, 'lessons'), data);
+                const { error } = await supabase
+                    .from('lessons')
+                    .insert(data);
+                if (error) throw error;
             }
             setShowModal(false);
             loadLessons();
@@ -95,10 +106,14 @@ export default function Lessons() {
     async function toggleCovered(lesson) {
         try {
             const newStatus = lesson.status === 'covered' ? 'planned' : 'covered';
-            await updateDoc(doc(db, 'lessons', lesson.id), {
-                status: newStatus,
-                coveredOn: newStatus === 'covered' ? format(new Date(), 'yyyy-MM-dd') : '',
-            });
+            const { error } = await supabase
+                .from('lessons')
+                .update({
+                    status: newStatus,
+                    covered_on: newStatus === 'covered' ? format(new Date(), 'yyyy-MM-dd') : null,
+                })
+                .eq('id', lesson.id);
+            if (error) throw error;
             loadLessons();
             toast.success(newStatus === 'covered' ? 'Topic marked as covered!' : 'Topic unmarked.');
         } catch (err) {
@@ -109,7 +124,11 @@ export default function Lessons() {
     async function handleDelete(lessonId) {
         if (!confirm('Are you sure you want to delete this topic?')) return;
         try {
-            await deleteDoc(doc(db, 'lessons', lessonId));
+            const { error } = await supabase
+                .from('lessons')
+                .delete()
+                .eq('id', lessonId);
+            if (error) throw error;
             loadLessons();
             toast.success('Topic removed');
         } catch (err) {

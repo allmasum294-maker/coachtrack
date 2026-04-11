@@ -1,17 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Link } from 'react-router-dom';
-import {
-    collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp,
-} from 'firebase/firestore';
-import { db } from '../services/firebase';
+import { supabase } from '../services/supabaseClient';
 import { GraduationCap, Plus, Edit2, Trash2, Users, BookOpen, X, CheckCircle, Sparkles, Filter, ChevronRight } from 'lucide-react';
 import Modal from '../components/Modal';
-import { closeBatch, reactivateBatch } from '../services/batchService';
+import { batchService } from '../services/batchService';
+import { studentService } from '../services/studentService';
 import toast from 'react-hot-toast';
 
 export default function Batches() {
-    const { currentUser } = useAuth();
+    const { userProfile } = useAuth();
     const [batches, setBatches] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
@@ -21,24 +19,22 @@ export default function Batches() {
     const [studentCounts, setStudentCounts] = useState({});
 
     useEffect(() => {
-        if (currentUser) loadBatches();
-    }, [currentUser]);
+        if (userProfile?.id) loadBatches();
+    }, [userProfile]);
 
     async function loadBatches() {
         try {
-            const snap = await getDocs(
-                query(collection(db, 'batches'), where('teacherId', '==', currentUser.uid))
-            );
-            const data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-            setBatches(data);
+            const uid = userProfile.id;
+            const [allBatches, allStudents] = await Promise.all([
+                batchService.getBatches(uid),
+                studentService.getStudentsByTeacher(uid)
+            ]);
+            
+            setBatches(allBatches);
 
             const counts = {};
-            const studentSnap = await getDocs(
-                query(collection(db, 'students'), where('teacherId', '==', currentUser.uid))
-            );
-            studentSnap.docs.forEach((d) => {
-                const s = d.data();
-                (s.batchIds || []).forEach((bid) => {
+            allStudents.forEach(s => {
+                (s.batchIds || []).forEach(bid => {
                     counts[bid] = (counts[bid] || 0) + 1;
                 });
             });
@@ -58,7 +54,7 @@ export default function Batches() {
 
     function openEdit(batch) {
         setEditingBatch(batch);
-        setForm({ name: batch.name, grade: String(batch.grade), subject: batch.subject, isClosed: !!batch.isClosed });
+        setForm({ name: batch.name, grade: String(batch.grade), subject: batch.subject, isClosed: !!batch.is_closed });
         setShowModal(true);
     }
 
@@ -69,18 +65,22 @@ export default function Batches() {
                 name: form.name,
                 grade: parseInt(form.grade),
                 subject: form.subject,
-                isClosed: form.isClosed,
-                closedAt: form.isClosed ? (editingBatch?.closedAt || serverTimestamp()) : null,
-                teacherId: currentUser.uid,
+                is_closed: form.isClosed,
+                closed_at: form.isClosed ? (editingBatch?.closed_at || new Date().toISOString()) : null,
+                teacher_id: userProfile.id,
             };
 
             if (editingBatch) {
-                await updateDoc(doc(db, 'batches', editingBatch.id), data);
+                const { error } = await supabase
+                    .from('batches')
+                    .update(data)
+                    .eq('id', editingBatch.id);
+                if (error) throw error;
             } else {
-                data.createdAt = serverTimestamp();
-                data.studentIds = [];
-                data.isClosed = false;
-                await addDoc(collection(db, 'batches'), data);
+                const { error } = await supabase
+                    .from('batches')
+                    .insert(data);
+                if (error) throw error;
             }
             setShowModal(false);
             loadBatches();
@@ -94,7 +94,11 @@ export default function Batches() {
     async function handleDelete(batchId) {
         if (!confirm('Are you sure you want to delete this batch? All associated data will remain but student assignments will need manual cleanup.')) return;
         try {
-            await deleteDoc(doc(db, 'batches', batchId));
+            const { error } = await supabase
+                .from('batches')
+                .delete()
+                .eq('id', batchId);
+            if (error) throw error;
             loadBatches();
             toast.success('Batch Deleted');
         } catch (err) {

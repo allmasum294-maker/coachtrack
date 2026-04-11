@@ -16,7 +16,7 @@ const EXPORT_TYPES = [
     { id: 'attendance', icon: ClipboardCheck, title: 'Attendance History', desc: 'Present/Absent/Late records for students' },
     { id: 'lessons', icon: BookOpen, title: 'Lesson Progress', desc: 'Which lessons are finished and when they were taught' },
     { id: 'exams', icon: BarChart3, title: 'Exam Scores', desc: 'Student marks and how they are doing in tests' },
-    { id: 'students', icon: UserCheck, title: 'Student List', desc: 'Profiles and which batches they belong to' },
+    { id: 'students', icon: UserCheck, title: 'Student List', desc: 'User accounts and which batches they belong to' },
 ];
 
 export default function Export() {

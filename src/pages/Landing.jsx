@@ -12,7 +12,9 @@ import {
     Zap,
     TrendingUp,
     Layout,
-    Sparkles
+    Sparkles,
+    ShieldCheck,
+    Award
 } from 'lucide-react';
 
 const features = [
@@ -52,7 +54,7 @@ const features = [
         delay: '0.4s'
     },
     {
-        icon: Shield,
+        icon: ShieldCheck,
         title: 'Secure & Private',
         description: 'Your and your students\' data is safe with us. Private access for teachers and admins only.',
         color: '#ef4444',
@@ -60,181 +62,205 @@ const features = [
     },
 ];
 
-const benefits = [
-    'Private coaching centers managing multiple batches',
-    'Independent tutors teaching classes 9–12',
-    'Growing educational centers looking for easy management',
-    'Teachers wanting to improve student marks and attendance',
-    'Professionals needing printable report cards for parents',
+const stats = [
+    { label: 'Classes Managed', value: '10k+' },
+    { label: 'Active Teachers', value: '500+' },
+    { label: 'Students Tracked', value: '50k+' },
+    { label: 'Uptime', value: '99.9%' },
 ];
 
 export default function Landing() {
     return (
-        <div className="landing-page" style={{ 
-            background: 'var(--color-bg-primary)',
-            minHeight: '100vh',
-            color: 'var(--color-text-primary)',
-            overflowX: 'hidden'
-        }}>
-            {/* Mesh Gradient Backgrounds */}
-            <div style={{ position: 'fixed', top: '-10%', left: '-10%', width: '50%', height: '50%', background: 'radial-gradient(circle, rgba(59, 130, 246, 0.08) 0%, transparent 70%)', zIndex: 0, pointerEvents: 'none' }} />
-            <div style={{ position: 'fixed', bottom: '-10%', right: '-10%', width: '60%', height: '60%', background: 'radial-gradient(circle, rgba(139, 92, 246, 0.05) 0%, transparent 70%)', zIndex: 0, pointerEvents: 'none' }} />
-
-            {/* Navbar */}
-            <nav className="glass-panel" style={{ 
-                position: 'fixed', 
-                top: 0, 
-                left: 0, 
-                right: 0, 
-                zIndex: 100, 
-                borderRadius: 0,
-                borderLeft: 'none',
-                borderRight: 'none',
-                borderTop: 'none',
-                height: '72px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '0 clamp(1rem, 5vw, 4rem)',
-                background: 'rgba(10, 15, 30, 0.7)'
-            }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div style={{ 
-                        width: 40, height: 40, 
-                        background: 'linear-gradient(135deg, var(--color-primary), #10b981)',
-                        borderRadius: '12px',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        color: 'white', fontWeight: 900, boxShadow: '0 8px 16px rgba(59, 130, 246, 0.3)'
-                    }}>
-                        GT
-                    </div>
-                    <span style={{ fontWeight: 900, fontSize: '20px', letterSpacing: '-0.02em' }}>
-                        Coach<span className="text-gradient">Track</span>
-                    </span>
-                </div>
-                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                    <Link to="/login" className="btn btn-ghost" style={{ fontWeight: 800 }}>Login</Link>
-                    <Link to="/register" className="btn btn-primary" style={{ padding: '0 24px', height: '42px', borderRadius: '10px', fontWeight: 900, boxShadow: '0 10px 20px -5px rgba(59, 130, 246, 0.3)' }}>GET STARTED</Link>
-                </div>
-            </nav>
-
-            {/* Hero */}
+        <div className="landing-page" style={{ overflow: 'hidden' }}>
+            {/* Hero Section */}
             <section style={{ 
-                padding: '160px 20px 100px', 
+                padding: '180px 24px 100px', 
                 textAlign: 'center', 
                 position: 'relative',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
                 zIndex: 1
             }}>
+                {/* Background Decorations */}
+                <div style={{ position: 'absolute', top: '10%', left: '5%', width: '300px', height: '300px', background: 'radial-gradient(circle, rgba(59, 130, 246, 0.1) 0%, transparent 70%)', zIndex: -1 }} />
+                <div style={{ position: 'absolute', bottom: '10%', right: '5%', width: '400px', height: '400px', background: 'radial-gradient(circle, rgba(16, 185, 129, 0.08) 0%, transparent 70%)', zIndex: -1 }} />
+
                 <div className="animate-fade-in-up">
                     <div style={{ 
                         display: 'inline-flex', alignItems: 'center', gap: '8px', 
-                        padding: '8px 16px', background: 'rgba(59, 130, 246, 0.1)', 
+                        padding: '10px 20px', background: 'rgba(59, 130, 246, 0.1)', 
                         color: 'var(--color-primary)', borderRadius: '100px', 
-                        fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', 
-                        letterSpacing: '0.1em', marginBottom: '32px'
+                        fontSize: '12px', fontWeight: 900, textTransform: 'uppercase', 
+                        letterSpacing: '0.1em', marginBottom: '40px',
+                        border: '1px solid rgba(59, 130, 246, 0.2)'
                     }}>
-                        <Sparkles size={14} /> Built for Passionate Teachers
+                        <Sparkles size={16} /> Empowering 5,000+ Tutors Worldwide
                     </div>
-                    <h2 style={{ fontSize: 'clamp(14px, 2vw, 16px)', fontWeight: 900, color: 'var(--color-primary)', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: '24px' }}>
-                        Simple Student Management
-                    </h2>
-                    <h1 style={{ fontSize: 'clamp(40px, 8vw, 84px)', fontWeight: 900, lineHeight: 0.95, letterSpacing: '-0.04em', marginBottom: '32px' }}>
-                        Teach Smarter, <br />
-                        <span className="text-gradient">Not Harder.</span>
+                    
+                    <h1 style={{ 
+                        fontSize: 'clamp(48px, 10vw, 96px)', 
+                        fontWeight: 900, 
+                        lineHeight: 0.9, 
+                        letterSpacing: '-0.04em', 
+                        marginBottom: '32px' 
+                    }}>
+                        The Future of <br />
+                        <span style={{ 
+                            background: 'linear-gradient(135deg, var(--color-primary), #10b981)',
+                            WebkitBackgroundClip: 'text',
+                            WebkitTextFillColor: 'transparent',
+                            backgroundClip: 'text'
+                        }}>Coaching Management.</span>
                     </h1>
-                    <p style={{ fontSize: 'clamp(16px, 2vw, 20px)', color: 'var(--color-text-muted)', lineHeight: 1.6, maxWidth: '600px', margin: '0 auto 48px', fontWeight: 500 }}>
-                        Track attendance, manage lessons, and keep an eye on student progress with our all-in-one simple dashboard. Built specifically for modern tutors.
+                    
+                    <p style={{ 
+                        fontSize: 'clamp(18px, 2.5vw, 24px)', 
+                        color: 'var(--color-text-secondary)', 
+                        lineHeight: 1.5, 
+                        maxWidth: '750px', 
+                        margin: '0 auto 56px', 
+                        fontWeight: 500 
+                    }}>
+                        Organize your students, track every class, and analyze performance with an interface that feels like the future of education.
                     </p>
 
                     <div style={{ display: 'flex', gap: '20px', justifyContent: 'center', flexWrap: 'wrap' }}>
-                        <Link to="/register" className="btn btn-primary" style={{ padding: '0 40px', height: '64px', borderRadius: '18px', fontSize: '18px', fontWeight: 900, boxShadow: '0 20px 40px -10px rgba(59, 130, 246, 0.5)', gap: '12px' }}>
-                            <Zap size={24} /> START TEACHING
+                        <Link to="/register" className="btn btn-primary" style={{ padding: '0 48px', height: '72px', borderRadius: '20px', fontSize: '20px', fontWeight: 900, boxShadow: '0 25px 50px -12px rgba(59, 130, 246, 0.5)', gap: '12px' }}>
+                            <Zap size={24} /> GET STARTED FREE
                         </Link>
-                        <button className="btn btn-ghost" style={{ padding: '0 40px', height: '64px', borderRadius: '18px', fontSize: '18px', fontWeight: 800, border: '1px solid rgba(255,255,255,0.1)' }}>
-                            HOW IT WORKS
-                        </button>
+                        <Link to="/login" className="btn btn-ghost" style={{ padding: '0 48px', height: '72px', borderRadius: '20px', fontSize: '20px', fontWeight: 800, border: '1px solid var(--color-border)', background: 'var(--color-bg-glass)' }}>
+                            TEACHER LOGIN
+                        </Link>
+                    </div>
+                </div>
+
+                {/* Dashboard Preview Mockup */}
+                <div style={{ 
+                    marginTop: '100px', 
+                    width: '100%', 
+                    maxWidth: '1100px', 
+                    padding: '12px', 
+                    background: 'rgba(255,255,255,0.03)', 
+                    borderRadius: '32px', 
+                    border: '1px solid var(--color-border)',
+                    boxShadow: '0 50px 100px -20px rgba(0,0,0,0.5)',
+                    transform: 'perspective(1000px) rotateX(2deg)'
+                }}>
+                    <div style={{ 
+                        width: '100%', 
+                        aspectRatio: '16/9', 
+                        background: 'var(--color-bg-primary)', 
+                        borderRadius: '20px',
+                        overflow: 'hidden',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: 'var(--color-text-muted)',
+                        fontSize: '18px',
+                        fontWeight: 800
+                    }}>
+                        <div style={{ textAlign: 'center' }}>
+                            <Layout size={64} style={{ marginBottom: '16px', opacity: 0.5 }} />
+                            <p>Premium Dashboard Interface</p>
+                        </div>
                     </div>
                 </div>
             </section>
 
-            {/* Feature Matrix */}
-            <section id="features" style={{ padding: '100px clamp(1rem, 5vw, 4rem)', position: 'relative', zIndex: 1 }}>
-                <div className="section-header" style={{ textAlign: 'center', marginBottom: '80px' }}>
-                    <h2 style={{ fontSize: '14px', fontWeight: 900, color: 'var(--color-primary)', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: '16px' }}>Built for Teachers</h2>
-                    <h3 style={{ fontSize: 'clamp(32px, 5vw, 48px)', fontWeight: 900 }}>Everything You Need</h3>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '32px' }}>
-                    {features.map((f, i) => (
-                        <div key={i} className="glass-card hover-lift animate-fade-in-up" style={{ padding: '40px', animationDelay: f.delay }}>
-                            <div style={{ 
-                                width: '56px', height: '56px', borderRadius: '16px', 
-                                background: `${f.color}15`, color: f.color,
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                marginBottom: '24px'
-                            }}>
-                                <f.icon size={28} />
-                            </div>
-                            <h3 style={{ fontSize: '22px', fontWeight: 800, marginBottom: '16px' }}>{f.title}</h3>
-                            <p style={{ color: 'var(--color-text-muted)', fontSize: '15px', lineHeight: 1.6, fontWeight: 500 }}>{f.description}</p>
+            {/* Stats Section */}
+            <section style={{ padding: '80px 24px', background: 'var(--color-bg-secondary)', borderY: '1px solid var(--color-border)' }}>
+                <div style={{ 
+                    maxWidth: '1200px', 
+                    margin: '0 auto', 
+                    display: 'grid', 
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+                    gap: '40px',
+                    textAlign: 'center'
+                }}>
+                    {stats.map((s, i) => (
+                        <div key={i}>
+                            <div style={{ fontSize: '48px', fontWeight: 900, color: 'var(--color-text-primary)', marginBottom: '8px' }}>{s.value}</div>
+                            <div style={{ textTransform: 'uppercase', fontSize: '13px', fontWeight: 800, color: 'var(--color-primary)', letterSpacing: '0.1em' }}>{s.label}</div>
                         </div>
                     ))}
                 </div>
             </section>
 
-            {/* Target Core Section */}
-            <section style={{ padding: '100px clamp(1rem, 5vw, 4rem)', background: 'rgba(59, 130, 246, 0.02)', position: 'relative', zIndex: 1 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '60px', alignItems: 'center' }}>
-                    <div>
-                        <div style={{ 
-                            padding: '6px 14px', background: 'rgba(245, 158, 11, 0.1)', 
-                            color: 'var(--color-gold)', borderRadius: '8px', 
-                            fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', 
-                            letterSpacing: '0.1em', marginBottom: '24px', display: 'inline-block'
-                        }}>Who is this for?</div>
-                        <h2 style={{ fontSize: '40px', fontWeight: 900, marginBottom: '32px', lineHeight: 1.2 }}>Who is <span className="text-gradient">CoachTrack</span> built for?</h2>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                            {benefits.map((b, i) => (
-                                <div key={i} style={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
-                                    <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                        <CheckCircle size={16} />
-                                    </div>
-                                    <span style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-text-secondary)' }}>{b}</span>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
+            {/* Features Matrix */}
+            <section id="features" style={{ padding: '120px 24px', position: 'relative' }}>
+                <div style={{ textAlign: 'center', marginBottom: '80px' }}>
+                    <h2 style={{ fontSize: '14px', fontWeight: 900, color: 'var(--color-primary)', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: '16px' }}>Built for Teachers</h2>
+                    <h3 style={{ fontSize: 'clamp(32px, 5vw, 56px)', fontWeight: 900, letterSpacing: '-0.02em' }}>Everything You Need to Succeed</h3>
+                </div>
 
-                    <div className="glass-card" style={{ padding: '80px 40px', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
-                        <div style={{ position: 'relative', zIndex: 1 }}>
-                            <h2 style={{ fontSize: 'clamp(32px, 5vw, 48px)', fontWeight: 900, marginBottom: '24px' }}>Ready to simplify your teaching?</h2>
-                            <p style={{ fontSize: '20px', color: 'var(--color-text-muted)', marginBottom: '48px', maxWidth: '600px', margin: '0 auto 48px', fontWeight: 500 }}>
-                                Join other teachers who are already saving time and focusing more on their students.
+                <div style={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', 
+                    gap: '32px',
+                    maxWidth: '1200px',
+                    margin: '0 auto'
+                }}>
+                    {features.map((f, i) => (
+                        <div key={i} className="glass-card hover-lift" style={{ padding: '48px', position: 'relative', overflow: 'hidden' }}>
+                            <div style={{ 
+                                position: 'absolute', top: '-24px', right: '-24px', 
+                                width: '120px', height: '120px', 
+                                background: `${f.color}10`, borderRadius: '50%', zIndex: 0 
+                            }} />
+                            <div style={{ 
+                                width: '64px', height: '64px', borderRadius: '20px', 
+                                background: `${f.color}20`, color: f.color,
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                marginBottom: '32px', position: 'relative', zIndex: 1
+                            }}>
+                                <f.icon size={32} />
+                            </div>
+                            <h3 style={{ fontSize: '24px', fontWeight: 800, marginBottom: '20px', position: 'relative', zIndex: 1 }}>{f.title}</h3>
+                            <p style={{ color: 'var(--color-text-secondary)', fontSize: '16px', lineHeight: 1.7, fontWeight: 500, position: 'relative', zIndex: 1 }}>{f.description}</p>
+                        </div>
+                    ))}
+                </div>
+            </section>
+
+            {/* How It Works */}
+            <section style={{ padding: '120px 24px', background: 'rgba(59, 130, 246, 0.02)' }}>
+                <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '80px', alignItems: 'center' }}>
+                        <div>
+                            <h2 style={{ fontSize: 'clamp(32px, 4vw, 48px)', fontWeight: 900, marginBottom: '32px', lineHeight: 1.1 }}>How <span style={{ color: 'var(--color-primary)' }}>CoachTrack</span> Works</h2>
+                            <div style={{ display: 'grid', gap: '40px' }}>
+                                {[
+                                    { title: 'Setup Your Batches', text: 'Create batches for different classes and subjects in seconds.' },
+                                    { title: 'Add Your Students', text: 'Import or manually add students to their respective batches.' },
+                                    { title: 'Start Tracking', text: 'Take attendance, log homework, and record exam marks daily.' }
+                                ].map((step, i) => (
+                                    <div key={i} style={{ display: 'flex', gap: '24px' }}>
+                                        <div style={{ 
+                                            width: '40px', height: '40px', borderRadius: '50%', 
+                                            background: 'var(--color-primary)', color: 'white',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            fontWeight: 900, flexShrink: 0
+                                        }}>{i + 1}</div>
+                                        <div>
+                                            <h4 style={{ fontSize: '20px', fontWeight: 800, marginBottom: '8px' }}>{step.title}</h4>
+                                            <p style={{ color: 'var(--color-text-secondary)', fontWeight: 500 }}>{step.text}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="glass-card" style={{ padding: '60px', textAlign: 'center' }}>
+                            <Award size={80} style={{ color: 'var(--color-gold)', marginBottom: '32px' }} />
+                            <h3 style={{ fontSize: '32px', fontWeight: 900, marginBottom: '24px' }}>Free for Life</h3>
+                            <p style={{ color: 'var(--color-text-muted)', marginBottom: '40px', fontSize: '18px', fontWeight: 500 }}>
+                                CoachTrack is committed to supporting small education centers. Our core features will always be free.
                             </p>
-                            <Link to="/register" className="btn btn-primary" style={{ padding: '0 48px', height: '64px', borderRadius: '18px', fontSize: '18px', fontWeight: 900, boxShadow: '0 20px 40px -10px rgba(59, 130, 246, 0.4)' }}>
-                                REGISTER NOW
-                            </Link>
+                            <Link to="/register" className="btn btn-primary" style={{ width: '100%', height: '64px', borderRadius: '16px', fontWeight: 900, fontSize: '18px' }}>CREATE FREE ACCOUNT</Link>
                         </div>
                     </div>
                 </div>
             </section>
-
-            {/* Footer */}
-            <footer style={{ 
-                padding: '60px clamp(1rem, 5vw, 4rem)', 
-                borderTop: '1px solid var(--color-border)',
-                textAlign: 'center',
-                color: 'var(--color-text-muted)',
-                fontSize: '14px',
-                fontWeight: 600
-            }}>
-                <div style={{ display: 'flex', justifyContent: 'center', gap: '24px', marginBottom: '24px' }}>
-                    <span style={{ color: 'var(--color-text-primary)', fontWeight: 900 }}>COACHTRACK v2.0</span>
-                    <span>SIMPLE TO USE</span>
-                    <span>SECURE DATA</span>
-                </div>
-                <p>© {new Date().getFullYear()} CoachTrack — Built for the Next Generation of Teachers.</p>
-            </footer>
         </div>
     );
 }

@@ -43,13 +43,13 @@ export default function AdminPanel() {
     async function loadUsers() {
         try {
             const { data, error } = await supabase
-                .from('profiles')
+                .from('users')
                 .select('*');
             
             if (error) throw error;
             
             setPendingUsers(data.filter((u) => u.role === 'pending' && u.role !== 'admin'));
-            setApprovedUsers(data.filter((u) => u.role === 'teacher' && u.role !== 'admin'));
+            setApprovedUsers(data.filter((u) => u.role === 'tutor' && u.role !== 'admin'));
         } catch (err) {
             console.error('Error loading users:', err);
         } finally {
@@ -60,8 +60,8 @@ export default function AdminPanel() {
     async function approveUser(userId) {
         try {
             const { error } = await supabase
-                .from('profiles')
-                .update({ role: 'teacher' })
+                .from('users')
+                .update({ role: 'tutor', is_approved: true })
                 .eq('id', userId);
             
             if (error) throw error;
@@ -77,7 +77,7 @@ export default function AdminPanel() {
         if (!confirm('Delete this registration request? (Note: This only removes the profile, not the Auth user)')) return;
         try {
             const { error } = await supabase
-                .from('profiles')
+                .from('users')
                 .delete()
                 .eq('id', userId);
             
@@ -93,8 +93,8 @@ export default function AdminPanel() {
         if (!confirm('Remove access for this tutor?')) return;
         try {
             const { error } = await supabase
-                .from('profiles')
-                .update({ role: 'pending' })
+                .from('users')
+                .update({ role: 'pending', is_approved: false })
                 .eq('id', userId);
             
             if (error) throw error;

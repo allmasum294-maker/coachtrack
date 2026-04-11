@@ -33,12 +33,12 @@ export function AuthProvider({ children }) {
             id: data.user.id,
             display_name: displayName,
             email: email,
-            role: 'teacher',
-            is_approved: false,
+            role: 'tutor',
+            is_approved: true,
         };
 
         const { error: profileError } = await supabase
-            .from('profiles')
+            .from('users')
             .upsert(profile);
 
         if (profileError) console.error('Error creating profile:', profileError);
@@ -56,7 +56,7 @@ export function AuthProvider({ children }) {
         if (error) throw error;
 
         await supabase
-            .from('profiles')
+            .from('users')
             .update({ last_login: new Date().toISOString() })
             .eq('id', data.user.id);
 
@@ -85,7 +85,7 @@ export function AuthProvider({ children }) {
         }
         try {
             const { data, error } = await supabase
-                .from('profiles')
+                .from('users')
                 .select('*')
                 .eq('id', user.id)
                 .single();
@@ -98,13 +98,13 @@ export function AuthProvider({ children }) {
                     id: user.id,
                     display_name: metadata.full_name || metadata.display_name || user.email.split('@')[0],
                     email: user.email,
-                    role: 'teacher',
-                    is_approved: false,
+                    role: 'tutor',
+                    is_approved: true,
                     last_login: new Date().toISOString()
                 };
 
                 const { error: insertError } = await supabase
-                    .from('profiles')
+                    .from('users')
                     .upsert(newProfile);
 
                 if (insertError) {

@@ -1,16 +1,20 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { Toaster } from 'react-hot-toast';
 
 // Layout
 import AppLayout from './components/layout/AppLayout';
+import PublicLayout from './components/layout/PublicLayout';
 import ErrorBoundary from './components/common/ErrorBoundary';
 
 // Pages
 import Landing from './pages/Landing';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import About from './pages/About';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import Terms from './pages/Terms';
 import Dashboard from './pages/Dashboard';
 import Batches from './pages/Batches';
 import Students from './pages/Students';
@@ -32,7 +36,7 @@ import StudyPlans from './pages/StudyPlans';
 
 // Protected route wrapper
 function ProtectedRoute({ children }) {
-  const { currentUser, userProfile, loading } = useAuth();
+  const { currentUser, userProfile, isApproved, isAdmin, loading } = useAuth();
 
   if (loading) {
     return (
@@ -49,7 +53,7 @@ function ProtectedRoute({ children }) {
     return <Navigate to="/login" replace />;
   }
 
-  if (userProfile && userProfile.isApproved === false && userProfile.role !== 'admin') {
+  if (userProfile && !isApproved && !isAdmin) {
     return (
       <div className="auth-page">
         <div className="auth-card" style={{ textAlign: 'center' }}>
@@ -97,7 +101,7 @@ function ProtectedRoute({ children }) {
 
 // Public route wrapper (redirect to dashboard if logged in)
 function PublicRoute({ children }) {
-  const { currentUser, userProfile, loading } = useAuth();
+  const { currentUser, isApproved, isAdmin, loading } = useAuth();
 
   if (loading) {
     return (
@@ -107,7 +111,7 @@ function PublicRoute({ children }) {
     );
   }
 
-  if (currentUser && userProfile?.isApproved) {
+  if (currentUser && isApproved) {
     return <Navigate to="/dashboard" replace />;
   }
 
@@ -116,7 +120,7 @@ function PublicRoute({ children }) {
 
 function App() {
   return (
-    <Router basename="/coachtrack">
+    <Router>
       <ThemeProvider>
         <AuthProvider>
           <Toaster
@@ -134,31 +138,36 @@ function App() {
             }}
           />
           <Routes>
-            {/* Public Routes */}
-            <Route
-              path="/"
-              element={
-                <PublicRoute>
-                  <Landing />
-                </PublicRoute>
-              }
-            />
-            <Route
-              path="/login"
-              element={
-                <PublicRoute>
-                  <Login />
-                </PublicRoute>
-              }
-            />
-            <Route
-              path="/register"
-              element={
-                <PublicRoute>
-                  <Register />
-                </PublicRoute>
-              }
-            />
+            {/* Public Routes Wrapped in PublicLayout */}
+            <Route element={<PublicLayout />}>
+              <Route
+                path="/"
+                element={
+                  <PublicRoute>
+                    <Landing />
+                  </PublicRoute>
+                }
+              />
+              <Route
+                path="/login"
+                element={
+                  <PublicRoute>
+                    <Login />
+                  </PublicRoute>
+                }
+              />
+              <Route
+                path="/register"
+                element={
+                  <PublicRoute>
+                    <Register />
+                  </PublicRoute>
+                }
+              />
+              <Route path="/about" element={<About />} />
+              <Route path="/privacy" element={<PrivacyPolicy />} />
+              <Route path="/terms" element={<Terms />} />
+            </Route>
 
             {/* Protected Routes (inside app layout) */}
             <Route

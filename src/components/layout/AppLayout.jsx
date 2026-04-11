@@ -1,14 +1,17 @@
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
+import TopHeader from './TopHeader';
 import { useState } from 'react';
 
 export default function AppLayout() {
-    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+    const [mobileOpen, setMobileOpen] = useState(false);
 
     return (
         <div className="app-layout">
-            <Sidebar />
-            <main className={`app-main ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+            <Sidebar mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
+            
+            <main className="app-main">
+                <TopHeader onMenuClick={() => setMobileOpen(true)} />
                 <div className="app-content">
                     <Outlet />
                 </div>

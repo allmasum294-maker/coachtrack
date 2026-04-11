@@ -10,6 +10,7 @@ import {
 import { format, isToday, startOfWeek, endOfWeek, differenceInDays } from 'date-fns';
 import { batchService } from '../services/batchService';
 import { studentService } from '../services/studentService';
+import { safeToDate } from '../utils/dateUtils';
 import toast from 'react-hot-toast';
 
 export default function Dashboard() {
@@ -260,11 +261,9 @@ export default function Dashboard() {
                     <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                         <button 
                             className="btn btn-ghost" 
-                            onClick={async () => {
-                                const res = await migrateBatchesIsClosed();
-                                if (res.count > 0) toast.success(`Updated ${res.count} records`);
-                                else toast.success('Database up to date');
+                            onClick={() => {
                                 loadDashboardData();
+                                toast.success('Data refreshed');
                             }}
                             style={{ fontSize: '11px', fontWeight: 700, opacity: 0.8 }}
                         >

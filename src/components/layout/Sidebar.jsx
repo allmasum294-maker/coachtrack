@@ -105,14 +105,6 @@ export default function Sidebar({ mobileOpen, setMobileOpen }) {
 
     return (
         <>
-            {/* Mobile toggle button - now handled by CSS display rules */}
-            <button
-                className="sidebar-toggle glass-panel"
-                onClick={() => setMobileOpen(true)}
-            >
-                <Menu size={22} />
-            </button>
-
             {/* Mobile overlay */}
             <div
                 className={`sidebar-overlay ${mobileOpen ? 'active' : ''}`}

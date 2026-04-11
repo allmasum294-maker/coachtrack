@@ -520,14 +520,14 @@ export default function Students() {
                                                 </div>
                                             </div>
                                         </td>
-                                        <td>
+                                        <td data-label="Grade">
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                                 <Shield size={14} style={{ color: '#10b981' }} />
                                                 <span style={{ fontSize: '13px', fontWeight: 700 }}>Grade {student.grade}</span>
                                             </div>
                                         </td>
-                                        <td>
-                                            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                        <td data-label="Batches">
+                                            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                                                 {(student.batchIds || []).map((bid) => (
                                                     <span key={bid} style={{ padding: '3px 8px', background: 'rgba(59, 130, 246, 0.1)', color: 'var(--color-primary)', borderRadius: '6px', fontSize: '10px', fontWeight: 800 }}>{getBatchName(bid)}</span>
                                                 ))}
@@ -536,14 +536,14 @@ export default function Students() {
                                                 )}
                                             </div>
                                         </td>
-                                        <td>
-                                            <div style={{ fontSize: '12px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                        <td data-label="Contact">
+                                            <div style={{ fontSize: '12px', display: 'flex', flexDirection: 'column', gap: '2px', textAlign: 'right' }}>
                                                 <span style={{ color: 'var(--color-text-primary)', fontWeight: 700 }}>{student.phone || '—'}</span>
                                                 <span style={{ color: 'var(--color-text-muted)', fontSize: '10px' }}>{student.email || ''}</span>
                                             </div>
                                         </td>
-                                        <td>
-                                            <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 600 }}>
+                                        <td data-label="Joined">
+                                            <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 600, textAlign: 'right' }}>
                                                 {student.created_at ? format(new Date(student.created_at), 'MMM d, yyyy') : '—'}
                                             </div>
                                         </td>
@@ -561,7 +561,11 @@ export default function Students() {
                                                         const newStatus = (student.status || 'enrolled') === 'enrolled' ? 'unenrolled' : 'enrolled';
                                                         if (confirm(`Are you sure you want to ${newStatus === 'unenrolled' ? 'deactivate' : 'reactivate'} ${student.name}?`)) {
                                                             try {
-                                                                await setStudentStatus(student.id, newStatus);
+                                                                const { error } = await supabase
+                                                                    .from('students')
+                                                                    .update({ status: newStatus })
+                                                                    .eq('id', student.id);
+                                                                if (error) throw error;
                                                                 toast.success(`Status updated to ${newStatus}`);
                                                                 loadData();
                                                             } catch (err) {

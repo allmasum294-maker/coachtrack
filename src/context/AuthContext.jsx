@@ -63,6 +63,17 @@ export function AuthProvider({ children }) {
         return data;
     }
 
+    async function loginWithGoogle() {
+        const { data, error } = await supabase.auth.signInWithOAuth({
+            provider: 'google',
+            options: {
+                redirectTo: `${window.location.origin}/coachtrack`,
+            },
+        });
+        if (error) throw error;
+        return data;
+    }
+
     function logout() {
         return supabase.auth.signOut();
     }
@@ -79,7 +90,30 @@ export function AuthProvider({ children }) {
                 .eq('id', user.id)
                 .single();
 
-            if (error) {
+            if (error && error.code === 'PGRST116') {
+                // Profile not found - create one for OAuth users
+                console.log('Profile missing, creating for OAuth user:', user.email);
+                const metadata = user.user_metadata || {};
+                const newProfile = {
+                    id: user.id,
+                    display_name: metadata.full_name || metadata.display_name || user.email.split('@')[0],
+                    email: user.email,
+                    role: 'teacher',
+                    is_approved: false,
+                    last_login: new Date().toISOString()
+                };
+
+                const { error: insertError } = await supabase
+                    .from('profiles')
+                    .upsert(newProfile);
+
+                if (insertError) {
+                    console.error('Error creating auto-profile:', insertError);
+                    setUserProfile(null);
+                } else {
+                    setUserProfile(newProfile);
+                }
+            } else if (error) {
                 console.error('Error fetching user profile:', error);
                 setUserProfile(null);
             } else {
@@ -103,7 +137,13 @@ export function AuthProvider({ children }) {
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
             const user = session?.user ?? null;
             setCurrentUser(user);
-            await fetchUserProfile(user);
+            
+            if (event === 'SIGNED_IN' || event === 'USER_UPDATED' || event === 'INITIAL_SESSION') {
+                await fetchUserProfile(user);
+            } else if (event === 'SIGNED_OUT') {
+                setUserProfile(null);
+            }
+            
             setLoading(false);
         });
 
@@ -116,6 +156,7 @@ export function AuthProvider({ children }) {
         loading,
         register,
         login,
+        loginWithGoogle,
         logout,
         fetchUserProfile,
         isAdmin: userProfile?.role === 'admin',

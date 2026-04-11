@@ -43,6 +43,7 @@ const mainNavItems = [
 
 const managementNavItems = [
     { path: '/attendance', icon: ClipboardCheck, label: 'Attendance' },
+    { path: '/schools', icon: Layers, label: 'Schools & Colleges' },
     { path: '/lessons', icon: BookOpen, label: 'Lessons' },
     { path: '/homework', icon: BookCheck, label: 'Homework' },
     { path: '/exams', icon: FileText, label: 'Exams' },

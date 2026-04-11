@@ -21,6 +21,7 @@ export default function Homework() {
     const { userProfile } = useAuth();
     const [assignments, setAssignments] = useState([]);
     const [batches, setBatches] = useState([]);
+    const [schools, setSchools] = useState([]);
     const [students, setStudents] = useState([]);
     const [sessionLogs, setSessionLogs] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -32,6 +33,7 @@ export default function Homework() {
         title: '',
         description: '',
         batchId: '',
+        targetSchoolId: '',
         dueDate: format(new Date(), 'yyyy-MM-dd'),
         sessionLogId: '',
     });
@@ -45,14 +47,16 @@ export default function Homework() {
     async function loadData() {
         try {
             const uid = userProfile.id;
-            const [hwList, activeBatches, allStudents, logs] = await Promise.all([
+            const [hwList, activeBatches, allStudents, logs, schoolData] = await Promise.all([
                 homeworkService.getHomeworkByTeacher(uid),
                 batchService.getBatches(uid, true),
                 studentService.getStudentsByTeacher(uid),
-                lessonPlanService.getLessonsByTeacher(uid)
+                lessonPlanService.getLessonsByTeacher(uid),
+                schoolService.getSchools(uid)
             ]);
             setAssignments(hwList);
             setBatches(activeBatches);
+            setSchools(schoolData);
             setStudents(allStudents.filter(s => s.status === 'enrolled'));
             setSessionLogs(logs);
         } catch (err) {
@@ -68,7 +72,11 @@ export default function Homework() {
     }
 
     function getSubmissionStats(hw) {
-        const assignedStudents = students.filter(s => (s.batchIds || []).includes(hw.batch_id));
+        const assignedStudents = students.filter(s => {
+            const inBatch = (s.batch_ids || []).includes(hw.batch_id);
+            const inSchool = !hw.target_school_id || s.school_id === hw.target_school_id;
+            return inBatch && inSchool;
+        });
         const total = assignedStudents.length;
         const subs = getSubmissions(hw);
         let completed = 0, late = 0, partial = 0, notSubmitted = 0;
@@ -85,7 +93,7 @@ export default function Homework() {
     function openCreate() {
         setEditingAssignment(null);
         setForm({
-            title: '', description: '', batchId: filterBatch,
+            title: '', description: '', batchId: filterBatch, targetSchoolId: '',
             dueDate: format(new Date(), 'yyyy-MM-dd'), sessionLogId: '',
         });
         setShowModal(true);
@@ -97,6 +105,7 @@ export default function Homework() {
             title: hw.title || '',
             description: hw.description || '',
             batchId: hw.batch_id || '',
+            targetSchoolId: hw.target_school_id || '',
             dueDate: hw.due_date || '',
             sessionLogId: hw.session_log_id || '',
         });
@@ -110,6 +119,7 @@ export default function Homework() {
                 title: form.title,
                 description: form.description,
                 batch_id: form.batchId,
+                target_school_id: form.targetSchoolId || null,
                 due_date: form.dueDate,
                 session_log_id: form.sessionLogId || null,
                 teacher_id: userProfile.id,
@@ -318,13 +328,21 @@ export default function Homework() {
                         <input className="form-input" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} required placeholder="e.g. Chapter 4 Exercises" />
                     </div>
                     
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)', marginBottom: 'var(--space-4)' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-4)', marginBottom: 'var(--space-4)' }}>
                         <div className="form-group">
                             <label className="form-label">Batch <span style={{ color: 'var(--color-danger)' }}>*</span></label>
                             <select className="form-select" value={form.batchId} onChange={e => setForm({ ...form, batchId: e.target.value, sessionLogId: '' })} required>
                                 <option value="">Select Batch</option>
                                 {batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                             </select>
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label">Target School</label>
+                            <select className="form-select" value={form.targetSchoolId} onChange={e => setForm({ ...form, targetSchoolId: e.target.value })}>
+                                <option value="">All Schools</option>
+                                {schools.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                            </select>
+                            <span style={{ fontSize: '9px', color: 'var(--color-text-muted)' }}>Optional filter</span>
                         </div>
                         <div className="form-group">
                             <label className="form-label">Due Date <span style={{ color: 'var(--color-danger)' }}>*</span></label>
@@ -395,7 +413,11 @@ export default function Homework() {
 
                         <div style={{ maxHeight: '450px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', paddingRight: '4px' }}>
                             {(() => {
-                                const assignedStudents = students.filter(s => s.batchIds?.includes(trackingAssignment.batchId));
+                                const assignedStudents = students.filter(s => {
+                                    const inBatch = (s.batch_ids || []).includes(trackingAssignment.batch_id);
+                                    const inSchool = !trackingAssignment.target_school_id || s.school_id === trackingAssignment.target_school_id;
+                                    return inBatch && inSchool;
+                                });
                                 const subs = getSubmissions(trackingAssignment);
                                 
                                 if (assignedStudents.length === 0) {

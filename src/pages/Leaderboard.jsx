@@ -74,7 +74,10 @@ export default function Leaderboard() {
 
             // Homework Points (20 pts per completed HW)
             homeworks.forEach(hw => {
-                if (hw.batch_id === selectedBatchId) {
+                const isRelevantBatch = hw.batch_id === selectedBatchId;
+                const isRelevantSchool = !hw.target_school_id || hw.target_school_id === student.school_id;
+
+                if (isRelevantBatch && isRelevantSchool) {
                     if ((hw.completedBy || []).includes(student.id)) hwPoints += 20;
                 }
             });

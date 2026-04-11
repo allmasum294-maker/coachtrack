@@ -92,6 +92,8 @@ export async function getStudentsByTeacher(teacherId) {
     .from('students')
     .select(`
       *,
+      school_id,
+      schools (name),
       student_batches (
         batch_id
       )

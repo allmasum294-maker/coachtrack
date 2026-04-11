@@ -36,8 +36,9 @@ export default function Students() {
     const [schoolList, setSchoolList] = useState([]);
     const [form, setForm] = useState({
         name: '', email: '', phone: '', guardianName: '', guardianPhone: '',
-        school: '', grade: '', address: '', notes: '', batchIds: [], unenrolledBatchIds: [],
+        schoolId: '', grade: '', address: '', notes: '', batchIds: [], unenrolledBatchIds: [],
     });
+    const [schools, setSchools] = useState([]);
 
     useEffect(() => {
         if (userProfile?.id) loadData();
@@ -46,15 +47,17 @@ export default function Students() {
     async function loadData() {
         try {
             const uid = userProfile.id;
-            const [studentData, allBatches, attSnap, examSnap, hwSnap] = await Promise.all([
+            const [studentData, allBatches, attSnap, examSnap, hwSnap, schoolData] = await Promise.all([
                 studentService.getStudentsByTeacher(uid),
-                batchService.getBatches(uid),
+                batchService.getBatches(uid, true),
                 supabase.from('attendance_records').select('*').eq('teacher_id', uid),
                 supabase.from('exams').select('*').eq('teacher_id', uid),
                 supabase.from('homeworks').select('*').eq('teacher_id', uid),
+                schoolService.getSchools(uid)
             ]);
             
             setStudents(studentData);
+            setSchools(schoolData);
 
             const schools = [...new Set(studentData.map(s => s.school).filter(Boolean))];
             setSchoolList(schools);
@@ -78,7 +81,7 @@ export default function Students() {
         
         setForm({
             name: '', email: '', phone: '', guardianName: '', guardianPhone: '',
-            school: lastSchool, grade: lastGrade, address: '', notes: '', batchIds: [], unenrolledBatchIds: [],
+            schoolId: lastSchool, grade: lastGrade, address: '', notes: '', batchIds: [], unenrolledBatchIds: [],
         });
         setShowModal(true);
     }
@@ -91,7 +94,7 @@ export default function Students() {
             phone: student.phone || '',
             guardianName: student.guardianName || '',
             guardianPhone: student.guardianPhone || '',
-            school: student.school || '',
+            schoolId: student.school_id || '',
             grade: String(student.grade || ''),
             address: student.address || '',
             notes: student.notes || '',
@@ -111,7 +114,7 @@ export default function Students() {
                 phone: form.phone,
                 guardian_name: form.guardianName,
                 guardian_phone: form.guardianPhone,
-                school: form.school,
+                school_id: form.schoolId || null,
                 grade: form.grade, // Keep as string or handle as number based on DB
                 address: form.address,
                 notes: form.notes,
@@ -139,7 +142,7 @@ export default function Students() {
                 toast.success('Student added');
                 
                 // UX Improvement: Remember the school for the next entry
-                localStorage.setItem('last_used_school', form.school);
+                localStorage.setItem('last_used_school', form.schoolId);
                 localStorage.setItem('last_used_grade', form.grade);
             }
 
@@ -278,7 +281,11 @@ export default function Students() {
         let totalHomeworks = 0;
         let completedHomeworks = 0;
         homeworks.forEach(hw => {
-            if (viewingStudent.batchIds?.includes(hw.batchId)) {
+            // DEEP LOGIC: Fair targeting
+            const isRelevantBatch = viewingStudent.batchIds?.includes(hw.batchId);
+            const isRelevantSchool = !hw.target_school_id || hw.target_school_id === viewingStudent.school_id;
+
+            if (isRelevantBatch && isRelevantSchool) {
                 totalHomeworks++;
                 if ((hw.completedBy || []).includes(viewingStudent.id)) {
                     completedHomeworks++;
@@ -525,7 +532,7 @@ export default function Students() {
                                                 </div>
                                                 <div>
                                                     <div style={{ fontWeight: 800, fontSize: '15px' }}>{student.name}</div>
-                                                    <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 600 }}>{student.school || 'Private Student'}</div>
+                                                    <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 600 }}>{student.schools?.name || 'Private Student'}</div>
                                                 </div>
                                             </div>
                                         </td>
@@ -661,20 +668,21 @@ export default function Students() {
                         </div>
                     </div>
                     <div className="form-group">
-                        <label className="form-label" style={{ fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', marginBottom: '8px', color: 'var(--color-text-muted)' }}>School Name</label>
-                        <input 
-                            className="form-input" 
-                            list="school-suggestions" 
-                            value={form.school} 
-                            onChange={(e) => setForm({ ...form, school: e.target.value })} 
-                            placeholder="Type to search or add school..." 
+                        <label className="form-label" style={{ fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', marginBottom: '8px', color: 'var(--color-text-muted)' }}>School/College Name</label>
+                        <select 
+                            className="form-select" 
+                            value={form.schoolId} 
+                            onChange={(e) => setForm({ ...form, schoolId: e.target.value })} 
                             style={{ height: '48px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)' }} 
-                        />
-                        <datalist id="school-suggestions">
-                            {schoolSuggestions.map((school, i) => (
-                                <option key={i} value={school} />
+                        >
+                            <option value="">Select Institution</option>
+                            {schools.map(s => (
+                                <option key={s.id} value={s.id}>{s.name}</option>
                             ))}
-                        </datalist>
+                        </select>
+                        <p style={{ marginTop: '4px', fontSize: '10px', color: 'var(--color-primary)', fontWeight: 700 }}>
+                            Add more institutions in the "Schools & Colleges" section.
+                        </p>
                     </div>
                     
                     <div style={{ marginTop: '12px', padding: '24px', background: 'rgba(255,255,255,0.03)', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.05)' }}>
@@ -745,7 +753,7 @@ export default function Students() {
                                 <div>
                                     <h2 style={{ fontSize: '36px', fontWeight: 900, margin: 0, letterSpacing: '-0.04em', color: 'white' }}>{viewingStudent.name}</h2>
                                     <div style={{ opacity: 0.8, fontSize: '15px', marginTop: '4px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <Shield size={16} /> Class {viewingStudent.grade} | {viewingStudent.school || 'No school listed'}
+                                        <Shield size={16} /> Class {viewingStudent.grade} | {viewingStudent.schools?.name || 'No school listed'}
                                     </div>
                                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '20px' }}>
                                         {viewingStudent.batchIds?.map((bid) => (

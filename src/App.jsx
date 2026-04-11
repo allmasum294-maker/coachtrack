@@ -33,6 +33,7 @@ import ReportCard from './pages/ReportCard';
 import Homework from './pages/Homework';
 import Leaderboard from './pages/Leaderboard';
 import StudyPlans from './pages/StudyPlans';
+import Schools from './pages/Schools';
 
 // Protected route wrapper
 function ProtectedRoute({ children }) {
@@ -184,6 +185,7 @@ function App() {
               <Route path="/students" element={<Students />} />
               <Route path="/schedule" element={<Schedule />} />
               <Route path="/attendance" element={<Attendance />} />
+              <Route path="/schools" element={<Schools />} />
               <Route path="/lessons" element={<Lessons />} />
               <Route path="/exams" element={<Exams />} />
               <Route path="/sessions" element={<SessionLog />} />

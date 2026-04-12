@@ -29,7 +29,9 @@ export const lessonPlanService = {
       .insert({
         teacher_id: data.teacherId,
         batch_id: data.batchId,
+        batch_name: data.batchName, // New field
         schedule_id: data.scheduleId,
+        class_title: data.classTitle, // New field
         date: data.date || new Date().toISOString().split('T')[0],
         topics_covered: data.topicsCovered,
         homework_assigned: data.homeworkAssigned,
@@ -46,12 +48,15 @@ export const lessonPlanService = {
     const { data, error } = await supabase
       .from('session_logs')
       .select('*')
-      .eq('teacher_id', teacherId);
+      .eq('teacher_id', teacherId)
+      .order('date', { ascending: false });
     if (error) throw error;
     if (!data) return [];
     return data.map(l => ({
       ...l,
       batchId: l.batch_id,
+      batchName: l.batch_name, // Map stored name
+      classTitle: l.class_title, // Map stored title
       teacherId: l.teacher_id
     }));
   }

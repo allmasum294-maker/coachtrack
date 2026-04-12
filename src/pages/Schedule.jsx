@@ -95,91 +95,75 @@ export default function Schedule() {
         }
     }
 
-    function getCalendarEvents() {
-        const loggedScheduleIds = new Set(sessionLogs.filter(l => l.schedule_id).map(l => l.schedule_id));
+    const getCalendarEvents = () => {
+        const events = [];
 
-        const classEvents = schedules
-            .filter(s => !filterBatch || s.batchId === filterBatch)
-            .map((s) => {
-                let color = '#3b82f6'; 
-                if (s.status === 'completed') color = '#14b8a6'; 
-                if (s.status === 'cancelled') color = '#ef4444'; 
-                if (s.status === 'rescheduled') color = '#f59e0b'; 
+        // 1. Regular Classes (Schedules)
+        schedules.forEach(s => {
+            let color = '#3b82f6'; // Default Scheduled (Blue)
+            if (s.status === 'completed') color = '#14b8a6'; // Completed (Teal)
+            if (s.status === 'cancelled') color = '#ef4444'; // Cancelled (Red)
+            if (s.status === 'rescheduled') color = '#f59e0b'; // Rescheduled (Amber)
 
-                return {
-                    id: s.id,
-                    title: `${s.batchName || ''}: ${s.title}`,
-                    start: `${s.date}T${s.startTime || '00:00:00'}`,
-                    end: `${s.date}T${s.endTime || '23:59:59'}`,
-                    backgroundColor: color,
-                    borderColor: 'transparent',
-                    textColor: 'white',
-                    extendedProps: { schedule: s, type: 'class' },
-                };
+            events.push({
+                id: s.id,
+                title: `${s.title}${s.batch_name ? `: ${s.batch_name}` : ''}`,
+                start: `${s.date}T${s.start_time}`,
+                end: `${s.date}T${s.end_time}`,
+                backgroundColor: color,
+                borderColor: color,
+                extendedProps: { ...s, type: 'class' }
             });
+        });
 
-        const examEvents = exams
-            .filter(e => !filterBatch || e.batchId === filterBatch)
-            .map((e) => {
-                const color = '#8b5cf6'; 
-
-                return {
-                    id: `exam-${e.id}`,
-                    title: `EXAM: ${e.title}`,
-                    start: `${e.date}T${e.start_time || '00:00:00'}`,
-                    end: `${e.date}T${e.end_time || '23:59:59'}`,
-                    backgroundColor: color,
-                    borderColor: 'transparent',
-                    textColor: 'white',
-                    extendedProps: { exam: e, type: 'exam' },
-                };
+        // 2. Exams
+        exams.forEach(e => {
+            const color = '#8b5cf6'; // Exam (Purple)
+            events.push({
+                id: `exam-${e.id}`,
+                title: `EXAM: ${e.title}`,
+                start: `${e.date}T${e.start_time}`,
+                end: `${e.date}T${e.end_time}`,
+                backgroundColor: color,
+                borderColor: color,
+                extendedProps: { ...e, type: 'exam' }
             });
+        });
 
-        const sessionLogEvents = sessionLogs
-            .filter(l => !filterBatch || l.batchId === filterBatch)
-            .filter(l => !l.scheduleId || !loggedScheduleIds.has(l.scheduleId))
-            .map((l) => {
-                const color = '#f97316'; 
-                return {
-                    id: `log-${l.id}`,
-                    title: `LOG: ${l.batchName || ''} — ${l.topics_covered || 'Session'}`,
-                    start: `${l.date}T00:00:00`,
-                    end: `${l.date}T23:59:59`,
-                    backgroundColor: color,
-                    borderColor: 'transparent',
-                    textColor: 'white',
-                    extendedProps: { sessionLog: l, type: 'sessionLog' },
-                };
-            });
-
-        const homeworkEvents = homeworks
-            .filter(hw => !filterBatch || hw.batchId === filterBatch)
-            .filter(hw => hw.due_date)
-            .map((hw) => {
-                const batchMsg = batches.find(b => b.id === hw.batchId)?.name || '';
-                const color = '#ec4899'; 
-                
-                // Fix: due_date from Supabase might be a full ISO string. 
-                // We just need the date part for the calendar start.
-                let startDate = hw.due_date;
-                if (typeof startDate === 'string' && startDate.includes('T')) {
-                    startDate = startDate.split('T')[0];
-                }
-
-                return {
-                    id: `hw-${hw.id}`,
-                    title: `HW DUE: [${batchMsg}] ${hw.title}`,
-                    start: `${startDate}T23:59:59`,
+        // 3. HW Due Dates (from session logs)
+        sessionLogs.forEach(l => {
+            if (l.homework_assigned && l.date) {
+                const color = '#ec4899'; // HW Due (Pink)
+                events.push({
+                    id: `hw-${l.id}`,
+                    title: `HW: ${l.batch_name || l.batchId}`,
+                    start: l.date,
                     allDay: true,
-                    backgroundColor: color,
-                    borderColor: 'transparent',
-                    textColor: 'white',
-                    extendedProps: { homework: hw, batchName: batchMsg, type: 'homework' },
-                };
+                    backgroundColor: 'transparent',
+                    borderColor: color,
+                    textColor: color,
+                    display: 'list-item',
+                    extendedProps: { ...l, type: 'homework' }
+                });
+            }
+            
+            // Session Log itself as an event (Orange)
+            const logColor = '#f97316';
+            events.push({
+                id: `log-${l.id}`,
+                title: `LOG: ${l.batch_name || 'Class Log'}`,
+                start: l.date,
+                allDay: true,
+                backgroundColor: `${logColor}20`,
+                borderColor: logColor,
+                textColor: logColor,
+                display: 'block',
+                extendedProps: { ...l, type: 'log' }
             });
+        });
 
-        return [...classEvents, ...examEvents, ...sessionLogEvents, ...homeworkEvents];
-    }
+        return events;
+    };
 
     function openRecurringCreate() {
         setRecurringForm({
@@ -327,12 +311,13 @@ export default function Schedule() {
         e.preventDefault();
         try {
             const batch = batches.find(b => b.id === editingSchedule.batchId);
-            const dateVal = editingSchedule.date;
+            const dateVal = completeForm.date || editingSchedule.date;
 
             const sessionData = {
                 batchId: editingSchedule.batchId,
-                batchName: batch?.name || '',
+                batchName: batch?.name || editingSchedule.batch_name || 'Individual Class',
                 scheduleId: editingSchedule.id,
+                classTitle: editingSchedule.title || 'Untitled Class',
                 date: dateVal,
                 topicsCovered: completeForm.topicsCovered,
                 notes: completeForm.notes,

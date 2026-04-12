@@ -94,7 +94,11 @@ export default function Leaderboard() {
                     const sRecord = (record.records || []).find(r => r.studentId === student.id);
                     if (sRecord) {
                         attPossible++;
-                        if (sRecord.status === 'present') attPresent++;
+                        if (sRecord.status === 'present') {
+                            attPresent++;
+                        } else if (sRecord.status === 'late') {
+                            attPresent += 0.5; // 50% marks for being late
+                        }
                     }
                 }
             });

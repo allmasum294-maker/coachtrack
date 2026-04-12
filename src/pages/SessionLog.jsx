@@ -216,72 +216,87 @@ export default function SessionLog() {
             </div>
 
             {filteredLogs.length === 0 ? (
-                <div className="glass-card" style={{ padding: 'var(--space-12)', textAlign: 'center' }}>
-                    <div style={{ width: '80px', height: '80px', background: 'rgba(255,255,255,0.05)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto var(--space-6)' }}>
-                        <FileEdit size={40} style={{ color: 'var(--color-text-muted)', opacity: 0.3 }} />
+                <div className="glass-panel" style={{ padding: '80px var(--space-12)', textAlign: 'center' }}>
+                    <div style={{ width: '80px', height: '80px', background: 'rgba(255,255,255,0.03)', borderRadius: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto var(--space-8)' }}>
+                        <BookOpen size={40} style={{ color: 'var(--color-primary)', opacity: 0.5 }} />
                     </div>
-                    <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '8px' }}>No Records Found</h2>
-                    <p style={{ color: 'var(--color-text-muted)', maxWidth: '400px', margin: '0 auto' }}>You haven't added any class records yet.</p>
+                    <h2 style={{ fontSize: '24px', fontWeight: 900, marginBottom: '12px' }}>Journal is Empty</h2>
+                    <p style={{ color: 'var(--color-text-muted)', maxWidth: '400px', margin: '0 auto' }}>Once you finish a scheduled class, the details will appear here automatically.</p>
                 </div>
             ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 'var(--space-4)' }}>
                     {filteredLogs.map((log) => {
                         const dateVal = new Date(log.date);
-                        const linkedSchedule = getScheduleForLog(log.schedule_id);
                         return (
-                            <div key={log.id} className="glass-card list-item-hover" style={{ padding: 'var(--space-6)', transition: 'all 0.3s ease' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 'var(--space-6)' }}>
+                            <div key={log.id} className="glass-panel session-log-card" style={{ 
+                                padding: 'var(--space-6)', 
+                                border: '1px solid rgba(255,255,255,0.03)',
+                                transition: 'all 0.3s ease',
+                                position: 'relative',
+                                overflow: 'hidden'
+                            }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '24px' }}>
                                     <div style={{ flex: 1 }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: 'var(--space-4)', flexWrap: 'wrap' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--color-primary)', fontWeight: 700, fontSize: '13px', background: 'var(--color-primary-light)', padding: '4px 12px', borderRadius: '20px' }}>
+                                        {/* Top Meta Row */}
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                                            <div style={{ 
+                                                fontSize: '11px', fontWeight: 900, color: 'white', 
+                                                background: 'var(--color-primary)', 
+                                                padding: '4px 10px', borderRadius: '8px',
+                                                textTransform: 'uppercase'
+                                            }}>
+                                                {log.batchName || 'Individual'}
+                                            </div>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--color-text-muted)', fontWeight: 600 }}>
                                                 <Calendar size={14} />
-                                                {format(dateVal, 'MMM d, yyyy')}
+                                                {format(dateVal, 'MMMM d, yyyy')}
                                             </div>
-                                            <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-text-secondary)' }}>
-                                                {log.batchName}
-                                            </div>
-                                            {linkedSchedule && (
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--color-teal)', background: 'var(--color-teal-light)', padding: '4px 12px', borderRadius: '20px' }}>
-                                                    <Clock size={14} />
-                                                    {linkedSchedule.startTime} – {linkedSchedule.endTime}
+                                            {log.schedule_id && (
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--color-teal)', fontWeight: 800, textTransform: 'uppercase' }}>
+                                                    <Link2 size={12} /> Linked to Schedule
                                                 </div>
                                             )}
                                         </div>
 
-                                        <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: 'var(--space-3)', color: 'var(--color-text)' }}>
-                                            {log.topicsCovered || 'Topics not recorded'}
+                                        {/* Title & Content */}
+                                        <h3 style={{ fontSize: '20px', fontWeight: 900, marginBottom: '12px', color: 'var(--color-text-primary)' }}>
+                                            {log.classTitle || log.topicsCovered || 'Untitled Class'}
                                         </h3>
                                         
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px' }}>
+                                            <div>
+                                                <span style={{ fontSize: '10px', fontWeight: 900, color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.1em', display: 'block', marginBottom: '8px' }}>Topics Covered</span>
+                                                <p style={{ fontSize: '14px', color: 'rgba(255,100,2014, 0.8)', margin: 0, lineHeight: 1.5 }}>
+                                                    {log.topicsCovered || 'No topics specified'}
+                                                </p>
+                                            </div>
+
                                             {log.homeworkAssigned && (
-                                                <div style={{ background: 'rgba(245, 158, 11, 0.05)', borderLeft: '3px solid var(--color-warning)', padding: '12px 16px', borderRadius: '0 8px 8px 0' }}>
-                                                    <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--color-warning)', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>Homework Assigned</span>
-                                                    <p style={{ fontSize: '14px', color: 'var(--color-text-secondary)', margin: 0 }}>{log.homeworkAssigned}</p>
-                                                </div>
-                                            )}
-                                            
-                                            {log.notes && (
-                                                <div style={{ background: 'rgba(255,255,255,0.03)', padding: '12px 16px', borderRadius: '8px' }}>
-                                                    <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>Class Notes</span>
-                                                    <p style={{ fontSize: '14px', color: 'var(--color-text-secondary)', lineHeight: 1.6, margin: 0 }}>{log.notes}</p>
+                                                <div style={{ padding: '12px', background: 'rgba(236, 72, 153, 0.05)', borderRadius: '12px', border: '1px solid rgba(236, 72, 153, 0.1)' }}>
+                                                    <span style={{ fontSize: '10px', fontWeight: 900, color: '#ec4899', textTransform: 'uppercase', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                                                        <Star size={12} fill="#ec4899" /> Homework Assigned
+                                                    </span>
+                                                    <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)', margin: 0 }}>{log.homeworkAssigned}</p>
                                                 </div>
                                             )}
                                         </div>
+
+                                        {log.notes && (
+                                            <div style={{ marginTop: '16px', padding: '12px', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                                <span style={{ fontSize: '10px', fontWeight: 900, color: 'var(--color-text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>Teacher Observations</span>
+                                                <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', margin: 0, fontStyle: 'italic' }}>"{log.notes}"</p>
+                                            </div>
+                                        )}
                                     </div>
 
-                                    <div style={{ display: 'flex', gap: '8px' }}>
-                                        <div className="tooltip-wrapper">
-                                            <button className="btn btn-ghost btn-icon" onClick={() => openEdit(log)}>
-                                                <Edit2 size={18} />
-                                            </button>
-                                            <span className="tooltip">Edit Record</span>
-                                        </div>
-                                        <div className="tooltip-wrapper">
-                                            <button className="btn btn-ghost btn-icon" onClick={() => handleDelete(log.id)} style={{ color: 'var(--color-danger)' }}>
-                                                <Trash2 size={18} />
-                                            </button>
-                                            <span className="tooltip">Delete Record</span>
-                                        </div>
+                                    {/* Actions */}
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                        <button onClick={() => openEdit(log)} className="btn btn-ghost btn-icon" style={{ width: '40px', height: '40px' }}>
+                                            <Edit2 size={18} />
+                                        </button>
+                                        <button onClick={() => handleDelete(log.id)} className="btn btn-ghost btn-icon" style={{ width: '40px', height: '40px', color: 'var(--color-danger)' }}>
+                                            <Trash2 size={18} />
+                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -289,6 +304,14 @@ export default function SessionLog() {
                     })}
                 </div>
             )}
+
+            <style>{`
+                .session-log-card:hover {
+                    background: rgba(255,255,255,0.02);
+                    border: 1px solid var(--color-primary-faded) !important;
+                    transform: translateX(4px);
+                }
+            `}</style>
 
             {/* Redesigned Modal */}
             <Modal

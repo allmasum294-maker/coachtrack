@@ -42,16 +42,15 @@ const mainNavItems = [
 ];
 
 const managementNavItems = [
-    { path: '/attendance', icon: ClipboardCheck, label: 'Attendance' },
-    { path: '/schools', icon: Layers, label: 'Schools & Colleges' },
-    { path: '/lessons', icon: BookOpen, label: 'Lessons' },
-    { path: '/homework', icon: BookCheck, label: 'Homework' },
-    { path: '/exams', icon: FileText, label: 'Exams' },
+    { id: 'attendance', path: '/attendance', icon: UserCheck, label: 'Attendance' },
+    { id: 'session-logs', path: '/session-logs', icon: BookOpen, label: 'Session Logs' },
+    { id: 'exams', path: '/exams', icon: GraduationCap, label: 'Exams' }
 ];
 
 const insightNavItems = [
-    { path: '/analytics', icon: BarChart3, label: 'Class Progress' },
-    { path: '/leaderboard', icon: Award, label: 'Top Students' },
+    { id: 'analytics', path: '/analytics', icon: LineChart, label: 'Class Analytics' },
+    { id: 'student-analytics', path: '/student-analytics', icon: BarChart3, label: 'Student Analytics' },
+    { id: 'leaderboard', path: '/leaderboard', icon: Trophy, label: 'Leaderboard' }
 ];
 
 const systemNavItems = [

@@ -29,7 +29,11 @@ export default function ReportCardModal({ student, batches, attendance, exams, h
                     const record = (a.records || []).find(r => r.studentId === student.id);
                     if (record) {
                         totalClasses++;
-                        if (record.status === 'present') presentClasses++;
+                        if (record.status === 'present') {
+                            presentClasses++;
+                        } else if (record.status === 'late') {
+                            presentClasses += 0.5; // 50% credit for being late
+                        }
                     }
                 }
             }

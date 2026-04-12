@@ -118,8 +118,11 @@ export default function StudentAnalytics() {
             if (record) {
                 totalClasses++;
                 if (record.status === 'present') presentClasses++;
+                else if (record.status === 'late') {
+                    lateClasses++;
+                    presentClasses += 0.5; // 50% credit for being late
+                }
                 else if (record.status === 'absent') absentClasses++;
-                else if (record.status === 'late') lateClasses++;
             }
         });
 

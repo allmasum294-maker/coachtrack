@@ -194,9 +194,12 @@ export default function SessionLog() {
                     <h1 className="page-title">Class Records</h1>
                     <p className="page-subtitle">A simple history of what you've taught in each class</p>
                 </div>
-                <button className="btn btn-primary" onClick={openCreate} style={{ boxShadow: 'var(--shadow-primary)' }}>
-                    <Plus size={18} /> Add Class Record
-                </button>
+                <div className="tooltip-wrapper">
+                    <button className="btn btn-primary btn-comfort" onClick={openCreate} style={{ boxShadow: 'var(--shadow-primary)' }}>
+                        <Plus size={24} />
+                    </button>
+                    <span className="tooltip">Add Class Record</span>
+                </div>
             </div>
 
             <div className="glass-card" style={{ padding: 'var(--space-5)', marginBottom: 'var(--space-8)', display: 'flex', gap: 'var(--space-3)', alignItems: 'center' }}>

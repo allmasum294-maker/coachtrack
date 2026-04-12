@@ -120,9 +120,12 @@ export default function Batches() {
                     <h1 className="page-title" style={{ fontSize: '32px', fontWeight: 900 }}>Batches</h1>
                     <p className="page-subtitle" style={{ fontWeight: 600 }}>Create and manage student batches</p>
                 </div>
-                <button className="btn btn-primary" onClick={openCreate} style={{ padding: '0 24px', height: '48px', fontWeight: 900, boxShadow: '0 8px 20px rgba(59, 130, 246, 0.2)' }}>
-                    <Plus size={18} /> ADD NEW BATCH
-                </button>
+                <div className="tooltip-wrapper">
+                    <button className="btn btn-primary btn-comfort" onClick={openCreate} style={{ boxShadow: '0 8px 20px rgba(59, 130, 246, 0.2)' }}>
+                        <Plus size={24} />
+                    </button>
+                    <span className="tooltip">New Batch</span>
+                </div>
             </div>
 
             <div className="glass-panel" style={{ padding: '6px', marginBottom: 'var(--space-8)', display: 'inline-flex', gap: '6px', background: 'rgba(255, 255, 255, 0.03)' }}>

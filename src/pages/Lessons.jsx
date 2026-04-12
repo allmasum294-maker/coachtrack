@@ -148,9 +148,12 @@ export default function Lessons() {
                     <h1 className="page-title">Topics</h1>
                     <p className="page-subtitle">Track your teaching progress for each batch</p>
                 </div>
-                <button className="btn btn-primary" onClick={openCreate} disabled={!selectedBatch}>
-                    <Plus size={18} /> Add Topic
-                </button>
+                <div className="tooltip-wrapper">
+                    <button className="btn btn-primary btn-comfort" onClick={openCreate} disabled={!selectedBatch}>
+                        <Plus size={24} />
+                    </button>
+                    <span className="tooltip">Add Topic</span>
+                </div>
             </div>
 
             <div className="glass-panel" style={{ padding: 'var(--space-4)', marginBottom: 'var(--space-6)' }}>

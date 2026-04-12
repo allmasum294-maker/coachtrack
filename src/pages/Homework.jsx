@@ -223,9 +223,12 @@ export default function Homework() {
                     <h1 className="page-title">Homework & Assignments</h1>
                     <p className="page-subtitle">Give work to students and track their progress</p>
                 </div>
-                <button className="btn btn-primary" onClick={openCreate} style={{ boxShadow: 'var(--shadow-primary)' }}>
-                    <Plus size={18} /> New Assignment
-                </button>
+                <div className="tooltip-wrapper">
+                    <button className="btn btn-primary btn-comfort" onClick={openCreate} style={{ boxShadow: 'var(--shadow-primary)' }}>
+                        <Plus size={24} />
+                    </button>
+                    <span className="tooltip">New Assignment</span>
+                </div>
             </div>
 
             <div className="glass-card" style={{ padding: 'var(--space-5)', marginBottom: 'var(--space-8)', display: 'flex', gap: 'var(--space-3)', alignItems: 'center' }}>

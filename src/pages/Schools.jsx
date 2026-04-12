@@ -120,10 +120,13 @@ export default function Schools() {
                     <h1 className="page-title" style={{ fontSize: '32px', fontWeight: 900 }}>Schools & Colleges</h1>
                     <p className="page-subtitle" style={{ fontWeight: 600 }}>Manage institutional targeting and student affiliations</p>
                 </div>
-                <div style={{ display: 'flex', gap: '12px' }}>
-                    <button className="btn btn-primary" onClick={openCreate} style={{ padding: '0 24px', height: '48px', fontWeight: 900, boxShadow: '0 8px 20px rgba(20, 184, 166, 0.2)' }}>
-                        <Plus size={18} /> ADD INSTITUTION
-                    </button>
+                <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
+                    <div className="tooltip-wrapper">
+                        <button className="btn btn-primary btn-comfort" onClick={openCreate} style={{ boxShadow: '0 8px 20px rgba(20, 184, 166, 0.2)' }}>
+                            <Plus size={24} />
+                        </button>
+                        <span className="tooltip">Add Institution</span>
+                    </div>
                 </div>
             </div>
 

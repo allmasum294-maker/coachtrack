@@ -306,9 +306,12 @@ export default function Exams() {
                     <h1 className="page-title">Exams & Tests</h1>
                     <p className="page-subtitle">Track tests and student progress in your batches</p>
                 </div>
-                <button className="btn btn-primary" onClick={openCreate} style={{ boxShadow: 'var(--shadow-primary)' }}>
-                    <Plus size={18} /> Add Exam
-                </button>
+                <div className="tooltip-wrapper">
+                    <button className="btn btn-primary btn-comfort" onClick={openCreate} style={{ boxShadow: 'var(--shadow-primary)' }}>
+                        <Plus size={24} />
+                    </button>
+                    <span className="tooltip">Add Exam</span>
+                </div>
             </div>
 
             <div className="glass-card" style={{ padding: 'var(--space-5)', marginBottom: 'var(--space-8)', display: 'flex', gap: 'var(--space-3)', alignItems: 'center' }}>

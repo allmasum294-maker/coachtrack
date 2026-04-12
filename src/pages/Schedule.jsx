@@ -447,13 +447,19 @@ export default function Schedule() {
                     </div>
                     <p className="page-subtitle">View and manage your classes, exams, and deadlines</p>
                 </div>
-                <div style={{ display: 'flex', gap: 'var(--space-4)' }}>
-                    <button className="btn btn-secondary" onClick={() => openRecurringCreate()} style={{ height: '48px', padding: '0 24px', borderRadius: '14px', fontWeight: 700 }}>
-                        <RefreshCw size={18} /> Recurring Classes
-                    </button>
-                    <button className="btn btn-primary" onClick={() => openCreate()} style={{ height: '48px', padding: '0 24px', borderRadius: '14px', fontWeight: 800, boxShadow: '0 10px 20px -5px rgba(59, 130, 246, 0.3)' }}>
-                        <Plus size={20} /> New Class
-                    </button>
+                <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
+                    <div className="tooltip-wrapper">
+                        <button className="btn btn-secondary btn-comfort" onClick={() => openRecurringCreate()} style={{ border: '1px solid rgba(255,255,255,0.05)' }}>
+                            <RefreshCw size={20} />
+                        </button>
+                        <span className="tooltip">Recurring Classes</span>
+                    </div>
+                    <div className="tooltip-wrapper">
+                        <button className="btn btn-primary btn-comfort" onClick={() => openCreate()} style={{ boxShadow: '0 10px 20px -5px rgba(59, 130, 246, 0.3)' }}>
+                            <Plus size={24} />
+                        </button>
+                        <span className="tooltip">New Class</span>
+                    </div>
                 </div>
             </div>
 

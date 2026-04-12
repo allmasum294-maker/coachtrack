@@ -341,13 +341,19 @@ export default function Students() {
                     <h1 className="page-title" style={{ fontSize: '32px', fontWeight: 900 }}>Student Registry</h1>
                     <p className="page-subtitle" style={{ fontWeight: 600 }}>Manage performance and affiliations for {students.length} students</p>
                 </div>
-                <div style={{ display: 'flex', gap: '12px' }}>
-                    <button className="btn btn-secondary" onClick={() => { setShowImportModal(true); setCsvPreview([]); }} style={{ padding: '0 20px', height: '48px', fontWeight: 800 }}>
-                        <Upload size={18} /> IMPORT LIST
-                    </button>
-                    <button className="btn btn-primary" onClick={openCreate} style={{ padding: '0 24px', height: '48px', fontWeight: 900, boxShadow: '0 8px 20px rgba(59, 130, 246, 0.2)' }}>
-                        <Plus size={18} /> ADD STUDENT
-                    </button>
+                <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
+                    <div className="tooltip-wrapper">
+                        <button className="btn btn-secondary btn-comfort" onClick={() => { setShowImportModal(true); setCsvPreview([]); }} style={{ border: '1px solid rgba(255,255,255,0.05)' }}>
+                            <Upload size={20} />
+                        </button>
+                        <span className="tooltip">Import Students</span>
+                    </div>
+                    <div className="tooltip-wrapper">
+                        <button className="btn btn-primary btn-comfort" onClick={openCreate} style={{ boxShadow: '0 8px 20px rgba(59, 130, 246, 0.2)' }}>
+                            <Plus size={24} />
+                        </button>
+                        <span className="tooltip">Add Student</span>
+                    </div>
                 </div>
             </div>
 

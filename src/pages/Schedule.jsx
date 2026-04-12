@@ -59,30 +59,36 @@ export default function Schedule() {
     async function loadData() {
         try {
             const uid = userProfile.id;
+            
+            // Fetch batches first and separately to ensure UI stability
+            try {
+                const activeBatches = await batchService.getBatches(uid, true);
+                setBatches(activeBatches);
+            } catch (batchErr) {
+                console.error('Error loading batches:', batchErr);
+            }
+
             const [
-                activeBatches,
                 allSchedules,
                 studentResult,
                 examResult,
                 logResult,
                 hwResult
             ] = await Promise.all([
-                batchService.getBatches(uid, true),
-                scheduleService.getSchedules(uid),
-                studentService.getStudentsByTeacher(uid),
-                examService.getExams(uid),
-                lessonPlanService.getLessonsByTeacher(uid),
-                homeworkService.getHomeworkByTeacher(uid)
+                scheduleService.getSchedules(uid).catch(() => []),
+                studentService.getStudentsByTeacher(uid).catch(() => []),
+                examService.getExams(uid).catch(() => []),
+                lessonPlanService.getLessonsByTeacher(uid).catch(() => []),
+                homeworkService.getHomeworkByTeacher(uid).catch(() => [])
             ]);
             
-            setBatches(activeBatches);
             setSchedules(allSchedules);
-            setStudents(studentResult.filter(s => s.status === 'enrolled'));
+            setStudents((studentResult || []).filter(s => s.status === 'enrolled'));
             setExams(examResult);
             setSessionLogs(logResult);
             setHomeworks(hwResult);
         } catch (err) {
-            console.error('Error loading schedules:', err);
+            console.error('Error loading schedules data:', err);
         } finally {
             setLoading(false);
         }

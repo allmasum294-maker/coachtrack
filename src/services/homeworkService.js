@@ -9,6 +9,8 @@ export const homeworkService = {
     
     if (error) throw error;
 
+    if (!data) return [];
+
     // Transform to include submissions object for backward compatibility in UI
     return data.map(hw => {
       const submissions = {};

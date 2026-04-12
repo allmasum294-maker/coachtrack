@@ -16,12 +16,14 @@ export async function getBatches(teacherId, includeClosed = false) {
   
   const { data, error } = await query;
   if (error) throw error;
-  
+
+  if (!data) return [];
+
   return data.map(batch => ({
     ...batch,
-    isClosed: batch.is_closed,
-    closedAt: batch.closed_at,
-    targetClasses: batch.target_classes
+    isClosed: batch.is_closed || false,
+    closedAt: batch.closed_at || null,
+    targetClasses: batch.target_classes || []
   }));
 }
 

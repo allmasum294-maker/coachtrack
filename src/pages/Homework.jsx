@@ -47,20 +47,28 @@ export default function Homework() {
     async function loadData() {
         try {
             const uid = userProfile.id;
-            const [hwList, activeBatches, allStudents, logs, schoolData] = await Promise.all([
-                homeworkService.getHomeworkByTeacher(uid),
-                batchService.getBatches(uid, true),
-                studentService.getStudentsByTeacher(uid),
-                lessonPlanService.getLessonsByTeacher(uid),
-                schoolService.getSchools(uid)
+
+            // Fetch batches first and separately to ensure UI stability
+            try {
+                const activeBatches = await batchService.getBatches(uid, true);
+                setBatches(activeBatches);
+            } catch (batchErr) {
+                console.error('Error loading batches:', batchErr);
+            }
+
+            const [hwList, allStudents, logs, schoolData] = await Promise.all([
+                homeworkService.getHomeworkByTeacher(uid).catch(() => []),
+                studentService.getStudentsByTeacher(uid).catch(() => []),
+                lessonPlanService.getLessonsByTeacher(uid).catch(() => []),
+                schoolService.getSchools(uid).catch(() => [])
             ]);
+
             setAssignments(hwList);
-            setBatches(activeBatches);
-            setSchools(schoolData);
-            setStudents(allStudents.filter(s => s.status === 'enrolled'));
+            setStudents((allStudents || []).filter(s => s.status === 'enrolled'));
             setSessionLogs(logs);
+            setSchools(schoolData);
         } catch (err) {
-            console.error(err);
+            console.error('Error loading homework data:', err);
         } finally {
             setLoading(false);
         }

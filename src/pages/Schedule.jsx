@@ -107,9 +107,9 @@ export default function Schedule() {
 
             events.push({
                 id: s.id,
-                title: `${s.title}${s.batch_name ? `: ${s.batch_name}` : ''}`,
-                start: `${s.date}T${s.start_time}`,
-                end: `${s.date}T${s.end_time}`,
+                title: `${s.title}${s.batchName ? `: ${s.batchName}` : ''}`,
+                start: `${s.date}T${s.startTime}`,
+                end: `${s.date}T${s.endTime}`,
                 backgroundColor: color,
                 borderColor: color,
                 extendedProps: { ...s, type: 'class' }
@@ -136,7 +136,7 @@ export default function Schedule() {
                 const color = '#ec4899'; // HW Due (Pink)
                 events.push({
                     id: `hw-${l.id}`,
-                    title: `HW: ${l.batch_name || l.batchId}`,
+                    title: `HW: ${l.batchName || l.batchId}`,
                     start: l.date,
                     allDay: true,
                     backgroundColor: 'transparent',
@@ -151,7 +151,7 @@ export default function Schedule() {
             const logColor = '#f97316';
             events.push({
                 id: `log-${l.id}`,
-                title: `LOG: ${l.batch_name || 'Class Log'}`,
+                title: `LOG: ${l.batchName || 'Class Log'}`,
                 start: l.date,
                 allDay: true,
                 backgroundColor: `${logColor}20`,
@@ -245,7 +245,6 @@ export default function Schedule() {
     async function handleSave(e) {
         e.preventDefault();
         try {
-            const batch = batches.find((b) => b.id === form.batchId);
             const data = {
                 title: form.title || batch?.name || 'Class',
                 batch_id: form.batchId,
@@ -381,11 +380,11 @@ export default function Schedule() {
             }
             
             if (props.type === 'class') {
-                await supabase.from('schedules').update(updateData).eq('id', props.schedule.id);
+                await supabase.from('schedules').update(updateData).eq('id', props.id);
                 toast.success('Schedule updated!');
                 loadData();
             } else if (props.type === 'exam') {
-                await supabase.from('exams').update(updateData).eq('id', props.exam.id);
+                await supabase.from('exams').update(updateData).eq('id', props.id);
                 toast.success('Exam updated!');
                 loadData();
             } else {
@@ -408,13 +407,13 @@ export default function Schedule() {
             if (props.type === 'class') {
                 await supabase.from('schedules').update({
                     end_time: format(event.end, 'HH:mm')
-                }).eq('id', props.schedule.id);
+                }).eq('id', props.id);
                 toast.success('Schedule duration updated!');
                 loadData();
             } else if (props.type === 'exam') {
                 await supabase.from('exams').update({
                     end_time: format(event.end, 'HH:mm')
-                }).eq('id', props.exam.id);
+                }).eq('id', props.id);
                 toast.success('Exam duration updated!');
                 loadData();
             } else {
@@ -505,18 +504,13 @@ export default function Schedule() {
                         dateClick={(info) => openCreate(info.dateStr)}
                         eventClick={(info) => {
                             const props = info.event.extendedProps;
-                            if (props.type === 'sessionLog') {
-                                navigate(`/sessions?batchId=${props.sessionLog.batchId || ''}`);
+                            if (props.type === 'log') {
+                                navigate(`/sessions?batchId=${props.batchId || ''}`);
                                 return;
                             }
                             
-                            let eventData;
-                            if (props.type === 'exam') eventData = props.exam;
-                            else if (props.type === 'homework') eventData = props.homework;
-                            else eventData = props.schedule;
-
                             setSelectedEvent({ 
-                                ...eventData, 
+                                ...props, 
                                 displayType: props.type,
                                 displayBatchName: props.batchName 
                             });

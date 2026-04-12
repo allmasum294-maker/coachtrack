@@ -17,6 +17,8 @@ export const homeworkService = {
       });
       return {
         ...hw,
+        batchId: hw.batch_id,
+        teacherId: hw.teacher_id,
         submissions,
         completedBy: (hw.homework_completions || [])
           .filter(c => c.status === 'completed')

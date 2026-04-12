@@ -12,7 +12,11 @@ export const lessonPlanService = {
       .order('date', { ascending: false });
 
     if (error) throw error;
-    return data;
+    return data.map(l => ({
+      ...l,
+      batchId: l.batch_id,
+      teacherId: l.teacher_id
+    }));
   },
 
   /**
@@ -43,7 +47,11 @@ export const lessonPlanService = {
       .select('*')
       .eq('teacher_id', teacherId);
     if (error) throw error;
-    return data;
+    return data.map(l => ({
+      ...l,
+      batchId: l.batch_id,
+      teacherId: l.teacher_id
+    }));
   }
 };
 

@@ -12,6 +12,17 @@ export const examService = {
     // Transform to include scores array for backward compat in UI if needed
     return data.map(exam => ({
       ...exam,
+      batchId: exam.batch_id,
+      teacherId: exam.teacher_id,
+      startTime: exam.start_time,
+      endTime: exam.end_time,
+      results: exam.exam_results.map(r => ({
+        studentId: r.student_id,
+        marksObtained: r.marks_obtained,
+        topicMarks: r.topic_marks,
+        remarks: r.remarks
+      })),
+      // Keep scores for older UI refs if any
       scores: exam.exam_results.map(r => ({
         studentId: r.student_id,
         marksObtained: r.marks_obtained,

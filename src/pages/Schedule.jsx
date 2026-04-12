@@ -12,6 +12,7 @@ import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
+import { scheduleService } from '../services/scheduleService';
 import { 
     Plus, X, Calendar as CalIcon, Clock, AlertCircle, 
     RefreshCw, Info, CheckCircle2, UserCheck, CalendarDays, 
@@ -60,22 +61,22 @@ export default function Schedule() {
             const uid = userProfile.id;
             const [
                 activeBatches,
-                schedResult,
+                allSchedules,
                 studentResult,
                 examResult,
                 logResult,
                 hwResult
             ] = await Promise.all([
                 batchService.getBatches(uid, true),
-                supabase.from('schedules').select('*').eq('teacher_id', uid),
+                scheduleService.getSchedules(uid),
                 studentService.getStudentsByTeacher(uid),
                 examService.getExams(uid),
                 lessonPlanService.getLessonsByTeacher(uid),
                 homeworkService.getHomeworkByTeacher(uid)
             ]);
-
+            
             setBatches(activeBatches);
-            setSchedules(schedResult.data || []);
+            setSchedules(allSchedules);
             setStudents(studentResult.filter(s => s.status === 'enrolled'));
             setExams(examResult);
             setSessionLogs(logResult);
@@ -91,7 +92,7 @@ export default function Schedule() {
         const loggedScheduleIds = new Set(sessionLogs.filter(l => l.schedule_id).map(l => l.schedule_id));
 
         const classEvents = schedules
-            .filter(s => !filterBatch || s.batch_id === filterBatch)
+            .filter(s => !filterBatch || s.batchId === filterBatch)
             .map((s) => {
                 let color = '#3b82f6'; 
                 if (s.status === 'completed') color = '#14b8a6'; 
@@ -100,9 +101,9 @@ export default function Schedule() {
 
                 return {
                     id: s.id,
-                    title: `${s.batch_name || ''}: ${s.title}`,
-                    start: `${s.date}T${s.start_time || '00:00:00'}`,
-                    end: `${s.date}T${s.end_time || '23:59:59'}`,
+                    title: `${s.batchName || ''}: ${s.title}`,
+                    start: `${s.date}T${s.startTime || '00:00:00'}`,
+                    end: `${s.date}T${s.endTime || '23:59:59'}`,
                     backgroundColor: color,
                     borderColor: 'transparent',
                     extendedProps: { schedule: s, type: 'class' },
@@ -110,7 +111,7 @@ export default function Schedule() {
             });
 
         const examEvents = exams
-            .filter(e => !filterBatch || e.batch_id === filterBatch)
+            .filter(e => !filterBatch || e.batchId === filterBatch)
             .map((e) => {
                 const color = '#8b5cf6'; 
 
@@ -126,13 +127,13 @@ export default function Schedule() {
             });
 
         const sessionLogEvents = sessionLogs
-            .filter(l => !filterBatch || l.batch_id === filterBatch)
-            .filter(l => !l.schedule_id || !loggedScheduleIds.has(l.schedule_id))
+            .filter(l => !filterBatch || l.batchId === filterBatch)
+            .filter(l => !l.scheduleId || !loggedScheduleIds.has(l.scheduleId))
             .map((l) => {
                 const color = '#f97316'; 
                 return {
                     id: `log-${l.id}`,
-                    title: `LOG: ${l.batch_name || ''} — ${l.topics_covered || 'Session'}`,
+                    title: `LOG: ${l.batchName || ''} — ${l.topics_covered || 'Session'}`,
                     start: `${l.date}T00:00:00`,
                     end: `${l.date}T23:59:59`,
                     backgroundColor: color,
@@ -142,10 +143,10 @@ export default function Schedule() {
             });
 
         const homeworkEvents = homeworks
-            .filter(hw => !filterBatch || hw.batch_id === filterBatch)
+            .filter(hw => !filterBatch || hw.batchId === filterBatch)
             .filter(hw => hw.due_date)
             .map((hw) => {
-                const batchMsg = batches.find(b => b.id === hw.batch_id)?.name || '';
+                const batchMsg = batches.find(b => b.id === hw.batchId)?.name || '';
                 const color = '#ec4899'; 
                 return {
                     id: `hw-${hw.id}`,
@@ -228,10 +229,10 @@ export default function Schedule() {
         setEditingSchedule(schedule);
         setForm({
             title: schedule.title || '',
-            batchId: schedule.batch_id || '',
+            batchId: schedule.batchId || '',
             date: schedule.date,
-            startTime: schedule.start_time || '',
-            endTime: schedule.end_time || '',
+            startTime: schedule.startTime || '',
+            endTime: schedule.endTime || '',
             status: schedule.status || 'scheduled',
             notes: schedule.notes || '',
         });
@@ -295,7 +296,7 @@ export default function Schedule() {
         if (!editingSchedule) return;
         setCompleteForm({ topicsCovered: '', notes: '', homeworkAssigned: '' });
         const recs = {};
-        students.filter(s => (s.batchIds || []).includes(editingSchedule.batch_id)).forEach(s => {
+        students.filter(s => (s.batchIds || []).includes(editingSchedule.batchId)).forEach(s => {
             recs[s.id] = 'present';
         });
         setAttendanceRecords(recs);
@@ -306,11 +307,11 @@ export default function Schedule() {
     async function handleSaveCompleteSession(e) {
         e.preventDefault();
         try {
-            const batch = batches.find(b => b.id === editingSchedule.batch_id);
+            const batch = batches.find(b => b.id === editingSchedule.batchId);
             const dateVal = editingSchedule.date;
 
             const sessionData = {
-                batchId: editingSchedule.batch_id,
+                batchId: editingSchedule.batchId,
                 batchName: batch?.name || '',
                 scheduleId: editingSchedule.id,
                 date: dateVal,
@@ -330,7 +331,7 @@ export default function Schedule() {
                 await homeworkService.saveHomework({
                     title: completeForm.homeworkAssigned.substring(0, 80),
                     description: completeForm.homeworkAssigned,
-                    batch_id: editingSchedule.batch_id,
+                    batch_id: editingSchedule.batchId,
                     due_date: format(dueDate, 'yyyy-MM-dd'),
                     teacher_id: userProfile.id,
                     session_log_id: logId
@@ -339,7 +340,7 @@ export default function Schedule() {
 
             await attendanceService.saveAttendance(
                 userProfile.id,
-                editingSchedule.batch_id,
+                editingSchedule.batchId,
                 dateVal,
                 attendanceRecords
             );

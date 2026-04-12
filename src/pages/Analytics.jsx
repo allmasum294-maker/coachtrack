@@ -5,6 +5,7 @@ import { batchService } from '../services/batchService';
 import { studentService } from '../services/studentService';
 import { attendanceService } from '../services/attendanceService';
 import { examService } from '../services/examService';
+import { scheduleService } from '../services/scheduleService';
 import toast from 'react-hot-toast';
 import {
     BarChart3, TrendingUp, Users, BookOpen, Calendar, 
@@ -38,7 +39,7 @@ export default function Analytics() {
     useEffect(() => {
         if (selectedBatch) {
             const b = batches.find(x => x.id === selectedBatch);
-            setTargetClasses(b?.target_classes || '');
+            setTargetClasses(b?.targetClasses || '');
         } else {
             setTargetClasses('');
         }
@@ -51,20 +52,20 @@ export default function Analytics() {
     async function loadAllData() {
         try {
             const uid = userProfile.id;
-            const [activeBatches, allStudents, allAttendance, lessonRes, allExams, schedRes] = await Promise.all([
+            const [activeBatches, allStudents, allAttendance, lessonRes, allExams, allSchedules] = await Promise.all([
                 batchService.getBatches(uid, false),
                 studentService.getStudentsByTeacher(uid),
                 attendanceService.getAttendanceByTeacher(uid),
                 supabase.from('lessons').select('*').eq('teacher_id', uid),
                 examService.getExams(uid),
-                supabase.from('schedules').select('*').eq('teacher_id', uid),
+                scheduleService.getSchedules(uid),
             ]);
             setBatches(activeBatches);
             setStudents(allStudents.filter(s => s.status === 'enrolled'));
             setAttendance(allAttendance);
             setLessons(lessonRes.data || []);
             setExams(allExams);
-            setSchedules(schedRes.data || []);
+            setSchedules(allSchedules);
         } catch (err) {
             console.error('Error loading analytics data:', err);
             toast.error('Failed to load dashboard data');
@@ -82,7 +83,7 @@ export default function Analytics() {
                 .update({ target_classes: val })
                 .eq('id', selectedBatch);
             if (error) throw error;
-            setBatches(batches.map(b => b.id === selectedBatch ? { ...b, target_classes: val } : b));
+            setBatches(batches.map(b => b.id === selectedBatch ? { ...b, targetClasses: val } : b));
             toast.success('Batch goals updated');
         } catch (err) {
             console.error(err);
@@ -92,7 +93,7 @@ export default function Analytics() {
 
     function getFilteredSchedules() {
         return schedules.filter(s => {
-            if (selectedBatch && s.batch_id !== selectedBatch) return false;
+            if (selectedBatch && s.batchId !== selectedBatch) return false;
             return s.date >= startDate && s.date <= endDate;
         });
     }
@@ -135,7 +136,7 @@ export default function Analytics() {
     }, [attendance, lessons, exams, students, selectedBatch, enrolledStudentIds]);
 
     function getAttendanceTrend() {
-        const filtered = selectedBatch ? attendance.filter((a) => a.batch_id === selectedBatch) : attendance;
+        const filtered = selectedBatch ? attendance.filter((a) => a.batchId === selectedBatch) : attendance;
         const byDate = {};
         filtered.forEach((a) => {
             const key = format(new Date(a.date), 'MMM d');
@@ -154,7 +155,7 @@ export default function Analytics() {
 
     function getBatchAttendanceComparison() {
         return batches.map((batch) => {
-            const batchAtt = attendance.filter((a) => a.batch_id === batch.id);
+            const batchAtt = attendance.filter((a) => a.batchId === batch.id);
             let total = 0, present = 0;
             batchAtt.forEach((a) => {
                 (a.records || []).forEach((r) => { 
@@ -170,7 +171,7 @@ export default function Analytics() {
 
     function getSyllabusCoverage() {
         return batches.map((batch) => {
-            const batchLessons = lessons.filter((l) => l.batch_id === batch.id);
+            const batchLessons = lessons.filter((l) => l.batchId === batch.id);
             const covered = batchLessons.filter((l) => l.status === 'covered').length;
             const total = batchLessons.length;
             return { name: batch.name, covered, total, percent: total > 0 ? Math.round((covered / total) * 100) : 0 };
@@ -178,7 +179,7 @@ export default function Analytics() {
     }
 
     function getExamPerformanceTrend() {
-        const filtered = selectedBatch ? exams.filter((e) => e.batch_id === selectedBatch) : exams;
+        const filtered = selectedBatch ? exams.filter((e) => e.batchId === selectedBatch) : exams;
         return filtered
             .filter((e) => (e.scores || []).some(s => enrolledStudentIds.has(s.studentId)))
             .sort((a, b) => new Date(a.date) - new Date(b.date))

@@ -61,8 +61,8 @@ export default function Attendance() {
             if (existing) {
                 setExistingAttendance(existing);
                 const recs = {};
-                (existing.attendance_log || []).forEach((log) => {
-                    recs[log.student_id] = log.status;
+                (existing.records || []).forEach((log) => {
+                    recs[log.studentId] = log.status;
                 });
                 setRecords(recs);
             } else {
@@ -81,8 +81,8 @@ export default function Attendance() {
 
     const batchStudents = useMemo(() => {
         const enrolled = students.filter((s) => (s.batchIds || []).includes(selectedBatch));
-        if (existingAttendance?.attendance_log) {
-            const historicalIds = existingAttendance.attendance_log.map((log) => log.student_id);
+        if (existingAttendance?.records) {
+            const historicalIds = existingAttendance.records.map((log) => log.studentId);
             const historicalStudents = students.filter(
                 (s) => historicalIds.includes(s.id) && !enrolled.some((e) => e.id === s.id)
             );

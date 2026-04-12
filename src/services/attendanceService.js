@@ -18,7 +18,15 @@ export const attendanceService = {
       .order('date', { ascending: false });
 
     if (error) throw error;
-    return data;
+    return data.map(record => ({
+      ...record,
+      batchId: record.batch_id,
+      teacherId: record.teacher_id,
+      records: record.attendance_log?.map(log => ({
+        studentId: log.student_id,
+        status: log.status
+      })) || []
+    }));
   },
 
   /**

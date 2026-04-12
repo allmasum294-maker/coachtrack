@@ -145,7 +145,7 @@ export default function Export() {
             } else if (selectedType === 'students') {
                 title = 'Enrolled Students';
                 enrolledStudents.forEach((data) => {
-                    if (selectedBatch && !(data.batch_ids || []).includes(selectedBatch)) return;
+                    if (selectedBatch && !(data.batchIds || []).includes(selectedBatch)) return;
                     rows.push({
                         'Student ID': data.student_id || '',
                         Name: data.name,
@@ -155,7 +155,7 @@ export default function Export() {
                         Phone: data.phone || '',
                         Guardian: data.guardian_name || '',
                         'Guardian Phone': data.guardian_phone || '',
-                        Batches: (data.batch_ids || []).map((id) => batchMap[id] || id).join(', '),
+                        Batches: (data.batchIds || []).map((id) => batchMap[id] || id).join(', '),
                     });
                 });
             }

@@ -54,7 +54,7 @@ export default function ReportCard() {
     const filteredStudents = useMemo(() => {
         let list = students.filter(s => s.status === 'enrolled');
         if (selectedBatchId) {
-            list = list.filter(s => s.batch_ids?.includes(selectedBatchId));
+            list = list.filter(s => s.batchIds?.includes(selectedBatchId));
         }
         return list;
     }, [students, selectedBatchId]);
@@ -74,7 +74,7 @@ export default function ReportCard() {
         let presentClasses = 0;
 
         attendance.forEach((a) => {
-            if (selectedStudent.batch_ids?.includes(a.batch_id)) {
+            if (selectedStudent.batchIds?.includes(a.batch_id)) {
                 (a.records || []).forEach(r => {
                     if (r.studentId === selectedStudent.id) {
                         totalClasses++;
@@ -91,7 +91,7 @@ export default function ReportCard() {
         let totalMarksEarned = 0;
 
         exams.forEach(e => {
-            if (selectedStudent.batch_ids?.includes(e.batch_id)) {
+            if (selectedStudent.batchIds?.includes(e.batch_id)) {
                 const sScore = (e.scores || []).find(sc => sc.studentId === selectedStudent.id);
                 if (sScore) {
                     const perc = e.totalMarks > 0 ? Math.round((sScore.marksObtained / e.totalMarks) * 100) : 0;
@@ -114,7 +114,7 @@ export default function ReportCard() {
         let completedHomework = 0;
 
         homework.forEach(hw => {
-            if (selectedStudent.batch_ids?.includes(hw.batch_id)) {
+            if (selectedStudent.batchIds?.includes(hw.batch_id)) {
                 totalHomework++;
                 const submissions = hw.submissions || [];
                 const sub = submissions.find(s => s.student_id === selectedStudent.id);

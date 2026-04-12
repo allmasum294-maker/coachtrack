@@ -9,16 +9,19 @@ export async function getEnrolledStudents(batchId) {
     .from('student_batches')
     .select(`
       student_id,
-      students (*)
+      students (
+        *,
+        student_batches (batch_id)
+      )
     `)
     .eq('batch_id', batchId)
     .eq('status', 'enrolled');
 
   if (error) throw error;
-  // Flatten the result to match expected format
+  
   return data.map(item => ({
-    id: item.students.id,
-    ...item.students
+    ...item.students,
+    batchIds: item.students.student_batches?.map(sb => sb.batch_id) || []
   }));
 }
 
@@ -30,15 +33,19 @@ export async function getUnenrolledStudents(batchId) {
     .from('student_batches')
     .select(`
       student_id,
-      students (*)
+      students (
+        *,
+        student_batches (batch_id)
+      )
     `)
     .eq('batch_id', batchId)
     .eq('status', 'unenrolled');
 
   if (error) throw error;
+  
   return data.map(item => ({
-    id: item.students.id,
-    ...item.students
+    ...item.students,
+    batchIds: item.students.student_batches?.map(sb => sb.batch_id) || []
   }));
 }
 
@@ -70,15 +77,18 @@ export async function getStudentsBySchool(batchId, schoolName) {
     .from('student_batches')
     .select(`
       student_id,
-      students (*)
+      students (
+        *,
+        student_batches (batch_id)
+      )
     `)
     .eq('batch_id', batchId)
     .eq('status', 'enrolled')
     .filter('students.school', 'eq', schoolName);
 
   if (error) throw error;
+  
   return data.map(item => ({
-    id: item.students.id,
     ...item.students,
     batchIds: item.students.student_batches?.map(sb => sb.batch_id) || []
   }));
@@ -145,3 +155,4 @@ export const studentService = {
 };
 
 export default studentService;
+

@@ -56,7 +56,7 @@ export default function Leaderboard() {
     const leaderboardData = useMemo(() => {
         if (!selectedBatchId) return [];
 
-        const batchStudents = students.filter(s => (s.batch_ids || []).includes(selectedBatchId));
+        const batchStudents = students.filter(s => (s.batchIds || []).includes(selectedBatchId));
         
         const scores = batchStudents.map(student => {
             let totalPoints = 0;

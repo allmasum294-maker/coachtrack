@@ -71,7 +71,7 @@ export default function StudentTimeline() {
     const filteredStudents = useMemo(() => {
         let list = students.filter(s => s.status === 'enrolled');
         if (filterBatch) {
-            list = list.filter(s => s.batch_ids?.includes(filterBatch));
+            list = list.filter(s => s.batchIds?.includes(filterBatch));
         }
         return list;
     }, [students, filterBatch]);
@@ -106,7 +106,7 @@ export default function StudentTimeline() {
 
         // Attendance records
         attendance.forEach(a => {
-            if (!selectedStudent.batch_ids?.includes(a.batch_id)) return;
+            if (!selectedStudent.batchIds?.includes(a.batch_id)) return;
             const rec = (a.records || []).find(r => r.studentId === selectedStudent.id);
             if (!rec) return;
             const d = toDate(a.date);
@@ -130,7 +130,7 @@ export default function StudentTimeline() {
 
         // Exam result logs
         exams.forEach(e => {
-            if (!selectedStudent.batch_ids?.includes(e.batch_id)) return;
+            if (!selectedStudent.batchIds?.includes(e.batch_id)) return;
             const d = toDate(e.date);
             if (!isInDateRange(d)) return;
             const s = (e.scores || []).find(sc => sc.studentId === selectedStudent.id);
@@ -150,7 +150,7 @@ export default function StudentTimeline() {
 
         // Lessons taught
         sessionLogs.forEach(l => {
-            if (!selectedStudent.batch_ids?.includes(l.batch_id)) return;
+            if (!selectedStudent.batchIds?.includes(l.batch_id)) return;
             const d = toDate(l.date);
             if (!isInDateRange(d)) return;
             if (l.homework_assigned) {
@@ -168,7 +168,7 @@ export default function StudentTimeline() {
 
         // Homework progress
         homeworks.forEach(hw => {
-            if (!selectedStudent.batch_ids?.includes(hw.batch_id)) return;
+            if (!selectedStudent.batchIds?.includes(hw.batch_id)) return;
             const dueDate = hw.due_date ? toDate(hw.due_date) : null;
             const submissions = hw.submissions || [];
             const sub = submissions.find(s => s.student_id === selectedStudent.id);

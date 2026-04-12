@@ -73,7 +73,7 @@ export default function Homework() {
 
     function getSubmissionStats(hw) {
         const assignedStudents = students.filter(s => {
-            const inBatch = (s.batch_ids || []).includes(hw.batch_id);
+            const inBatch = (s.batchIds || []).includes(hw.batch_id);
             const inSchool = !hw.target_school_id || s.school_id === hw.target_school_id;
             return inBatch && inSchool;
         });
@@ -484,7 +484,7 @@ export default function Homework() {
                         <div style={{ maxHeight: '450px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', paddingRight: '4px' }}>
                             {(() => {
                                 const assignedStudents = students.filter(s => {
-                                    const inBatch = (s.batch_ids || []).includes(trackingAssignment.batch_id);
+                                    const inBatch = (s.batchIds || []).includes(trackingAssignment.batch_id);
                                     const inSchool = !trackingAssignment.target_school_id || s.school_id === trackingAssignment.target_school_id;
                                     return inBatch && inSchool;
                                 });

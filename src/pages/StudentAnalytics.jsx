@@ -56,6 +56,12 @@ export default function StudentAnalytics() {
 
     const memoizedDateRange = useMemo(() => ({ from: dateFrom, to: dateTo }), [dateFrom, dateTo]);
 
+    function safeToDate(val) {
+        if (!val) return null;
+        const d = new Date(val);
+        return isNaN(d.getTime()) ? null : d;
+    }
+
     function isInDateRange(dateVal) {
         if (!memoizedDateRange.from && !memoizedDateRange.to) return true;
         const d = dateVal instanceof Date ? dateVal : new Date(dateVal);
@@ -66,7 +72,7 @@ export default function StudentAnalytics() {
 
     const filteredStudents = useMemo(() => {
         return selectedBatchId
-            ? students.filter(s => s.batch_ids?.includes(selectedBatchId))
+            ? students.filter(s => s.batchIds?.includes(selectedBatchId))
             : students;
     }, [selectedBatchId, students]);
 
@@ -85,7 +91,7 @@ export default function StudentAnalytics() {
         let totalClasses = 0, presentClasses = 0, absentClasses = 0, lateClasses = 0;
 
         attendance.forEach((a) => {
-            if (!selectedStudent.batch_ids?.includes(a.batch_id)) return;
+            if (!selectedStudent.batchIds?.includes(a.batch_id)) return;
             const d = new Date(a.date);
             if (!d || !isInDateRange(d)) return;
             const record = (a.records || []).find(r => r.studentId === selectedStudent.id);
@@ -102,7 +108,7 @@ export default function StudentAnalytics() {
         let totalExamMarks = 0, totalMarksEarned = 0, examsTaken = 0;
 
         exams.forEach(e => {
-            if (!selectedStudent.batch_ids?.includes(e.batch_id)) return;
+            if (!selectedStudent.batchIds?.includes(e.batch_id)) return;
             const ed = new Date(e.date);
             if (!ed || !isInDateRange(ed)) return;
             const sScore = (e.scores || []).find(sc => sc.studentId === selectedStudent.id);
@@ -118,7 +124,7 @@ export default function StudentAnalytics() {
         let totalHomeworks = 0, completedHomeworks = 0, lateHomeworks = 0, partialHomeworks = 0, notSubmittedHomeworks = 0;
 
         homeworks.forEach(hw => {
-            if (!selectedStudent.batch_ids?.includes(hw.batch_id)) return;
+            if (!selectedStudent.batchIds?.includes(hw.batch_id)) return;
             const hwDate = new Date(hw.due_date || hw.created_at);
             if (hwDate && !isInDateRange(hwDate)) return;
 
@@ -149,7 +155,7 @@ export default function StudentAnalytics() {
         if (!selectedStudent) return [];
         const history = [];
         attendance
-            .filter(a => selectedStudent.batch_ids?.includes(a.batch_id))
+            .filter(a => selectedStudent.batchIds?.includes(a.batch_id))
             .filter(a => {
                 const d = new Date(a.date);
                 return d && isInDateRange(d);
@@ -172,7 +178,7 @@ export default function StudentAnalytics() {
         if (!selectedStudent) return [];
         const history = [];
         exams
-            .filter(e => selectedStudent.batch_ids?.includes(e.batch_id))
+            .filter(e => selectedStudent.batchIds?.includes(e.batch_id))
             .filter(e => {
                 const d = new Date(e.date);
                 return d && isInDateRange(d);
@@ -197,7 +203,7 @@ export default function StudentAnalytics() {
     const hwData = useMemo(() => {
         if (!selectedStudent) return [];
         return homeworks
-            .filter(hw => selectedStudent.batch_ids?.includes(hw.batch_id))
+            .filter(hw => selectedStudent.batchIds?.includes(hw.batch_id))
             .filter(hw => {
                 const d = new Date(hw.due_date || hw.created_at);
                 return isInDateRange(d);
@@ -218,7 +224,7 @@ export default function StudentAnalytics() {
     const examTableData = useMemo(() => {
         if (!selectedStudent) return [];
         return exams
-            .filter(e => selectedStudent.batch_ids?.includes(e.batch_id))
+            .filter(e => selectedStudent.batchIds?.includes(e.batch_id))
             .filter(e => {
                 const d = new Date(e.date);
                 return d && isInDateRange(d);

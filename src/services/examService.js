@@ -16,6 +16,8 @@ export const examService = {
       teacherId: exam.teacher_id,
       startTime: exam.start_time,
       endTime: exam.end_time,
+      totalMarks: exam.total_marks,
+      topicConfig: exam.topic_config,
       results: exam.exam_results.map(r => ({
         studentId: r.student_id,
         marksObtained: r.marks_obtained,

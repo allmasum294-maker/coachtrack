@@ -59,8 +59,8 @@ export default function Exams() {
 
     // Helper: get topics from exam (supports both old and new format)
     function getExamTopics(exam) {
-        if (exam.topic_config && exam.topic_config.length > 0) {
-            return exam.topic_config; // structured format: [{name, maxMarks}]
+        if (exam.topicConfig && exam.topicConfig.length > 0) {
+            return exam.topicConfig; // structured format: [{name, maxMarks}]
         }
         return [];
     }
@@ -80,9 +80,9 @@ export default function Exams() {
     function openEdit(exam) {
         setEditingExam(exam);
         setForm({
-            title: exam.title, batchId: exam.batch_id, date: exam.date,
-            startTime: exam.start_time || '09:00', endTime: exam.end_time || '10:00',
-            totalMarks: exam.total_marks || 100,
+            title: exam.title, batchId: exam.batchId, date: exam.date,
+            startTime: exam.startTime || '09:00', endTime: exam.endTime || '10:00',
+            totalMarks: exam.totalMarks || 100,
         });
         setTopicConfig(getExamTopics(exam));
         setNewTopicName('');
@@ -109,7 +109,7 @@ export default function Exams() {
     function openAttendance(exam) {
         setScoringExam(exam);
         const records = {};
-        const studentsInBatch = students.filter(s => (s.batchIds || []).includes(exam.batch_id));
+        const studentsInBatch = students.filter(s => (s.batchIds || []).includes(exam.batchId));
         studentsInBatch.forEach(s => {
             records[s.id] = (exam.attendance || {})[s.id] || 'present';
         });
@@ -129,7 +129,7 @@ export default function Exams() {
             // 2. Sync with main attendance system
             await attendanceService.saveAttendance(
                 userProfile.id,
-                scoringExam.batch_id,
+                scoringExam.batchId,
                 scoringExam.date,
                 attendanceRecords
             );
@@ -146,7 +146,7 @@ export default function Exams() {
     function openScores(exam) {
         setScoringExam(exam);
         const presentStudents = students.filter(s => {
-            const inBatch = (s.batchIds || []).includes(exam.batch_id);
+            const inBatch = (s.batchIds || []).includes(exam.batchId);
             const attended = exam.attendance?.[s.id] === 'present' || !exam.attendance;
             return inBatch && attended;
         });

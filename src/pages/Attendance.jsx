@@ -163,366 +163,292 @@ export default function Attendance() {
     const presentCount = Object.values(records).filter((s) => s === 'present').length;
     const absentCount = Object.values(records).filter((s) => s === 'absent').length;
     const lateCount = Object.values(records).filter((s) => s === 'late').length;
+    const totalCount = batchStudents.length;
+    const attendancePercentage = totalCount > 0 ? Math.round((presentCount / totalCount) * 100) : 0;
+
+    function markAllPresent() {
+        const newRecords = { ...records };
+        batchStudents.forEach(s => {
+            newRecords[s.id] = 'present';
+        });
+        setRecords(newRecords);
+        toast.success(`Marked ${batchStudents.length} students as present`);
+    }
 
     if (loading) return <div className="loading-page"><div className="loading-spinner" /></div>;
 
     return (
         <div className="animate-fade-in" style={{ paddingBottom: 'var(--space-12)' }}>
-            <div className="page-header" style={{ marginBottom: 'var(--space-8)' }}>
+            {/* 1. Page Header & Live Stats */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--space-8)', flexWrap: 'wrap', gap: 'var(--space-6)' }}>
                 <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-                        <div style={{ padding: '8px', background: 'rgba(59, 130, 246, 0.1)', color: 'var(--color-primary)', borderRadius: '12px' }}>
-                            <Activity size={24} />
-                        </div>
-                        <h1 className="page-title" style={{ margin: 0 }}>Attendance Records</h1>
-                    </div>
-                    <p className="page-subtitle">Track student attendance for your classes</p>
+                    <h1 style={{ fontSize: '32px', fontWeight: 900, letterSpacing: '-0.03em', marginBottom: '8px' }}>
+                        Attendance <span style={{ color: 'var(--color-primary)' }}>Taking</span>
+                    </h1>
+                    <p style={{ color: 'var(--color-text-muted)', fontSize: '15px', fontWeight: 600 }}>
+                        {selectedBatch ? 'Mark attendance accurately for this session' : 'Select a batch below to begin tracking'}
+                    </p>
                 </div>
+
+                {selectedBatch && batchStudents.length > 0 && (
+                    <div className="glass-panel" style={{ padding: '16px 24px', display: 'flex', alignItems: 'center', gap: '32px', background: 'rgba(255, 255, 255, 0.02)' }}>
+                        <div style={{ position: 'relative', width: '64px', height: '64px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <svg width="64" height="64" viewBox="0 0 100 100">
+                                <circle cx="50" cy="50" r="45" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="8" />
+                                <circle cx="50" cy="50" r="45" fill="none" stroke="var(--color-primary)" strokeWidth="8" 
+                                    strokeDasharray="282.7" strokeDashoffset={282.7 - (282.7 * attendancePercentage) / 100} 
+                                    strokeLinecap="round" style={{ transition: 'stroke-dashoffset 0.8s ease' }} 
+                                    transform="rotate(-90 50 50)" />
+                            </svg>
+                            <span style={{ position: 'absolute', fontSize: '14px', fontWeight: 900 }}>{attendancePercentage}%</span>
+                        </div>
+                        <div style={{ display: 'flex', gap: '24px' }}>
+                            <div>
+                                <div style={{ fontSize: '10px', fontWeight: 900, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Present</div>
+                                <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--color-teal)' }}>{presentCount}</div>
+                            </div>
+                            <div>
+                                <div style={{ fontSize: '10px', fontWeight: 900, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Absent</div>
+                                <div style={{ fontSize: '20px', fontWeight: 900, color: 'var(--color-danger)' }}>{absentCount}</div>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
 
-            {/* Premium Tab Navigation */}
-            <div className="glass-panel" style={{ 
-                display: 'flex', 
-                gap: '8px', 
-                padding: '6px', 
-                marginBottom: 'var(--space-8)', 
-                flexWrap: 'wrap'
-            }}>
-                <button 
-                    className={`tab ${tab === 'mark' ? 'active' : ''}`} 
-                    onClick={() => setTab('mark')}
-                    style={{ 
-                        padding: '12px 24px', 
-                        borderRadius: '12px', 
-                        fontSize: '14px', 
-                        fontWeight: 800, 
-                        background: tab === 'mark' ? 'var(--color-accent)' : 'transparent',
-                        color: tab === 'mark' ? 'white' : 'var(--color-text-secondary)',
-                        border: 'none', 
-                        cursor: 'pointer', 
-                        transition: 'all 0.3s ease',
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        gap: '10px',
-                        flex: '1',
-                        minWidth: '160px',
-                        justifyContent: 'center'
-                    }}
-                >
-                    <LayoutGrid size={18} /> Mark Attendance
-                </button>
-                <button 
-                    className={`tab ${tab === 'history' ? 'active' : ''}`} 
-                    onClick={() => setTab('history')}
-                    style={{ 
-                        padding: '12px 24px', 
-                        borderRadius: '12px', 
-                        fontSize: '14px', 
-                        fontWeight: 800, 
-                        background: tab === 'history' ? 'var(--color-accent)' : 'transparent',
-                        color: tab === 'history' ? 'white' : 'var(--color-text-secondary)',
-                        border: 'none', 
-                        cursor: 'pointer', 
-                        transition: 'all 0.3s ease',
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        gap: '10px',
-                        flex: '1',
-                        minWidth: '160px',
-                        justifyContent: 'center'
-                    }}
-                >
-                    <History size={18} /> Past Records
-                </button>
+            {/* 2. Navigation Tabs */}
+            <div style={{ display: 'flex', gap: '8px', marginBottom: 'var(--space-8)' }}>
+                {[
+                    { id: 'mark', label: 'Taking Attendance', icon: UserCheck },
+                    { id: 'history', label: 'Past Records Search', icon: History }
+                ].map(t => (
+                    <button 
+                        key={t.id}
+                        onClick={() => setTab(t.id)}
+                        style={{ 
+                            padding: '10px 24px', borderRadius: '14px', fontSize: '13px', fontWeight: 800, 
+                            border: '1px solid rgba(255,255,255,0.04)', cursor: 'pointer', transition: 'all 0.3s ease',
+                            background: tab === t.id ? 'var(--color-accent)' : 'rgba(255,255,255,0.02)',
+                            color: tab === t.id ? 'white' : 'var(--color-text-muted)',
+                            display: 'flex', alignItems: 'center', gap: '10px'
+                        }}
+                    >
+                        <t.icon size={16} /> {t.label}
+                    </button>
+                ))}
             </div>
 
-            {/* Focus Controls */}
-            <div className="glass-panel" style={{ 
-                padding: 'var(--space-8)', 
-                marginBottom: 'var(--space-8)', 
-                display: 'grid', 
-                gridTemplateColumns: '1fr 1fr', 
-                gap: 'var(--space-8)',
-                background: 'rgba(255, 255, 255, 0.02)',
-                border: '1px solid rgba(255, 255, 255, 0.05)'
-            }}>
+            {/* 3. Primary Controls */}
+            <div className="glass-panel" style={{ padding: 'var(--space-6)', marginBottom: 'var(--space-8)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 'var(--space-6)', background: 'rgba(255,255,255,0.01)' }}>
                 <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', fontWeight: 900, color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-                        <UserCheck size={16} /> Select Batch
-                    </label>
-                    <select className="form-select" value={selectedBatch} onChange={(e) => setSelectedBatch(e.target.value)} style={{ height: '56px', fontSize: '16px', fontWeight: 700, borderRadius: '14px', background: 'rgba(255, 255, 255, 0.04)' }}>
-                        <option value="">Choose a Batch...</option>
-                        {batches.map((b) => (
-                            <option key={b.id} value={b.id}>{b.name}</option>
-                        ))}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', fontWeight: 900, color: 'var(--color-text-muted)', marginBottom: '10px', textTransform: 'uppercase' }}>
+                        <LayoutGrid size={14} /> Selected Batch Profile
+                    </div>
+                    <select className="form-select" value={selectedBatch} onChange={(e) => setSelectedBatch(e.target.value)} style={{ borderRadius: '12px', height: '52px', fontWeight: 700, fontSize: '15px' }}>
+                        <option value="">Choose your coaching batch...</option>
+                        {batches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
                     </select>
                 </div>
                 <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', fontWeight: 900, color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-                        <CalendarDays size={16} /> Class Date
-                    </label>
-                    <input className="form-input" type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} style={{ height: '56px', fontSize: '16px', fontWeight: 700, borderRadius: '14px', background: 'rgba(255, 255, 255, 0.04)' }} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', fontWeight: 900, color: 'var(--color-text-muted)', marginBottom: '10px', textTransform: 'uppercase' }}>
+                        <CalendarDays size={14} /> Scheduled Session Date
+                    </div>
+                    <input className="form-input" type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} style={{ borderRadius: '12px', height: '52px', fontWeight: 700, fontSize: '15px' }} />
                 </div>
             </div>
 
-            {tab === 'mark' && (
+            {tab === 'mark' ? (
                 <div className="animate-fade-in">
                     {!selectedBatch ? (
-                        <div className="glass-panel" style={{ padding: 'var(--space-20)', textAlign: 'center', background: 'rgba(255, 255, 255, 0.01)' }}>
-                            <div style={{ 
-                                width: '100px', height: '100px', borderRadius: '30px', 
-                                background: 'rgba(59, 130, 246, 0.05)', display: 'flex', 
-                                alignItems: 'center', justifyContent: 'center', 
-                                margin: '0 auto var(--space-8)', color: 'var(--color-primary)',
-                                border: '1px solid rgba(59, 130, 246, 0.1)'
-                            }}>
-                                <Info size={48} />
+                        <div className="glass-panel" style={{ padding: 'var(--space-16)', textAlign: 'center' }}>
+                            <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'rgba(255,255,255,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto var(--space-6)' }}>
+                                <Info size={32} style={{ color: 'var(--color-text-muted)', opacity: 0.3 }} />
                             </div>
-                            <h2 style={{ fontSize: '28px', fontWeight: 900, marginBottom: '12px', letterSpacing: '-0.02em' }}>Select a Batch</h2>
-                            <p style={{ color: 'var(--color-text-muted)', maxWidth: '450px', margin: '0 auto', fontSize: '16px', lineHeight: 1.6 }}>Please select a batch from the menu above to start marking student attendance.</p>
+                            <h3 style={{ fontSize: '20px', fontWeight: 800, marginBottom: '8px' }}>Batch Selection Required</h3>
+                            <p style={{ color: 'var(--color-text-muted)', fontSize: '14px' }}>Choose a batch profile to view its student enrollment list.</p>
                         </div>
                     ) : batchStudents.length === 0 ? (
-                        <div className="glass-panel" style={{ padding: 'var(--space-20)', textAlign: 'center' }}>
-                            <ClipboardCheck size={80} style={{ color: 'rgba(255, 255, 255, 0.05)', marginBottom: 'var(--space-8)' }} />
-                            <h2 style={{ fontSize: '28px', fontWeight: 900, marginBottom: '12px', letterSpacing: '-0.02em' }}>No Enrolled Students</h2>
-                            <p style={{ color: 'var(--color-text-muted)', fontSize: '16px' }}>There are no active students in this batch.</p>
+                        <div className="glass-panel" style={{ padding: 'var(--space-16)', textAlign: 'center' }}>
+                            <h3 style={{ fontSize: '20px', fontWeight: 800, marginBottom: '8px' }}>No Enrolled Students Found</h3>
+                            <p style={{ color: 'var(--color-text-muted)', fontSize: '14px' }}>There are currently no active students assigned to this batch group.</p>
                         </div>
                     ) : (
                         <>
-                            {/* Summary Stat Bar */}
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-6)', marginBottom: 'var(--space-8)' }}>
-                                <div className="glass-card" style={{ padding: 'var(--space-6)', display: 'flex', alignItems: 'center', gap: 'var(--space-4)', border: '1px solid rgba(20, 184, 166, 0.1)' }}>
-                                    <div style={{ padding: '12px', background: 'rgba(20, 184, 166, 0.1)', color: 'var(--color-teal)', borderRadius: '14px', boxShadow: '0 0 15px rgba(20, 184, 166, 0.2)' }}><Check size={24} /></div>
-                                    <div><div style={{ fontSize: '12px', fontWeight: 900, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>PRESENT</div><div style={{ fontSize: '24px', fontWeight: 900 }}>{presentCount}</div></div>
-                                </div>
-                                <div className="glass-card" style={{ padding: 'var(--space-6)', display: 'flex', alignItems: 'center', gap: 'var(--space-4)', border: '1px solid rgba(239, 68, 68, 0.1)' }}>
-                                    <div style={{ padding: '12px', background: 'rgba(239, 68, 68, 0.1)', color: 'var(--color-danger)', borderRadius: '14px', boxShadow: '0 0 15px rgba(239, 68, 68, 0.2)' }}><XIcon size={24} /></div>
-                                    <div><div style={{ fontSize: '12px', fontWeight: 900, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>ABSENT</div><div style={{ fontSize: '24px', fontWeight: 900 }}>{absentCount}</div></div>
-                                </div>
-                                <div className="glass-card" style={{ padding: 'var(--space-6)', display: 'flex', alignItems: 'center', gap: 'var(--space-4)', border: '1px solid rgba(245, 158, 11, 0.1)' }}>
-                                    <div style={{ padding: '12px', background: 'rgba(245, 158, 11, 0.1)', color: 'var(--color-warning)', borderRadius: '14px', boxShadow: '0 0 15px rgba(245, 158, 11, 0.2)' }}><Clock size={24} /></div>
-                                    <div><div style={{ fontSize: '12px', fontWeight: 900, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>LATE</div><div style={{ fontSize: '24px', fontWeight: 900 }}>{lateCount}</div></div>
-                                </div>
-                                {existingAttendance && (
-                                    <div className="glass-card" style={{ padding: 'var(--space-6)', display: 'flex', alignItems: 'center', gap: 'var(--space-4)', border: '1px solid var(--color-primary)', background: 'rgba(59, 130, 246, 0.05)' }}>
-                                        <div style={{ padding: '12px', background: 'rgba(59, 130, 246, 0.2)', color: 'var(--color-primary)', borderRadius: '14px', boxShadow: '0 0 20px rgba(59, 130, 246, 0.3)' }}><Save size={24} /></div>
-                                        <div><div style={{ fontSize: '12px', fontWeight: 900, color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>STATUS</div><div style={{ fontSize: '20px', fontWeight: 900, color: 'white' }}>SAVED</div></div>
-                                    </div>
-                                )}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-6)', padding: '0 8px' }}>
+                                <h4 style={{ fontSize: '16px', fontWeight: 900, color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    <ClipboardCheck size={20} /> Student Enrollment ({batchStudents.length})
+                                </h4>
+                                <button className="btn btn-ghost" onClick={markAllPresent} style={{ fontSize: '12px', color: 'var(--color-primary)', fontWeight: 800, padding: '8px 16px', borderRadius: '10px' }}>
+                                    <Check size={14} /> Fast-Mark All Present
+                                </button>
                             </div>
 
-                            <div className="glass-panel" style={{ padding: 0, overflow: 'hidden', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
-                                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                    {batchStudents.map((student, idx) => (
-                                        <div key={student.id} 
-                                            style={{ 
-                                                padding: '24px 40px', 
-                                                borderBottom: idx === batchStudents.length - 1 ? 'none' : '1px solid rgba(255, 255, 255, 0.04)',
-                                                display: 'flex',
-                                                justifyContent: 'space-between',
-                                                alignItems: 'center',
-                                                background: records[student.id] === 'absent' ? 'rgba(239, 68, 68, 0.03)' : 'transparent',
-                                                transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
-                                            }}
-                                        >
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+                            <div className="glass-panel" style={{ padding: 0, overflow: 'hidden' }}>
+                                {batchStudents.map((student, idx) => {
+                                    const status = records[student.id];
+                                    const isSelected = status !== undefined;
+                                    
+                                    return (
+                                        <div key={student.id} style={{ 
+                                            padding: '16px 24px', 
+                                            display: 'flex', justifyContent: 'space-between', alignItems: 'center', 
+                                            borderBottom: idx === batchStudents.length - 1 ? 'none' : '1px solid rgba(255, 255, 255, 0.04)',
+                                            background: isSelected ? 'rgba(255, 255, 255, 0.01)' : 'transparent',
+                                            transition: 'all 0.2s ease'
+                                        }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1 }}>
                                                 <div style={{ 
-                                                    width: '60px', height: '60px', borderRadius: '20px', 
-                                                    background: 'rgba(255, 255, 255, 0.03)', display: 'flex', 
-                                                    alignItems: 'center', justifyContent: 'center',
-                                                    fontSize: '22px', fontWeight: 900, color: 'var(--color-primary)',
-                                                    border: '1px solid rgba(255, 255, 255, 0.08)',
-                                                    textShadow: '0 0 10px rgba(59, 130, 246, 0.3)'
+                                                    width: '44px', height: '44px', borderRadius: '14px', 
+                                                    background: 'rgba(255, 255, 255, 0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                    fontSize: '18px', fontWeight: 900, color: 'var(--color-primary)', border: '1px solid rgba(255, 255, 255, 0.04)'
                                                 }}>
-                                                    {student.name?.charAt(0).toUpperCase()}
+                                                    {student.name?.charAt(0)}
                                                 </div>
                                                 <div>
-                                                    <div style={{ fontWeight: 800, fontSize: '20px', letterSpacing: '-0.01em' }}>{student.name}</div>
-                                                    <div style={{ fontSize: '13px', color: 'var(--color-text-muted)', display: 'flex', gap: '10px', marginTop: '4px', alignItems: 'center' }}>
-                                                        <span style={{ 
-                                                            background: 'rgba(255, 255, 255, 0.08)', 
-                                                            padding: '2px 10px', 
-                                                            borderRadius: '6px', 
-                                                            fontWeight: 700,
-                                                            fontSize: '11px',
-                                                            color: 'white'
-                                                        }}>GRADE: {student.grade}</span>
-                                                        <span style={{ opacity: 0.3 }}>•</span>
-                                                        <span style={{ fontWeight: 600 }}>{student.studentId || 'NO_UID'}</span>
+                                                    <div style={{ fontWeight: 800, fontSize: '16px', color: 'white' }}>{student.name}</div>
+                                                    <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-text-muted)', marginTop: '2px' }}>
+                                                        {student.studentId || 'ID#---'} • GRADE {student.grade}
                                                     </div>
                                                 </div>
                                             </div>
 
-                                            <div style={{ display: 'flex', gap: 'var(--space-4)' }}>
+                                            <div style={{ display: 'flex', gap: '6px' }}>
                                                 {[
-                                                    { id: 'present', label: 'Present', icon: Check, color: 'var(--color-teal)' },
-                                                    { id: 'absent', label: 'Absent', icon: XIcon, color: 'var(--color-danger)' },
-                                                    { id: 'late', label: 'Late', icon: Clock, color: 'var(--color-warning)' }
-                                                ].map((btn) => (
+                                                    { id: 'present', label: 'P', color: '#38a169', bg: '#f0fff4' },
+                                                    { id: 'absent', label: 'A', color: '#e53e3e', bg: '#fff5f5' },
+                                                    { id: 'late', label: 'L', color: '#d69e2e', bg: '#fffff0' }
+                                                ].map(btn => (
                                                     <button
                                                         key={btn.id}
                                                         onClick={() => setStatus(student.id, btn.id)}
+                                                        className="tooltip-wrapper"
                                                         style={{ 
-                                                            display: 'flex', alignItems: 'center', gap: '10px', 
-                                                            padding: '12px 24px', borderRadius: '14px', 
-                                                            fontSize: '14px', fontWeight: 800, 
-                                                            cursor: 'pointer', transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                                            border: records[student.id] === btn.id ? `2px solid ${btn.color}` : '1px solid rgba(255, 255, 255, 0.04)',
-                                                            background: records[student.id] === btn.id ? `${btn.color}15` : 'rgba(255, 255, 255, 0.02)',
-                                                            color: records[student.id] === btn.id ? btn.color : 'var(--color-text-muted)',
-                                                            boxShadow: records[student.id] === btn.id ? `0 0 20px ${btn.color}20` : 'none',
-                                                            transform: records[student.id] === btn.id ? 'translateY(-2px)' : 'none'
+                                                            width: '42px', height: '42px', borderRadius: '12px', border: 'none', cursor: 'pointer',
+                                                            background: status === btn.id ? btn.bg : 'rgba(255, 255, 255, 0.03)',
+                                                            color: status === btn.id ? btn.color : 'rgba(255, 255, 255, 0.2)',
+                                                            fontWeight: 900, fontSize: '15px', transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                                                            boxShadow: status === btn.id ? `0 4px 12px ${btn.color}30` : 'none',
+                                                            transform: status === btn.id ? 'scale(1.05)' : 'none'
                                                         }}
                                                     >
-                                                        <btn.icon size={18} /> {btn.label}
+                                                        {btn.label}
+                                                        <span className="tooltip">{btn.id.charAt(0).toUpperCase() + btn.id.slice(1)}</span>
                                                     </button>
                                                 ))}
                                             </div>
                                         </div>
-                                    ))}
-                                </div>
+                                    );
+                                })}
                             </div>
 
-                            <div style={{ marginTop: 'var(--space-10)', display: 'flex', justifyContent: 'flex-end' }}>
+                            <div style={{ marginTop: 'var(--space-10)', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '24px' }}>
+                                {existingAttendance && (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-teal)', fontSize: '13px', fontWeight: 700 }}>
+                                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--color-teal)' }} />
+                                        Update existing record for {format(new Date(selectedDate), 'MMM d')}
+                                    </div>
+                                )}
                                 <button className="btn btn-primary" onClick={handleSave} disabled={saving} style={{ 
-                                    padding: '0 56px', height: '64px', borderRadius: '20px', 
-                                    fontSize: '18px', fontWeight: 900, 
-                                    boxShadow: '0 20px 40px -10px rgba(59, 130, 246, 0.4)',
-                                    display: 'flex', alignItems: 'center', gap: '12px'
+                                    padding: '0 48px', height: '56px', borderRadius: '16px', fontSize: '16px', fontWeight: 900, 
+                                    boxShadow: '0 20px 40px -10px rgba(59, 130, 246, 0.4)', display: 'flex', alignItems: 'center', gap: '12px'
                                 }}>
-                                    {saving ? (
-                                        <>Saving Records...</>
-                                    ) : (
-                                        <>
-                                            <Save size={22} />
-                                            Save Attendance
-                                        </>
-                                    )}
+                                    {saving ? <div className="loading-spinner" style={{ width: '18px', height: '18px', borderWidth: '2px' }} /> : <Save size={20} />}
+                                    {saving ? 'Saving Data...' : 'Submit Attendance'}
                                 </button>
                             </div>
                         </>
                     )}
                 </div>
-            )}
-
-            {tab === 'history' && (
+            ) : (
                 <div className="animate-fade-in">
                     {history.length === 0 ? (
-                        <div className="glass-panel" style={{ padding: 'var(--space-20)', textAlign: 'center' }}>
-                            <History size={80} style={{ color: 'rgba(255, 255, 255, 0.05)', marginBottom: 'var(--space-8)' }} />
-                            <h2 style={{ fontSize: '28px', fontWeight: 900, marginBottom: '12px', letterSpacing: '-0.02em' }}>No History Found</h2>
-                            <p style={{ color: 'var(--color-text-muted)', fontSize: '16px' }}>Attendance history for this batch will show up here.</p>
+                        <div className="glass-panel" style={{ padding: 'var(--space-16)', textAlign: 'center' }}>
+                            <History size={48} style={{ color: 'var(--color-text-muted)', opacity: 0.1, marginBottom: 'var(--space-4)' }} />
+                            <h3 style={{ fontSize: '18px', fontWeight: 800, color: 'var(--color-text-muted)' }}>No historical logs found</h3>
                         </div>
                     ) : (
-                        <div className="glass-panel" style={{ padding: 0, overflow: 'hidden', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
-                            <div className="table-container">
-                                <table className="table">
-                                    <thead>
-                                        <tr style={{ background: 'rgba(255, 255, 255, 0.03)' }}>
-                                            <th style={{ padding: '24px 40px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--color-primary)' }}>Class Date</th>
-                                            <th style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--color-primary)' }}>Attendance Summary</th>
-                                            <th style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--color-primary)' }}>Attendance %</th>
-                                            <th style={{ textAlign: 'right', paddingRight: '40px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--color-primary)' }}>Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {history.map((att) => {
-                                            const isExpanded = expandedId === att.id;
-                                            const dateVal = att.date?.toDate ? att.date.toDate() : new Date(att.date);
-                                            const attRecords = att.records || [];
-                                            const p = attRecords.filter((r) => r.status === 'present').length;
-                                            const a = attRecords.filter((r) => r.status === 'absent').length;
-                                            const l = attRecords.filter((r) => r.status === 'late').length;
-                                            const total = attRecords.length;
-                                            const rate = total > 0 ? Math.round((p / total) * 100) : 0;
-                                            
-                                            return (
-                                                <React.Fragment key={att.id}>
-                                                    <tr style={{ cursor: 'pointer', transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)', background: isExpanded ? 'rgba(255, 255, 255, 0.02)' : 'transparent' }} onClick={() => setExpandedId(isExpanded ? null : att.id)}>
-                                                        <td style={{ padding: '28px 40px', fontWeight: 800, fontSize: '16px', letterSpacing: '-0.01em' }}>{format(dateVal, 'MMMM d, yyyy')}</td>
-                                                        <td>
-                                                            <div style={{ display: 'flex', gap: '10px' }}>
-                                                                <span style={{ fontSize: '11px', fontWeight: 900, padding: '4px 12px', borderRadius: '8px', background: 'rgba(20, 184, 166, 0.1)', color: 'var(--color-teal)', border: '1px solid rgba(20, 184, 166, 0.2)' }}>{p} PRESENT</span>
-                                                                <span style={{ fontSize: '11px', fontWeight: 900, padding: '4px 12px', borderRadius: '8px', background: 'rgba(239, 68, 68, 0.1)', color: 'var(--color-danger)', border: '1px solid rgba(239, 68, 68, 0.2)' }}>{a} ABSENT</span>
-                                                                <span style={{ fontSize: '11px', fontWeight: 900, padding: '4px 12px', borderRadius: '8px', background: 'rgba(245, 158, 11, 0.1)', color: 'var(--color-warning)', border: '1px solid rgba(245, 158, 11, 0.2)' }}>{l} LATE</span>
-                                                            </div>
-                                                        </td>
-                                                        <td>
-                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                                                                <div style={{ width: '120px', height: '10px', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '6px', overflow: 'hidden', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
-                                                                    <div style={{ width: `${rate}%`, height: '100%', background: 'var(--color-primary)', boxShadow: '0 0 15px rgba(59, 130, 246, 0.4)' }} />
-                                                                </div>
-                                                                <span style={{ fontSize: '16px', fontWeight: 900, color: 'white' }}>{rate}%</span>
-                                                            </div>
-                                                        </td>
-                                                        <td style={{ textAlign: 'right', paddingRight: '40px' }}>
-                                                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', alignItems: 'center' }}>
-                                                                <div className="tooltip-wrapper">
-                                                                    <button className="btn btn-ghost btn-sm btn-icon" style={{ width: '36px', height: '36px', borderRadius: '10px' }} onClick={(e) => { e.stopPropagation(); handleEdit(att); }}>
-                                                                        <Edit2 size={18} />
-                                                                    </button>
-                                                                    <span className="tooltip">Edit Record</span>
-                                                                </div>
-                                                                <div className="tooltip-wrapper">
-                                                                    <button className="btn btn-ghost btn-sm btn-icon" style={{ width: '36px', height: '36px', borderRadius: '10px' }} onClick={(e) => { e.stopPropagation(); handleDelete(att.id); }}>
-                                                                        <Trash2 size={18} style={{ color: 'var(--color-danger)' }} />
-                                                                    </button>
-                                                                    <span className="tooltip">Delete Record</span>
-                                                                </div>
-                                                                <div style={{ marginLeft: '12px', opacity: 0.5 }}>
-                                                                    {isExpanded ? <ChevronUp size={24} /> : <ChevronDown size={24} />}
-                                                                </div>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                    {isExpanded && (
-                                                        <tr>
-                                                            <td colSpan="4" style={{ padding: '0', background: 'rgba(255, 255, 255, 0.01)' }}>
-                                                                <div className="animate-slide-down" style={{ padding: '40px' }}>
-                                                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '48px' }}>
-                                                                        {[
-                                                                            { title: 'Confirmed Present', status: 'present', color: 'var(--color-teal)', icon: Check },
-                                                                            { title: 'Recorded Absent', status: 'absent', color: 'var(--color-danger)', icon: XIcon },
-                                                                            { title: 'Marked Late', status: 'late', color: 'var(--color-warning)', icon: Clock }
-                                                                        ].map((group) => (
-                                                                            <div key={group.status}>
-                                                                                <h4 style={{ fontSize: '13px', fontWeight: 950, color: group.color, textTransform: 'uppercase', marginBottom: '20px', letterSpacing: '0.15em', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                                                                    <group.icon size={16} /> {group.title}
-                                                                                </h4>
-                                                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                                                                    {attRecords.filter(r => r.status === group.status).length === 0 ? (
-                                                                                        <span style={{ color: 'var(--color-text-muted)', fontSize: '14px', fontStyle: 'italic', opacity: 0.6 }}>No students recorded</span>
-                                                                                    ) : (
-                                                                                        attRecords.filter(r => r.status === group.status).map(r => (
-                                                                                            <div key={r.studentId} className="glass-card" style={{ 
-                                                                                                padding: '12px 20px', 
-                                                                                                fontSize: '14px', 
-                                                                                                fontWeight: 700, 
-                                                                                                background: 'rgba(255, 255, 255, 0.03)',
-                                                                                                border: '1px solid rgba(255, 255, 255, 0.04)',
-                                                                                                display: 'flex',
-                                                                                                justifyContent: 'space-between',
-                                                                                                alignItems: 'center'
-                                                                                            }}>
-                                                                                                {getStudentName(r.studentId)}
-                                                                                                <span style={{ opacity: 0.3, fontSize: '11px' }}>#{r.studentId.substring(0, 6)}</span>
-                                                                                            </div>
-                                                                                        ))
-                                                                                    )}
-                                                                                </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+                            {history.map((att) => {
+                                const isExpanded = expandedId === att.id;
+                                const dateVal = new Date(att.date);
+                                const attRecords = att.records || [];
+                                const p = attRecords.filter((r) => r.status === 'present').length;
+                                const a = attRecords.filter((r) => r.status === 'absent').length;
+                                const rate = attRecords.length > 0 ? Math.round((p / attRecords.length) * 100) : 0;
+                                
+                                return (
+                                    <div key={att.id} className="glass-panel" style={{ padding: 0, overflow: 'hidden', transition: 'all 0.3s ease' }}>
+                                        <div style={{ padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }} onClick={() => setExpandedId(isExpanded ? null : att.id)}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                                                <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                                    <span style={{ fontSize: '11px', fontWeight: 900, lineHeight: 1 }}>{format(dateVal, 'MMM')}</span>
+                                                    <span style={{ fontSize: '18px', fontWeight: 900, lineHeight: 1 }}>{format(dateVal, 'dd')}</span>
+                                                </div>
+                                                <div>
+                                                    <div style={{ fontWeight: 800, fontSize: '16px' }}>{format(dateVal, 'EEEE, d MMM')}</div>
+                                                    <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                                                        <span style={{ fontSize: '10px', fontWeight: 900, color: '#38a169' }}>{p} PRESENT</span>
+                                                        <span style={{ fontSize: '10px', fontWeight: 900, color: 'var(--color-text-muted)', opacity: 0.3 }}>•</span>
+                                                        <span style={{ fontSize: '10px', fontWeight: 900, color: '#e53e3e' }}>{a} ABSENT</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                    <div style={{ width: '80px', height: '6px', background: 'rgba(255,255,255,0.05)', borderRadius: '10px', overflow: 'hidden' }}>
+                                                        <div style={{ width: `${rate}%`, height: '100%', background: rate > 80 ? '#38a169' : rate > 50 ? '#d69e2e' : '#e53e3e' }} />
+                                                    </div>
+                                                    <span style={{ fontSize: '14px', fontWeight: 900, minWidth: '35px' }}>{rate}%</span>
+                                                </div>
+                                                <div style={{ display: 'flex', gap: '8px' }}>
+                                                    <button className="btn btn-ghost btn-icon" style={{ width: '32px', height: '32px' }} onClick={(e) => { e.stopPropagation(); handleEdit(att); }}>
+                                                        <Edit2 size={14} />
+                                                    </button>
+                                                    <button className="btn btn-ghost btn-icon" style={{ width: '32px', height: '32px', color: 'var(--color-danger)' }} onClick={(e) => { e.stopPropagation(); handleDelete(att.id); }}>
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                </div>
+                                                <div style={{ transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.3s ease', opacity: 0.3 }}>
+                                                    <ChevronDown size={20} />
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {isExpanded && (
+                                            <div className="animate-slide-down" style={{ padding: '0 24px 24px', background: 'rgba(255,255,255,0.01)', borderTop: '1px solid rgba(255,255,255,0.02)' }}>
+                                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px', marginTop: '20px' }}>
+                                                    {[
+                                                        { id: 'present', label: 'Present', color: '#38a169' },
+                                                        { id: 'absent', label: 'Absent', color: '#e53e3e' },
+                                                        { id: 'late', label: 'Late', color: '#d69e2e' }
+                                                    ].map(group => {
+                                                        const groupRecs = attRecords.filter(r => r.status === group.id);
+                                                        return (
+                                                            <div key={group.id}>
+                                                                <h5 style={{ fontSize: '10px', fontWeight: 900, color: group.color, textTransform: 'uppercase', marginBottom: '12px', letterSpacing: '0.1em' }}>
+                                                                    {group.label} ({groupRecs.length})
+                                                                </h5>
+                                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                                                    {groupRecs.length === 0 ? (
+                                                                        <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', opacity: 0.5, fontStyle: 'italic' }}>None</div>
+                                                                    ) : (
+                                                                        groupRecs.map(r => (
+                                                                            <div key={r.studentId} style={{ fontSize: '13px', fontWeight: 700, color: 'rgba(255,255,255,0.8)', padding: '6px 10px', background: 'rgba(255,255,255,0.02)', borderRadius: '6px' }}>
+                                                                                {getStudentName(r.studentId)}
                                                                             </div>
-                                                                        ))}
-                                                                    </div>
+                                                                        ))
+                                                                    )}
                                                                 </div>
-                                                            </td>
-                                                        </tr>
-                                                    )}
-                                                </React.Fragment>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
-                            </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
                         </div>
                     )}
                 </div>

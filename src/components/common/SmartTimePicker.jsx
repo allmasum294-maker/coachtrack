@@ -8,6 +8,7 @@ const SmartTimePicker = ({ value, onChange, label }) => {
     const [isPM, setIsPM] = useState(true);
     const [h12, setH12] = useState(2);
     const [isOpen, setIsOpen] = useState(false);
+    const [inputValue, setInputValue] = useState('');
 
     useEffect(() => {
         if (value) {
@@ -15,11 +16,43 @@ const SmartTimePicker = ({ value, onChange, label }) => {
             if (!isNaN(h) && !isNaN(m)) {
                 setH24(h);
                 setMin(m);
-                setIsPM(h >= 12);
-                setH12(h % 12 || 12);
+                const pm = h >= 12;
+                setIsPM(pm);
+                const h12Val = h % 12 || 12;
+                setH12(h12Val);
+                setInputValue(`${h12Val}:${m.toString().padStart(2, '0')} ${pm ? 'PM' : 'AM'}`);
             }
         }
     }, [value]);
+
+    const handleTypedTime = (text) => {
+        setInputValue(text);
+        // Simple parser for manual entry
+        const match = text.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
+        if (match) {
+            let h = parseInt(match[1]);
+            let m = parseInt(match[2]);
+            const ampm = match[3]?.toUpperCase();
+
+            if (h >= 1 && h <= 12 && m >= 0 && m <= 59) {
+                let h24Val = h;
+                let pmVal = ampm ? ampm === 'PM' : isPM;
+                
+                if (pmVal) {
+                    h24Val = h === 12 ? 12 : h + 12;
+                } else {
+                    h24Val = h === 12 ? 0 : h;
+                }
+                
+                setH12(h);
+                setMin(m);
+                setIsPM(pmVal);
+                setH24(h24Val);
+                const formatted = `${h24Val.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+                onChange(formatted);
+            }
+        }
+    };
 
     const handleHourSelect = (h) => {
         let newH24;
@@ -40,12 +73,12 @@ const SmartTimePicker = ({ value, onChange, label }) => {
         setIsPM(smartIsPM);
         setH12(h);
         setH24(newH24);
-        updateValue(newH24, min);
+        updateValue(newH24, min, smartIsPM);
     };
 
     const handleMinSelect = (m) => {
         setMin(m);
-        updateValue(h24, m);
+        updateValue(h24, m, isPM);
     };
 
     const toggleAMPM = () => {
@@ -58,11 +91,15 @@ const SmartTimePicker = ({ value, onChange, label }) => {
         }
         setIsPM(nextPM);
         setH24(newH24);
-        updateValue(newH24, min);
+        updateValue(newH24, min, nextPM);
     };
 
-    const updateValue = (h, m) => {
+    const updateValue = (h, m, pm) => {
         const formatted = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+        const displayH = h % 12 || 12;
+        const displayM = m.toString().padStart(2, '0');
+        const displayPM = pm ?? isPM;
+        setInputValue(`${displayH}:${displayM} ${displayPM ? 'PM' : 'AM'}`);
         onChange(formatted);
     };
 
@@ -75,26 +112,41 @@ const SmartTimePicker = ({ value, onChange, label }) => {
             
             <div 
                 className="form-input" 
-                onClick={() => setIsOpen(!isOpen)}
                 style={{ 
-                    cursor: 'pointer', 
+                    cursor: 'text', 
                     display: 'flex', 
                     alignItems: 'center', 
                     justifyContent: 'space-between',
                     height: '52px',
                     borderRadius: '14px',
-                    background: 'rgba(255,255,255,0.03)',
-                    border: isOpen ? '1px solid var(--color-accent)' : '1px solid var(--color-border)',
-                    boxShadow: isOpen ? '0 0 0 3px var(--color-accent-soft)' : 'none'
+                    background: 'var(--color-bg-light)',
+                    border: isOpen ? '1px solid var(--color-accent)' : '1px solid rgba(255,255,255,0.1)',
+                    boxShadow: isOpen ? '0 0 0 3px var(--color-accent-soft)' : 'none',
+                    padding: '0 16px'
                 }}
             >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <Clock size={18} className={isOpen ? "text-primary" : "text-muted"} />
-                    <span style={{ fontWeight: 800, fontSize: '15px' }}>
-                        {h12}:{min.toString().padStart(2, '0')} {isPM ? 'PM' : 'AM'}
-                    </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
+                    <Clock size={18} style={{ color: isOpen ? 'var(--color-accent)' : 'var(--color-text-muted)' }} />
+                    <input 
+                        type="text"
+                        value={inputValue}
+                        onChange={(e) => handleTypedTime(e.target.value)}
+                        onFocus={() => setIsOpen(true)}
+                        placeholder="12:00 PM"
+                        style={{ 
+                            background: 'transparent', 
+                            border: 'none', 
+                            outline: 'none', 
+                            color: 'white', 
+                            fontWeight: 800, 
+                            fontSize: '15px',
+                            width: '100%' 
+                        }}
+                    />
                 </div>
-                {isOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                <div onClick={() => setIsOpen(!isOpen)} style={{ cursor: 'pointer', padding: '4px' }}>
+                    {isOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                </div>
             </div>
 
             {isOpen && (
@@ -103,17 +155,19 @@ const SmartTimePicker = ({ value, onChange, label }) => {
                         style={{ position: 'fixed', inset: 0, zIndex: 100 }} 
                         onClick={() => setIsOpen(false)} 
                     />
-                    <div className="glass-panel" style={{ 
+                    <div style={{ 
                         position: 'absolute', 
                         top: 'calc(100% + 8px)', 
                         left: 0, 
                         right: 0, 
                         zIndex: 101, 
-                        padding: '16px',
-                        borderRadius: '20px',
-                        boxShadow: '0 20px 40px rgba(0,0,0,0.4)',
-                        border: '1px solid rgba(255,255,255,0.1)',
-                        animation: 'fadeIn 0.2s ease'
+                        padding: '20px',
+                        borderRadius: '24px',
+                        background: '#1a1d21',
+                        boxShadow: '0 24px 48px rgba(0,0,0,0.6)',
+                        border: '1px solid rgba(255,255,255,0.08)',
+                        animation: 'fadeIn 0.2s ease',
+                        backdropFilter: 'blur(10px)'
                     }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                             <span style={{ fontSize: '12px', fontWeight: 900, textTransform: 'uppercase', color: 'var(--color-primary)' }}>Select Time</span>

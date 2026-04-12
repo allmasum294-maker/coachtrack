@@ -31,7 +31,8 @@ import {
     Layers,
     TrendingUp,
     Trophy,
-    FileDown
+    FileDown,
+    UserCheck
 } from 'lucide-react';
 
 const mainNavItems = [

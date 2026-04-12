@@ -283,63 +283,112 @@ export default function Attendance() {
                                 </button>
                             </div>
 
-                            <div className="glass-panel" style={{ padding: 0, overflow: 'hidden' }}>
-                                {batchStudents.map((student, idx) => {
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                {batchStudents.map((student) => {
                                     const status = records[student.id];
-                                    const isSelected = status !== undefined;
-                                    
                                     return (
-                                        <div key={student.id} style={{ 
-                                            padding: '16px 24px', 
-                                            display: 'flex', justifyContent: 'space-between', alignItems: 'center', 
-                                            borderBottom: idx === batchStudents.length - 1 ? 'none' : '1px solid rgba(255, 255, 255, 0.04)',
-                                            background: isSelected ? 'rgba(255, 255, 255, 0.01)' : 'transparent',
-                                            transition: 'all 0.2s ease'
+                                        <div key={student.id} className="attendance-row glass-panel" style={{ 
+                                            padding: '12px 24px', 
+                                            display: 'flex', 
+                                            justifyContent: 'space-between', 
+                                            alignItems: 'center',
+                                            border: '1px solid rgba(255,255,255,0.03)',
+                                            transition: 'all 0.3s ease',
+                                            borderRadius: '16px'
                                         }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1 }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
                                                 <div style={{ 
-                                                    width: '44px', height: '44px', borderRadius: '14px', 
-                                                    background: 'rgba(255, 255, 255, 0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                    fontSize: '18px', fontWeight: 900, color: 'var(--color-primary)', border: '1px solid rgba(255, 255, 255, 0.04)'
+                                                    width: '44px', height: '44px', borderRadius: '14px',
+                                                    background: 'rgba(255,255,255,0.03)',
+                                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                    fontSize: '18px', fontWeight: 900, color: 'var(--color-primary)'
                                                 }}>
                                                     {student.name?.charAt(0)}
                                                 </div>
                                                 <div>
-                                                    <div style={{ fontWeight: 800, fontSize: '16px', color: 'white' }}>{student.name}</div>
-                                                    <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-text-muted)', marginTop: '2px' }}>
-                                                        {student.studentId || 'ID#---'} • GRADE {student.grade}
+                                                    <div style={{ fontSize: '16px', fontWeight: 800 }}>{student.name}</div>
+                                                    <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 700 }}>
+                                                        STUDENT ID: {student.custom_id || student.id.slice(0, 8)} • GRADE {student.grade}
                                                     </div>
                                                 </div>
                                             </div>
 
-                                            <div style={{ display: 'flex', gap: '6px' }}>
-                                                {[
-                                                    { id: 'present', label: 'P', color: '#38a169', bg: '#f0fff4' },
-                                                    { id: 'absent', label: 'A', color: '#e53e3e', bg: '#fff5f5' },
-                                                    { id: 'late', label: 'L', color: '#d69e2e', bg: '#fffff0' }
-                                                ].map(btn => (
-                                                    <button
-                                                        key={btn.id}
-                                                        onClick={() => setStatus(student.id, btn.id)}
-                                                        className="tooltip-wrapper"
-                                                        style={{ 
-                                                            width: '42px', height: '42px', borderRadius: '12px', border: 'none', cursor: 'pointer',
-                                                            background: status === btn.id ? btn.bg : 'rgba(255, 255, 255, 0.03)',
-                                                            color: status === btn.id ? btn.color : 'rgba(255, 255, 255, 0.2)',
-                                                            fontWeight: 900, fontSize: '15px', transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                                                            boxShadow: status === btn.id ? `0 4px 12px ${btn.color}30` : 'none',
-                                                            transform: status === btn.id ? 'scale(1.05)' : 'none'
-                                                        }}
-                                                    >
-                                                        {btn.label}
-                                                        <span className="tooltip">{btn.id.charAt(0).toUpperCase() + btn.id.slice(1)}</span>
-                                                    </button>
-                                                ))}
+                                            <div style={{ display: 'flex', gap: '10px' }}>
+                                                {/* Present Toggle */}
+                                                <button 
+                                                    onClick={() => setStatus(student.id, 'present')}
+                                                    className={`status-icon-btn ${status === 'present' ? 'active present' : ''}`}
+                                                    title="Mark Present"
+                                                >
+                                                    <Check size={20} />
+                                                </button>
+                                                
+                                                {/* Absent Toggle */}
+                                                <button 
+                                                    onClick={() => setStatus(student.id, 'absent')}
+                                                    className={`status-icon-btn ${status === 'absent' ? 'active absent' : ''}`}
+                                                    title="Mark Absent"
+                                                >
+                                                    <XIcon size={20} />
+                                                </button>
+
+                                                {/* Late Toggle */}
+                                                <button 
+                                                    onClick={() => setStatus(student.id, 'late')}
+                                                    className={`status-icon-btn ${status === 'late' ? 'active late' : ''}`}
+                                                    title="Mark Late"
+                                                >
+                                                    <Clock size={20} />
+                                                </button>
                                             </div>
                                         </div>
                                     );
                                 })}
                             </div>
+
+                            <style>{`
+                                .status-icon-btn {
+                                    width: 44px;
+                                    height: 44px;
+                                    border-radius: 14px;
+                                    border: 1px solid rgba(255,255,255,0.1);
+                                    background: rgba(255,255,255,0.02);
+                                    display: flex;
+                                    align-items: center;
+                                    justify-content: center;
+                                    cursor: pointer;
+                                    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                                    color: var(--color-text-muted);
+                                    opacity: 0.6;
+                                }
+                                .status-icon-btn:hover {
+                                    background: rgba(255,255,255,0.05);
+                                    transform: translateY(-2px);
+                                    opacity: 1;
+                                }
+                                .status-icon-btn.active {
+                                    opacity: 1;
+                                    border: 1px solid currentColor !important;
+                                    color: white !important;
+                                }
+                                .status-icon-btn.present.active {
+                                    background: #10b981 !important;
+                                    box-shadow: 0 0 20px rgba(16, 185, 129, 0.4);
+                                }
+                                .status-icon-btn.absent.active {
+                                    background: #ef4444 !important;
+                                    box-shadow: 0 0 20px rgba(239, 68, 68, 0.4);
+                                }
+                                .status-icon-btn.late.active {
+                                    background: #f59e0b !important;
+                                    box-shadow: 0 0 20px rgba(245, 158, 11, 0.4);
+                                }
+                                .attendance-row:hover {
+                                    border: 1px solid var(--color-primary-faded) !important;
+                                    background: rgba(255,255,255,0.03) !important;
+                                    transform: translateX(4px);
+                                }
+                            `}</style>
 
                             <div style={{ marginTop: 'var(--space-10)', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '24px' }}>
                                 {existingAttendance && (

@@ -475,16 +475,25 @@ export default function Students() {
                                             </div>
                                         </td>
                                         <td style={{ paddingRight: '20px' }}>
-                                            <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
-                                                <button className="btn btn-ghost btn-icon" onClick={() => setViewingStudent(student)} title="View Stats">
-                                                    <Activity size={18} />
-                                                </button>
-                                                <button className="btn btn-ghost btn-icon" onClick={() => openEdit(student)} title="Edit">
-                                                    <Edit2 size={16} />
-                                                </button>
-                                                <button className="btn btn-ghost btn-icon" onClick={() => handleDelete(student.id)} title="Delete">
-                                                    <Trash2 size={16} style={{ color: 'var(--color-danger)' }} />
-                                                </button>
+                                            <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end', alignItems: 'center' }}>
+                                                <div className="tooltip-wrapper">
+                                                    <button className="btn btn-ghost btn-icon" onClick={() => setViewingStudent(student)}>
+                                                        <Activity size={18} />
+                                                    </button>
+                                                    <span className="tooltip">Analytics</span>
+                                                </div>
+                                                <div className="tooltip-wrapper">
+                                                    <button className="btn btn-ghost btn-icon" onClick={() => openEdit(student)}>
+                                                        <Edit2 size={16} />
+                                                    </button>
+                                                    <span className="tooltip">Edit Profile</span>
+                                                </div>
+                                                <div className="tooltip-wrapper">
+                                                    <button className="btn btn-ghost btn-icon" onClick={() => handleDelete(student.id)}>
+                                                        <Trash2 size={16} style={{ color: 'var(--color-danger)' }} />
+                                                    </button>
+                                                    <span className="tooltip">Delete Student</span>
+                                                </div>
                                             </div>
                                         </td>
                                     </tr>

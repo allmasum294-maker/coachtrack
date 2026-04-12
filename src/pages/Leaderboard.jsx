@@ -3,13 +3,16 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '../services/supabaseClient';
 import { 
     Award, Trophy, Star, Medal, ArrowUp, ArrowDown, 
-    Minus, Filter, Info, TrendingUp, Zap, Sparkles, UserCheck
+    Minus, Filter, Info, TrendingUp, Zap, Sparkles, UserCheck,
+    Calendar, FileText, BarChart3, Clock
 } from 'lucide-react';
+import { format, subDays, startOfDay, endOfDay, isWithinInterval } from 'date-fns';
 import { batchService } from '../services/batchService';
 import { studentService } from '../services/studentService';
 import { attendanceService } from '../services/attendanceService';
 import { examService } from '../services/examService';
 import { homeworkService } from '../services/homeworkService';
+import ReportCardModal from '../components/analytics/ReportCardModal';
 
 export default function Leaderboard() {
     const { userProfile } = useAuth();
@@ -20,6 +23,13 @@ export default function Leaderboard() {
     const [homeworks, setHomeworks] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedBatchId, setSelectedBatchId] = useState('');
+    
+    // Period Filtering
+    const [timePeriod, setTimePeriod] = useState('30'); // '7', '30', '90', 'all'
+    const [customDateRange, setCustomDateRange] = useState({ from: '', to: '' });
+    
+    // Modals
+    const [selectedStudentForReport, setSelectedStudentForReport] = useState(null);
 
     useEffect(() => {
         if (userProfile?.id) loadData();
@@ -53,60 +63,90 @@ export default function Leaderboard() {
         }
     }
 
+    const filteredRange = useMemo(() => {
+        if (timePeriod === 'all') return { start: new Date(0), end: new Date(2100, 0, 1) };
+        if (timePeriod === 'custom') {
+            return { 
+                start: startOfDay(new Date(customDateRange.from || '2000-01-01')), 
+                end: endOfDay(new Date(customDateRange.to || '2100-01-01')) 
+            };
+        }
+        return { 
+            start: startOfDay(subDays(new Date(), parseInt(timePeriod))), 
+            end: endOfDay(new Date()) 
+        };
+    }, [timePeriod, customDateRange]);
+
     const leaderboardData = useMemo(() => {
         if (!selectedBatchId) return [];
 
         const batchStudents = students.filter(s => (s.batchIds || []).includes(selectedBatchId));
         
-        const scores = batchStudents.map(student => {
-            let totalPoints = 0;
-            let attPoints = 0;
-            let hwPoints = 0;
-            let examPoints = 0;
-
-            // Attendance Points (10 pts per present)
-            attendance.forEach(a => {
-                if (a.batch_id === selectedBatchId) {
-                    const record = (a.records || []).find(r => r.studentId === student.id);
-                    if (record && record.status === 'present') attPoints += 10;
-                }
-            });
-
-            // Homework Points (20 pts per completed HW)
-            homeworks.forEach(hw => {
-                const isRelevantBatch = hw.batch_id === selectedBatchId;
-                const isRelevantSchool = !hw.target_school_id || hw.target_school_id === student.school_id;
-
-                if (isRelevantBatch && isRelevantSchool) {
-                    if ((hw.completedBy || []).includes(student.id)) hwPoints += 20;
-                }
-            });
-
-            // Exam Points (Marks / 2)
-            exams.forEach(e => {
-                if (e.batch_id === selectedBatchId) {
-                    const score = (e.scores || []).find(s => s.studentId === student.id);
-                    if (score && typeof score.marksObtained === 'number') {
-                        examPoints += Math.round(score.marksObtained / 2);
+        const rankings = batchStudents.map(student => {
+            let totalWeightedScore = 0;
+            
+            // 1. Attendance % (Weight: 30%)
+            let attPossible = 0;
+            let attPresent = 0;
+            attendance.filter(a => a.batch_id === selectedBatchId).forEach(record => {
+                const d = new Date(record.date);
+                if (isWithinInterval(d, filteredRange)) {
+                    const sRecord = (record.records || []).find(r => r.studentId === student.id);
+                    if (sRecord) {
+                        attPossible++;
+                        if (sRecord.status === 'present') attPresent++;
                     }
                 }
             });
+            const attRate = attPossible > 0 ? (attPresent / attPossible) : 0;
 
-            totalPoints = attPoints + hwPoints + examPoints;
+            // 2. Exam % (Weight: 50%)
+            let examTotalPossibleMarks = 0;
+            let examTotalEarnedMarks = 0;
+            exams.filter(e => e.batch_id === selectedBatchId).forEach(exam => {
+                const d = new Date(exam.date);
+                if (isWithinInterval(d, filteredRange)) {
+                    const score = (exam.scores || []).find(s => s.studentId === student.id);
+                    if (score) {
+                        examTotalPossibleMarks += (exam.totalMarks || 100);
+                        examTotalEarnedMarks += (score.marksObtained || 0);
+                    }
+                }
+            });
+            const examRate = examTotalPossibleMarks > 0 ? (examTotalEarnedMarks / examTotalPossibleMarks) : 0;
+
+            // 3. Homework % (Weight: 20%)
+            let hwPossible = 0;
+            let hwDone = 0;
+            homeworks.filter(hw => hw.batch_id === selectedBatchId).forEach(hw => {
+                const d = new Date(hw.due_date || hw.created_at);
+                if (isWithinInterval(d, filteredRange)) {
+                    hwPossible++;
+                    const sub = (hw.submissions || {})[student.id];
+                    if (sub && (sub.status === 'completed' || sub.status === 'late')) {
+                        hwDone++;
+                    }
+                }
+            });
+            const hwRate = hwPossible > 0 ? (hwDone / hwPossible) : 0;
+
+            // Final Weighted Calculation
+            // Scale to 1000 points for a cleaner leaderboard display
+            totalWeightedScore = Math.round(((attRate * 0.3) + (examRate * 0.5) + (hwRate * 0.2)) * 1000);
 
             return {
                 ...student,
-                points: totalPoints,
+                points: totalWeightedScore,
                 breakdown: {
-                    attendance: attPoints,
-                    homework: hwPoints,
-                    exams: examPoints
+                    attendance: Math.round(attRate * 100),
+                    exams: Math.round(examRate * 100),
+                    homework: Math.round(hwRate * 100)
                 }
             };
         });
 
-        return scores.sort((a, b) => b.points - a.points);
-    }, [students, selectedBatchId, attendance, homeworks, exams]);
+        return rankings.sort((a, b) => b.points - a.points);
+    }, [students, selectedBatchId, attendance, homeworks, exams, filteredRange]);
 
     const getRankUI = (index) => {
         switch (index) {
@@ -121,20 +161,38 @@ export default function Leaderboard() {
 
     return (
         <div className="animate-fade-in">
-            <div className="page-header">
+            <div className="page-header" style={{ marginBottom: 'var(--space-8)' }}>
                 <div>
                     <h1 className="page-title">Top Students</h1>
-                    <p className="page-subtitle">Celebrating our hardest working students</p>
+                    <p className="page-subtitle">Celebrating performance and consistency</p>
                 </div>
-                <div className="glass-card" style={{ padding: '10px 20px', display: 'flex', alignItems: 'center', gap: '15px', border: '1px solid var(--color-primary)' }}>
-                    <div style={{ color: 'var(--color-primary)' }}><Filter size={20} /></div>
-                    <div>
-                        <div style={{ fontSize: '10px', fontWeight: 900, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Batch</div>
+                
+                <div style={{ display: 'flex', gap: '12px' }}>
+                    {/* Time Filter */}
+                    <div className="glass-card" style={{ padding: '6px 16px', display: 'flex', alignItems: 'center', gap: '12px', border: '1px solid var(--color-border)' }}>
+                        <Clock size={16} color="var(--color-text-muted)" />
+                        <select 
+                            className="form-select" 
+                            value={timePeriod} 
+                            onChange={(e) => setTimePeriod(e.target.value)}
+                            style={{ width: '130px', height: '28px', border: 'none', background: 'transparent', padding: 0, fontWeight: 700, fontSize: '13px' }}
+                        >
+                            <option value="7">Last 7 Days</option>
+                            <option value="30">Last 30 Days</option>
+                            <option value="90">Last 90 Days</option>
+                            <option value="all">All Time</option>
+                            <option value="custom">Custom Range</option>
+                        </select>
+                    </div>
+
+                    {/* Batch Filter */}
+                    <div className="glass-card" style={{ padding: '6px 16px', display: 'flex', alignItems: 'center', gap: '12px', border: '1px solid var(--color-primary)' }}>
+                        <Filter size={16} color="var(--color-primary)" />
                         <select 
                             className="form-select" 
                             value={selectedBatchId} 
                             onChange={(e) => setSelectedBatchId(e.target.value)}
-                            style={{ minWidth: '180px', height: '32px', border: 'none', background: 'transparent', padding: 0, fontWeight: 700, fontSize: '15px' }}
+                            style={{ minWidth: '160px', height: '28px', border: 'none', background: 'transparent', padding: 0, fontWeight: 700, fontSize: '14px' }}
                         >
                             {batches.map(b => (
                                 <option key={b.id} value={b.id}>{b.name}</option>
@@ -144,19 +202,33 @@ export default function Leaderboard() {
                 </div>
             </div>
 
+            {timePeriod === 'custom' && (
+                <div className="glass-panel animate-slide-up" style={{ marginBottom: 'var(--space-6)', padding: '16px', display: 'flex', justifyContent: 'center', gap: '20px', alignItems: 'center' }}>
+                    <div style={{ fontSize: '12px', fontWeight: 800, color: 'var(--color-primary)' }}>CUSTOM RANGE</div>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <span style={{ fontSize: '11px', fontWeight: 900, color: 'var(--color-text-muted)' }}>FROM</span>
+                        <input type="date" className="form-input" style={{ width: '130px' }} value={customDateRange.from} onChange={e => setCustomDateRange(prev => ({ ...prev, from: e.target.value }))} />
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <span style={{ fontSize: '11px', fontWeight: 900, color: 'var(--color-text-muted)' }}>TO</span>
+                        <input type="date" className="form-input" style={{ width: '130px' }} value={customDateRange.to} onChange={e => setCustomDateRange(prev => ({ ...prev, to: e.target.value }))} />
+                    </div>
+                </div>
+            )}
+
             {!selectedBatchId || leaderboardData.length === 0 ? (
                 <div className="glass-panel" style={{ padding: 'var(--space-12)', textAlign: 'center' }}>
                     <div style={{ width: '100px', height: '100px', borderRadius: '30px', background: 'rgba(255,255,255,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto var(--space-8)' }}>
                         <Trophy size={48} style={{ color: 'var(--color-border)', opacity: 0.5 }} />
                     </div>
-                    <h2 style={{ fontSize: '26px', fontWeight: 900, marginBottom: '12px' }}>Select a Batch</h2>
-                    <p style={{ color: 'var(--color-text-muted)', maxWidth: '400px', margin: '0 auto' }}>Choose a batch to see who's leading the class.</p>
+                    <h2 style={{ fontSize: '26px', fontWeight: 900, marginBottom: '12px' }}>No Data Found</h2>
+                    <p style={{ color: 'var(--color-text-muted)', maxWidth: '400px', margin: '0 auto' }}>There isn't enough performance data for this batch in the selected period to generate rankings.</p>
                 </div>
             ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-10)' }}>
                     
                     {/* Elite Podium Display */}
-                    <div className="podium-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-end', gap: 'var(--space-4)', padding: 'var(--space-6) 0', marginTop: 'var(--space-8)' }}>
+                    <div className="podium-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-end', gap: 'var(--space-4)', padding: 'var(--space-6) 0', marginTop: 'var(--space-4)' }}>
                         {/* 2nd Place */}
                         {leaderboardData[1] && (
                             <div className="podium-item" style={{ width: '240px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -189,7 +261,7 @@ export default function Leaderboard() {
                                     <Trophy size={32} color="white" />
                                 </div>
                             </div>
-                            <div className="glass-panel" style={{ width: '100%', height: '220px', borderTopLeftRadius: '32px', borderTopRightRadius: '32px', borderBottomLeftRadius: 0, borderBottomRightRadius: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(251, 191, 36, 0.08)', border: '1px solid rgba(251, 191, 36, 0.3)', borderBottom: 'none', boxShadow: '0 -20px 40px -20px rgba(251, 191, 36, 0.2)' }}>
+                            <div className="glass-panel" style={{ width: '100%', height: '210px', borderTopLeftRadius: '32px', borderTopRightRadius: '32px', borderBottomLeftRadius: 0, borderBottomRightRadius: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(251, 191, 36, 0.08)', border: '1px solid rgba(251, 191, 36, 0.3)', borderBottom: 'none', boxShadow: '0 -20px 40px -20px rgba(251, 191, 36, 0.2)' }}>
                                 <div style={{ fontWeight: 900, fontSize: '22px', textAlign: 'center', marginBottom: '6px' }}>{leaderboardData[0].name}</div>
                                 <div style={{ fontSize: '42px', fontWeight: 900, color: '#fbbf24', textShadow: '0 0 20px rgba(251, 191, 36, 0.4)' }}>{leaderboardData[0].points}</div>
                                 <div style={{ fontSize: '13px', fontWeight: 900, color: '#fbbf24', letterSpacing: '0.1em', marginTop: '10px' }}>1st Place</div>
@@ -221,20 +293,21 @@ export default function Leaderboard() {
                         <div style={{ padding: '24px 32px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.01)' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                 <TrendingUp size={22} color="var(--color-primary)" />
-                                <h3 style={{ fontSize: '18px', fontWeight: 900 }}>Full Rankings</h3>
+                                <h3 style={{ fontSize: '18px', fontWeight: 900 }}>Top Performers</h3>
                             </div>
-                            <div style={{ fontSize: '13px', color: 'var(--color-text-muted)', fontWeight: 600 }}>Ranking for {batches.find(b => b.id === selectedBatchId)?.name}</div>
+                            <div style={{ fontSize: '13px', color: 'var(--color-text-muted)', fontWeight: 600 }}>Weightage: Exams (50%), Attendance (30%), Homework (20%)</div>
                         </div>
                         <div className="table-container">
                             <table className="table">
                                 <thead>
                                     <tr>
-                                        <th style={{ width: '100px', textAlign: 'center' }}>RANK</th>
+                                        <th style={{ width: '80px', textAlign: 'center' }}>RANK</th>
                                         <th>STUDENT</th>
                                         <th style={{ textAlign: 'center' }}>ATTENDANCE</th>
-                                        <th style={{ textAlign: 'center' }}>HOMEWORK</th>
                                         <th style={{ textAlign: 'center' }}>EXAMS</th>
-                                        <th style={{ textAlign: 'right', paddingRight: '32px' }}>TOTAL POINTS</th>
+                                        <th style={{ textAlign: 'center' }}>HOMEWORK</th>
+                                        <th style={{ textAlign: 'center' }}>SCORE</th>
+                                        <th style={{ textAlign: 'right', paddingRight: '32px' }}>ACTIONS</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -250,54 +323,70 @@ export default function Leaderboard() {
                                                 <td style={{ textAlign: 'center' }}>
                                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                                         {index < 3 ? (
-                                                            <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: rankUI.bg, color: rankUI.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: '15px' }}>
+                                                            <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: rankUI.bg, color: rankUI.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: '14px' }}>
                                                                 {rankUI.label}
                                                             </div>
                                                         ) : (
-                                                            <span style={{ fontWeight: 800, fontSize: '16px', opacity: 0.5 }}>{index + 1}</span>
+                                                            <span style={{ fontWeight: 800, fontSize: '15px', opacity: 0.5 }}>{index + 1}</span>
                                                         )}
                                                     </div>
                                                 </td>
                                                 <td>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '12px 0' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '8px 0' }}>
                                                         <div style={{ 
-                                                            width: '44px', height: '44px', borderRadius: '14px', 
+                                                            width: '40px', height: '40px', borderRadius: '12px', 
                                                             background: index < 3 ? rankUI.color : 'rgba(255,255,255,0.05)', 
                                                             color: index < 3 ? 'white' : 'var(--color-text-secondary)',
                                                             display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                            fontSize: '18px', fontWeight: 900,
-                                                            boxShadow: index < 3 ? `0 8px 15px -4px ${rankUI.color}60` : 'none'
+                                                            fontSize: '16px', fontWeight: 900
                                                         }}>
                                                             {student.name.charAt(0)}
                                                         </div>
                                                         <div>
                                                             <div style={{ fontWeight: 800, fontSize: '15px' }}>{student.name}</div>
-                                                            <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', display: 'flex', gap: '6px', alignItems: 'center' }}>
-                                                                <span>ID: {student.studentId || 'N/A'}</span>
-                                                                <span style={{ opacity: 0.3 }}>•</span>
-                                                                <span className="badge" style={{ background: 'rgba(255,255,255,0.05)', padding: '1px 6px', fontSize: '10px' }}>GRADE {student.grade}</span>
-                                                            </div>
+                                                            <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>Class {student.grade}</div>
                                                         </div>
                                                     </div>
                                                 </td>
                                                 <td style={{ textAlign: 'center' }}>
-                                                    <div style={{ fontSize: '14px', fontWeight: 700 }}>{student.breakdown.attendance}</div>
-                                                    <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', fontWeight: 800 }}>POINTS</div>
+                                                    <div style={{ fontSize: '14px', fontWeight: 800, color: student.breakdown.attendance >= 80 ? 'var(--color-teal)' : 'inherit' }}>{student.breakdown.attendance}%</div>
                                                 </td>
                                                 <td style={{ textAlign: 'center' }}>
-                                                    <div style={{ fontSize: '14px', fontWeight: 700 }}>{student.breakdown.homework}</div>
-                                                    <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', fontWeight: 800 }}>POINTS</div>
+                                                    <div style={{ fontSize: '14px', fontWeight: 800, color: student.breakdown.exams >= 80 ? 'var(--color-primary)' : 'inherit' }}>{student.breakdown.exams}%</div>
                                                 </td>
                                                 <td style={{ textAlign: 'center' }}>
-                                                    <div style={{ fontSize: '14px', fontWeight: 700 }}>{student.breakdown.exams}</div>
-                                                    <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', fontWeight: 800 }}>POINTS</div>
+                                                    <div style={{ fontSize: '14px', fontWeight: 800, color: student.breakdown.homework >= 80 ? 'var(--color-warning)' : 'inherit' }}>{student.breakdown.homework}%</div>
                                                 </td>
-                                                <td style={{ textAlign: 'right', paddingRight: '32px' }}>
-                                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '10px' }}>
-                                                        <div style={{ fontSize: '20px', fontWeight: 900, color: index === 0 ? '#fbbf24' : 'var(--color-primary)' }}>
+                                                <td style={{ textAlign: 'center' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                                                        <div style={{ fontSize: '18px', fontWeight: 900, color: index === 0 ? '#fbbf24' : 'var(--color-primary)' }}>
                                                             {student.points}
                                                         </div>
-                                                        {index < 3 && <Zap size={16} fill={rankUI.color} color={rankUI.color} />}
+                                                        {index < 3 && <Zap size={14} fill={rankUI.color} color={rankUI.color} />}
+                                                    </div>
+                                                </td>
+                                                <td style={{ textAlign: 'right', paddingRight: '24px' }}>
+                                                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', alignItems: 'center' }}>
+                                                        <div className="tooltip-wrapper">
+                                                            <button 
+                                                                className="btn btn-ghost btn-icon" 
+                                                                style={{ width: '36px', height: '36px', borderRadius: '10px' }}
+                                                                onClick={() => window.location.hash = `#/student-analytics?id=${student.id}`}
+                                                            >
+                                                                <BarChart3 size={18} />
+                                                            </button>
+                                                            <span className="tooltip">Analytics</span>
+                                                        </div>
+                                                        <div className="tooltip-wrapper">
+                                                            <button 
+                                                                className="btn btn-primary btn-icon" 
+                                                                style={{ width: '36px', height: '36px', borderRadius: '10px' }}
+                                                                onClick={() => setSelectedStudentForReport(student)}
+                                                            >
+                                                                <FileText size={18} />
+                                                            </button>
+                                                            <span className="tooltip">Report Card</span>
+                                                        </div>
                                                     </div>
                                                 </td>
                                             </tr>
@@ -307,37 +396,38 @@ export default function Leaderboard() {
                             </table>
                         </div>
                     </div>
-
-                    {/* Point Scoring Mechanics */}
+                    
+                    {/* Performance Formula Explanation */}
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-6)' }}>
                         {[
-                            { title: 'Attendance', subtitle: 'Being on time', value: '+10 pts / class', icon: UserCheck, color: 'var(--color-teal)' },
-                            { title: 'Homework', subtitle: 'Finishing tasks', value: '+20 pts / task', icon: Star, color: 'var(--color-warning)' },
-                            { title: 'Exams', subtitle: 'Doing well in tests', value: '50% of your marks', icon: Trophy, color: 'var(--color-primary)' }
-                        ].map((card, i) => (
-                            <div key={i} className="glass-card" style={{ padding: '24px', position: 'relative', overflow: 'hidden' }}>
-                                <div style={{ position: 'absolute', top: '-10px', right: '-10px', opacity: 0.05 }}>
-                                    <card.icon size={80} />
-                                </div>
-                                <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-                                    <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: `${card.color}15`, color: card.color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                        <card.icon size={24} />
+                            { title: 'Exams (Weight: 50%)', desc: 'Academic excellence is the core of our ranking system.', icon: GraduationCap, color: 'var(--color-primary)' },
+                            { title: 'Attendance (Weight: 30%)', desc: 'Consistency and discipline are key to long-term success.', icon: UserCheck, color: 'var(--color-teal)' },
+                            { title: 'Homework (Weight: 20%)', desc: 'Regular practice through tasks ensures solid foundations.', icon: Star, color: 'var(--color-warning)' }
+                        ].map((item, i) => (
+                            <div key={i} className="glass-card" style={{ padding: '24px', borderLeft: `4px solid ${item.color}` }}>
+                                <div style={{ display: 'flex', gap: '16px', alignItems: 'center', marginBottom: '12px' }}>
+                                    <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: `${item.color}15`, color: item.color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        <item.icon size={20} />
                                     </div>
-                                    <div>
-                                        <div style={{ fontSize: '15px', fontWeight: 900 }}>{card.title}</div>
-                                        <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 700 }}>{card.subtitle}</div>
-                                    </div>
+                                    <div style={{ fontSize: '15px', fontWeight: 900 }}>{item.title}</div>
                                 </div>
-                                <div style={{ marginTop: '20px', fontSize: '18px', fontWeight: 900, color: card.color }}>{card.value}</div>
+                                <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', lineHeight: 1.6 }}>{item.desc}</p>
                             </div>
                         ))}
                     </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', padding: '20px', background: 'rgba(255,255,255,0.02)', borderRadius: '20px', color: 'var(--color-text-muted)', fontSize: '13px', fontWeight: 600 }}>
-                        <Info size={16} />
-                        Only showing currently enrolled students. Data is synchronized across all active batch metrics.
-                    </div>
                 </div>
+            )}
+
+            {/* Support Modal */}
+            {selectedStudentForReport && (
+                <ReportCardModal 
+                    student={selectedStudentForReport}
+                    batches={batches}
+                    attendance={attendance}
+                    exams={exams}
+                    homeworks={homeworks}
+                    onClose={() => setSelectedStudentForReport(null)}
+                />
             )}
         </div>
     );

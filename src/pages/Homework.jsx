@@ -275,9 +275,19 @@ export default function Homework() {
                                         <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: status.color }} />
                                         <span style={{ fontSize: '11px', fontWeight: 700, color: status.color }}>{status.label}</span>
                                     </div>
-                                    <div style={{ display: 'flex', gap: '4px' }}>
-                                        <button className="btn btn-ghost btn-icon" onClick={() => openEdit(hw)} title="Edit Assignment"><Edit2 size={16} /></button>
-                                        <button className="btn btn-ghost btn-icon" onClick={() => handleDelete(hw.id)} title="Delete Assignment" style={{ color: 'var(--color-danger)' }}><Trash2 size={16} /></button>
+                                    <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                                        <div className="tooltip-wrapper">
+                                            <button className="btn btn-ghost btn-icon" onClick={() => openEdit(hw)}>
+                                                <Edit2 size={16} />
+                                            </button>
+                                            <span className="tooltip">Edit Work</span>
+                                        </div>
+                                        <div className="tooltip-wrapper">
+                                            <button className="btn btn-ghost btn-icon" onClick={() => handleDelete(hw.id)} style={{ color: 'var(--color-danger)' }}>
+                                                <Trash2 size={16} />
+                                            </button>
+                                            <span className="tooltip">Delete Work</span>
+                                        </div>
                                     </div>
                                 </div>
 

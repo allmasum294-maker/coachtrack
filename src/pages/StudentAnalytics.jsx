@@ -31,6 +31,26 @@ export default function StudentAnalytics() {
         if (userProfile?.id) loadData();
     }, [userProfile]);
 
+    // Handle incoming student ID from URL
+    useEffect(() => {
+        if (students.length > 0) {
+            const hashParts = window.location.hash.split('?');
+            if (hashParts.length > 1) {
+                const params = new URLSearchParams(hashParts[1]);
+                const studentId = params.get('id');
+                if (studentId) {
+                    const student = students.find(s => s.id === studentId);
+                    if (student) {
+                        setSelectedStudentId(studentId);
+                        if (student.batchIds?.length > 0) {
+                            setSelectedBatchId(student.batchIds[0]);
+                        }
+                    }
+                }
+            }
+        }
+    }, [students]);
+
     async function loadData() {
         try {
             const uid = userProfile.id;

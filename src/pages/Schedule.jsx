@@ -18,8 +18,9 @@ import {
     RefreshCw, Info, CheckCircle2, UserCheck, CalendarDays, 
     Calendar as CalendarIcon, Filter, Layers, ChevronRight
 } from 'lucide-react';
-import { format, eachDayOfInterval, getDay } from 'date-fns';
+import { format, eachDayOfInterval, getDay, parseISO } from 'date-fns';
 import toast from 'react-hot-toast';
+import SmartTimePicker from '../components/common/SmartTimePicker';
 
 export default function Schedule() {
     const { userProfile } = useAuth();
@@ -112,6 +113,7 @@ export default function Schedule() {
                     end: `${s.date}T${s.endTime || '23:59:59'}`,
                     backgroundColor: color,
                     borderColor: 'transparent',
+                    textColor: 'white',
                     extendedProps: { schedule: s, type: 'class' },
                 };
             });
@@ -128,6 +130,7 @@ export default function Schedule() {
                     end: `${e.date}T${e.end_time || '23:59:59'}`,
                     backgroundColor: color,
                     borderColor: 'transparent',
+                    textColor: 'white',
                     extendedProps: { exam: e, type: 'exam' },
                 };
             });
@@ -144,6 +147,7 @@ export default function Schedule() {
                     end: `${l.date}T23:59:59`,
                     backgroundColor: color,
                     borderColor: 'transparent',
+                    textColor: 'white',
                     extendedProps: { sessionLog: l, type: 'sessionLog' },
                 };
             });
@@ -154,13 +158,22 @@ export default function Schedule() {
             .map((hw) => {
                 const batchMsg = batches.find(b => b.id === hw.batchId)?.name || '';
                 const color = '#ec4899'; 
+                
+                // Fix: due_date from Supabase might be a full ISO string. 
+                // We just need the date part for the calendar start.
+                let startDate = hw.due_date;
+                if (typeof startDate === 'string' && startDate.includes('T')) {
+                    startDate = startDate.split('T')[0];
+                }
+
                 return {
                     id: `hw-${hw.id}`,
-                    title: `HW DUE: ${hw.title}`,
-                    start: `${hw.due_date}T23:59:59`,
+                    title: `HW DUE: [${batchMsg}] ${hw.title}`,
+                    start: `${startDate}T23:59:59`,
                     allDay: true,
                     backgroundColor: color,
                     borderColor: 'transparent',
+                    textColor: 'white',
                     extendedProps: { homework: hw, batchName: batchMsg, type: 'homework' },
                 };
             });
@@ -574,16 +587,16 @@ export default function Schedule() {
                                     </div>
                                 </div>
                                 <div className="form-row">
-                                    <div className="form-group">
-                                        <label className="form-label" style={{ fontWeight: 800, fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-primary)' }}>Start Time</label>
-                                        <input className="form-input" type="time" value={form.startTime} style={{ height: '52px', borderRadius: '14px', fontWeight: 700 }}
-                                            onChange={(e) => setForm({ ...form, startTime: e.target.value })} />
-                                    </div>
-                                    <div className="form-group">
-                                        <label className="form-label" style={{ fontWeight: 800, fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-primary)' }}>End Time</label>
-                                        <input className="form-input" type="time" value={form.endTime} style={{ height: '52px', borderRadius: '14px', fontWeight: 700 }}
-                                            onChange={(e) => setForm({ ...form, endTime: e.target.value })} />
-                                    </div>
+                                    <SmartTimePicker 
+                                        label="Start Time"
+                                        value={form.startTime}
+                                        onChange={(val) => setForm({ ...form, startTime: val })}
+                                    />
+                                    <SmartTimePicker 
+                                        label="End Time"
+                                        value={form.endTime}
+                                        onChange={(val) => setForm({ ...form, endTime: val })}
+                                    />
                                 </div>
                                 <div className="form-group">
                                     <label className="form-label" style={{ fontWeight: 800, fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-primary)' }}>Status</label>
@@ -685,16 +698,16 @@ export default function Schedule() {
                                     </div>
                                 </div>
                                 <div className="form-row">
-                                    <div className="form-group">
-                                        <label className="form-label" style={{ fontWeight: 800, fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-primary)' }}>Start Time *</label>
-                                        <input className="form-input" type="time" value={recurringForm.startTime} required style={{ height: '52px', borderRadius: '14px', fontWeight: 700 }}
-                                            onChange={(e) => setRecurringForm({...recurringForm, startTime: e.target.value})} />
-                                    </div>
-                                    <div className="form-group">
-                                        <label className="form-label" style={{ fontWeight: 800, fontSize: '12px', textTransform: 'uppercase', color: 'var(--color-primary)' }}>End Time</label>
-                                        <input className="form-input" type="time" value={recurringForm.endTime} style={{ height: '52px', borderRadius: '14px', fontWeight: 700 }}
-                                            onChange={(e) => setRecurringForm({...recurringForm, endTime: e.target.value})} />
-                                    </div>
+                                    <SmartTimePicker 
+                                        label="Start Time *"
+                                        value={recurringForm.startTime}
+                                        onChange={(val) => setRecurringForm({...recurringForm, startTime: val})}
+                                    />
+                                    <SmartTimePicker 
+                                        label="End Time"
+                                        value={recurringForm.endTime}
+                                        onChange={(val) => setRecurringForm({...recurringForm, endTime: val})}
+                                    />
                                 </div>
                             </div>
                             <div className="modal-footer" style={{ padding: '24px 32px 32px', border: 'none' }}>
@@ -848,8 +861,8 @@ export default function Schedule() {
                                     </div>
                                     <span style={{ fontWeight: 700, fontSize: '15px' }}>
                                         {selectedEvent.displayType === 'homework' 
-                                            ? (selectedEvent.dueDate?.toDate ? format(selectedEvent.dueDate.toDate(), 'PPP') : selectedEvent.dueDate)
-                                            : (selectedEvent.date?.toDate ? format(selectedEvent.date.toDate(), 'PPP') : selectedEvent.date)
+                                            ? (selectedEvent.dueDate ? format(new Date(selectedEvent.dueDate), 'PPP') : 'No Date')
+                                            : (selectedEvent.date ? format(new Date(selectedEvent.date), 'PPP') : 'No Date')
                                         }
                                     </span>
                                 </div>
@@ -858,7 +871,11 @@ export default function Schedule() {
                                         <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'rgba(255, 255, 255, 0.03)', color: 'var(--color-teal)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
                                             <Clock size={18} />
                                         </div>
-                                        <span style={{ fontWeight: 700, fontSize: '15px' }}>{selectedEvent.startTime ? format(new Date(`2000-01-01T${selectedEvent.startTime}`), 'h:mm a') : 'Start'} <ChevronRight size={14} style={{ opacity: 0.3 }} /> {selectedEvent.endTime ? format(new Date(`2000-01-01T${selectedEvent.endTime}`), 'h:mm a') : 'End'}</span>
+                                        <span style={{ fontWeight: 700, fontSize: '15px' }}>
+                                            {selectedEvent.startTime ? format(new Date(`2000-01-01T${selectedEvent.startTime}`), 'h:mm a') : 'Start'} 
+                                            <ChevronRight size={14} style={{ opacity: 0.3, margin: '0 4px' }} /> 
+                                            {selectedEvent.endTime ? format(new Date(`2000-01-01T${selectedEvent.endTime}`), 'h:mm a') : 'End'}
+                                        </span>
                                     </div>
                                 )}
                                 {selectedEvent.status && (

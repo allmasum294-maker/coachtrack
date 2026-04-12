@@ -5,6 +5,7 @@ import { supabase } from '../services/supabaseClient';
 import { FileText, Plus, Edit2, Trash2, X, Eye, Trophy, TrendingUp, Users, ClipboardCheck, PlusCircle, Filter, Calendar, Clock, BarChart2 } from 'lucide-react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
+import SmartTimePicker from '../components/common/SmartTimePicker';
 import { batchService } from '../services/batchService';
 import { studentService } from '../services/studentService';
 import { examService } from '../services/examService';
@@ -466,20 +467,16 @@ export default function Exams() {
                         </div>
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)', marginBottom: 'var(--space-6)' }}>
-                        <div className="form-group">
-                            <label className="form-label">Start Time</label>
-                            <div style={{ position: 'relative' }}>
-                                <Clock size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }} />
-                                <input className="form-input" type="time" value={form.startTime} onChange={(e) => setForm({ ...form, startTime: e.target.value })} required style={{ paddingLeft: '36px' }} />
-                            </div>
-                        </div>
-                        <div className="form-group">
-                            <label className="form-label">End Time</label>
-                            <div style={{ position: 'relative' }}>
-                                <Clock size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }} />
-                                <input className="form-input" type="time" value={form.endTime} onChange={(e) => setForm({ ...form, endTime: e.target.value })} required style={{ paddingLeft: '36px' }} />
-                            </div>
-                        </div>
+                        <SmartTimePicker 
+                            label="Start Time"
+                            value={form.startTime}
+                            onChange={(val) => setForm({ ...form, startTime: val })}
+                        />
+                        <SmartTimePicker 
+                            label="End Time"
+                            value={form.endTime}
+                            onChange={(val) => setForm({ ...form, endTime: val })}
+                        />
                     </div>
 
                     <div className="form-group" style={{ marginBottom: 'var(--space-6)' }}>

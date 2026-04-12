@@ -226,8 +226,8 @@ export default function SessionLog() {
             ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
                     {filteredLogs.map((log) => {
-                        const dateVal = log.date?.toDate ? log.date.toDate() : new Date(log.date);
-                        const linkedSchedule = getScheduleForLog(log.scheduleId);
+                        const dateVal = new Date(log.date);
+                        const linkedSchedule = getScheduleForLog(log.schedule_id);
                         return (
                             <div key={log.id} className="glass-card list-item-hover" style={{ padding: 'var(--space-6)', transition: 'all 0.3s ease' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 'var(--space-6)' }}>
@@ -270,12 +270,18 @@ export default function SessionLog() {
                                     </div>
 
                                     <div style={{ display: 'flex', gap: '8px' }}>
-                                        <button className="btn btn-ghost btn-icon" onClick={() => openEdit(log)} title="Edit Entry">
-                                            <Edit2 size={18} />
-                                        </button>
-                                        <button className="btn btn-ghost btn-icon" onClick={() => handleDelete(log.id)} title="Delete Entry" style={{ color: 'var(--color-danger)' }}>
-                                            <Trash2 size={18} />
-                                        </button>
+                                        <div className="tooltip-wrapper">
+                                            <button className="btn btn-ghost btn-icon" onClick={() => openEdit(log)}>
+                                                <Edit2 size={18} />
+                                            </button>
+                                            <span className="tooltip">Edit Record</span>
+                                        </div>
+                                        <div className="tooltip-wrapper">
+                                            <button className="btn btn-ghost btn-icon" onClick={() => handleDelete(log.id)} style={{ color: 'var(--color-danger)' }}>
+                                                <Trash2 size={18} />
+                                            </button>
+                                            <span className="tooltip">Delete Record</span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -316,15 +322,16 @@ export default function SessionLog() {
                             <select className="form-select" value={form.scheduleId} onChange={(e) => handleScheduleSelect(e.target.value)} style={{ borderStyle: 'dashed' }}>
                                 <option value="">— No scheduled link —</option>
                                 {getAvailableSchedules(form.batchId).map(s => {
-                                    const dateVal = s.date?.toDate ? format(s.date.toDate(), 'MMM d') : s.date;
+                                    const dateVal = s.date;
+                                    const formattedDate = dateVal ? format(new Date(dateVal), 'MMM d') : '';
                                     return (
                                         <option key={s.id} value={s.id}>
-                                            {dateVal} | {s.startTime}-{s.endTime} | {s.title}
+                                            {formattedDate} | {s.start_time}-{s.end_time} | {s.title}
                                         </option>
                                     );
                                 })}
-                                {editingLog && editingLog.scheduleId && !getAvailableSchedules(form.batchId).find(s => s.id === editingLog.scheduleId) && (
-                                    <option value={editingLog.scheduleId}>(Current Link)</option>
+                                {editingLog && editingLog.schedule_id && !getAvailableSchedules(form.batchId).find(s => s.id === editingLog.schedule_id) && (
+                                    <option value={editingLog.schedule_id}>(Current Link)</option>
                                 )}
                             </select>
                         </div>

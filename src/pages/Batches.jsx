@@ -206,24 +206,33 @@ export default function Batches() {
                                     </div>
                                 </div>
                                 <div style={{ display: 'flex', gap: '4px' }}>
-                                    <button 
-                                        className="btn btn-ghost btn-icon" 
-                                        onClick={async () => {
-                                            const newStatus = !batch.isClosed;
-                                            setEditingBatch(batch);
-                                            setForm(prev => ({ ...prev, isClosed: newStatus }));
-                                            setShowModal(true);
-                                        }}
-                                        style={{ width: '36px', height: '36px', borderRadius: '10px' }}
-                                    >
-                                        <CheckCircle size={18} style={{ color: batch.isClosed ? '#10b981' : 'var(--color-text-muted)', opacity: batch.isClosed ? 1 : 0.3 }} />
-                                    </button>
-                                    <button className="btn btn-ghost btn-icon" onClick={() => openEdit(batch)} style={{ width: '36px', height: '36px', borderRadius: '10px' }}>
-                                        <Edit2 size={18} />
-                                    </button>
-                                    <button className="btn btn-ghost btn-icon" onClick={() => handleDelete(batch.id)} style={{ width: '36px', height: '36px', borderRadius: '10px' }}>
-                                        <Trash2 size={18} style={{ color: '#ef4444', opacity: 0.7 }} />
-                                    </button>
+                                    <div className="tooltip-wrapper">
+                                        <button 
+                                            className="btn btn-ghost btn-icon" 
+                                            onClick={async () => {
+                                                const newStatus = !batch.isClosed;
+                                                setEditingBatch(batch);
+                                                setForm(prev => ({ ...prev, isClosed: newStatus }));
+                                                setShowModal(true);
+                                            }}
+                                            style={{ width: '36px', height: '36px', borderRadius: '10px' }}
+                                        >
+                                            <CheckCircle size={18} style={{ color: batch.isClosed ? '#10b981' : 'var(--color-text-muted)', opacity: batch.isClosed ? 1 : 0.3 }} />
+                                        </button>
+                                        <span className="tooltip">{batch.isClosed ? 'Unarchive' : 'Archive'}</span>
+                                    </div>
+                                    <div className="tooltip-wrapper">
+                                        <button className="btn btn-ghost btn-icon" onClick={() => openEdit(batch)} style={{ width: '36px', height: '36px', borderRadius: '10px' }}>
+                                            <Edit2 size={18} />
+                                        </button>
+                                        <span className="tooltip">Edit Batch</span>
+                                    </div>
+                                    <div className="tooltip-wrapper">
+                                        <button className="btn btn-ghost btn-icon" onClick={() => handleDelete(batch.id)} style={{ width: '36px', height: '36px', borderRadius: '10px' }}>
+                                            <Trash2 size={18} style={{ color: '#ef4444', opacity: 0.7 }} />
+                                        </button>
+                                        <span className="tooltip">Delete Batch</span>
+                                    </div>
                                 </div>
                             </div>
 

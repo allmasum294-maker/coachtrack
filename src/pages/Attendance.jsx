@@ -456,13 +456,19 @@ export default function Attendance() {
                                                             </div>
                                                         </td>
                                                         <td style={{ textAlign: 'right', paddingRight: '40px' }}>
-                                                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-                                                                <button className="btn btn-ghost btn-sm btn-icon" style={{ width: '36px', height: '36px', borderRadius: '10px' }} onClick={(e) => { e.stopPropagation(); handleEdit(att); }}>
-                                                                    <Edit2 size={18} />
-                                                                </button>
-                                                                <button className="btn btn-ghost btn-sm btn-icon" style={{ width: '36px', height: '36px', borderRadius: '10px' }} onClick={(e) => { e.stopPropagation(); handleDelete(att.id); }}>
-                                                                    <Trash2 size={18} style={{ color: 'var(--color-danger)' }} />
-                                                                </button>
+                                                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', alignItems: 'center' }}>
+                                                                <div className="tooltip-wrapper">
+                                                                    <button className="btn btn-ghost btn-sm btn-icon" style={{ width: '36px', height: '36px', borderRadius: '10px' }} onClick={(e) => { e.stopPropagation(); handleEdit(att); }}>
+                                                                        <Edit2 size={18} />
+                                                                    </button>
+                                                                    <span className="tooltip">Edit Record</span>
+                                                                </div>
+                                                                <div className="tooltip-wrapper">
+                                                                    <button className="btn btn-ghost btn-sm btn-icon" style={{ width: '36px', height: '36px', borderRadius: '10px' }} onClick={(e) => { e.stopPropagation(); handleDelete(att.id); }}>
+                                                                        <Trash2 size={18} style={{ color: 'var(--color-danger)' }} />
+                                                                    </button>
+                                                                    <span className="tooltip">Delete Record</span>
+                                                                </div>
                                                                 <div style={{ marginLeft: '12px', opacity: 0.5 }}>
                                                                     {isExpanded ? <ChevronUp size={24} /> : <ChevronDown size={24} />}
                                                                 </div>

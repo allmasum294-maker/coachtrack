@@ -47,7 +47,7 @@ export default function StudyPlans() {
     }
 
     const filteredStudents = useMemo(() => {
-        let list = students.filter(s => s.status === 'enrolled');
+        let list = students;
         if (selectedBatchId) {
             list = list.filter(s => s.batchIds?.includes(selectedBatchId));
         }

@@ -43,7 +43,7 @@ export default function Attendance() {
                 studentService.getStudentsByTeacher(uid)
             ]);
             setBatches(activeBatches);
-            setStudents(allStudents.filter(s => s.status === 'enrolled'));
+            setStudents(allStudents || []);
         } catch (err) {
             console.error('Error loading students:', err);
             toast.error('Failed to load students');

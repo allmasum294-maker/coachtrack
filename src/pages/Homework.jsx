@@ -56,19 +56,29 @@ export default function Homework() {
                 console.error('Error loading batches:', batchErr);
             }
 
-            const [hwList, allStudents, logs, schoolData] = await Promise.all([
-                homeworkService.getHomeworkByTeacher(uid).catch(() => []),
-                studentService.getStudentsByTeacher(uid).catch(() => []),
-                lessonPlanService.getLessonsByTeacher(uid).catch(() => []),
-                schoolService.getSchools(uid).catch(() => [])
+            const [hwRes, stRes, lgRes, schRes] = await Promise.allSettled([
+                homeworkService.getHomeworkByTeacher(uid),
+                studentService.getStudentsByTeacher(uid),
+                lessonPlanService.getLessonsByTeacher(uid),
+                schoolService.getSchools(uid)
             ]);
 
-            setAssignments(hwList);
-            setStudents((allStudents || []).filter(s => s.status === 'enrolled'));
-            setSessionLogs(logs);
-            setSchools(schoolData);
+            if (hwRes.status === 'fulfilled') setAssignments(hwRes.value || []);
+            if (stRes.status === 'fulfilled') {
+                // Broaden filter to include all associate students
+                setStudents(stRes.value || []);
+            }
+            if (lgRes.status === 'fulfilled') setSessionLogs(lgRes.value || []);
+            if (schRes.status === 'fulfilled') setSchools(schRes.value || []);
+
+            // Check for failures and notify
+            const failures = [hwRes, stRes, lgRes, schRes].filter(r => r.status === 'rejected');
+            if (failures.length > 0) {
+                toast.error('Some data components failed to load. Analytics might be partial.');
+            }
         } catch (err) {
-            console.error('Error loading homework data:', err);
+            console.error('Global error loading homework data:', err);
+            toast.error('Critical error loading page data.');
         } finally {
             setLoading(false);
         }

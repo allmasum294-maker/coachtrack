@@ -45,6 +45,7 @@ const mainNavItems = [
 const managementNavItems = [
     { id: 'attendance', path: '/attendance', icon: UserCheck, label: 'Attendance' },
     { id: 'session-logs', path: '/session-logs', icon: BookOpen, label: 'Session Logs' },
+    { id: 'homework', path: '/homework', icon: BookCheck, label: 'Homework' },
     { id: 'exams', path: '/exams', icon: GraduationCap, label: 'Exams' }
 ];
 

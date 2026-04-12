@@ -84,7 +84,7 @@ export default function Schedule() {
             ]);
             
             setSchedules(allSchedules);
-            setStudents((studentResult || []).filter(s => s.status === 'enrolled'));
+            setStudents(studentResult || []);
             setExams(examResult);
             setSessionLogs(logResult);
             setHomeworks(hwResult);

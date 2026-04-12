@@ -50,7 +50,7 @@ export default function Exams() {
             ]);
             setExams(examsList);
             setBatches(activeBatches);
-            setStudents(allStudents.filter(s => s.status === 'enrolled'));
+            setStudents(allStudents || []);
         } catch (err) {
             console.error('Error:', err);
         } finally {

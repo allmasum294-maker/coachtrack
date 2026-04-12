@@ -52,23 +52,33 @@ export default function Analytics() {
     async function loadAllData() {
         try {
             const uid = userProfile.id;
-            const [activeBatches, allStudents, allAttendance, lessonRes, allExams, allSchedules] = await Promise.all([
-                batchService.getBatches(uid, false),
+            
+            // Batches independently
+            try {
+                const activeBatches = await batchService.getBatches(uid, false);
+                setBatches(activeBatches);
+            } catch (bErr) { console.error('Batches load error:', bErr); }
+
+            const [stRes, attRes, lesRes, exRes, schRes] = await Promise.allSettled([
                 studentService.getStudentsByTeacher(uid),
                 attendanceService.getAttendanceByTeacher(uid),
-                supabase.from('lessons').select('*').eq('teacher_id', uid),
+                supabase.from('session_logs').select('*').eq('teacher_id', uid),
                 examService.getExams(uid),
                 scheduleService.getSchedules(uid),
             ]);
-            setBatches(activeBatches);
-            setStudents(allStudents.filter(s => s.status === 'enrolled'));
-            setAttendance(allAttendance);
-            setLessons(lessonRes.data || []);
-            setExams(allExams);
-            setSchedules(allSchedules);
+
+            if (stRes.status === 'fulfilled') setStudents(stRes.value || []);
+            if (attRes.status === 'fulfilled') setAttendance(attRes.value || []);
+            if (lesRes.status === 'fulfilled') setLessons(lesRes.value?.data || []);
+            if (exRes.status === 'fulfilled') setExams(exRes.value || []);
+            if (schRes.status === 'fulfilled') setSchedules(schRes.value || []);
+
+            const failures = [stRes, attRes, lesRes, exRes, schRes].filter(r => r.status === 'rejected');
+            if (failures.length > 0) {
+                toast.error('Some analytics data failed to load.');
+            }
         } catch (err) {
             console.error('Error loading analytics data:', err);
-            toast.error('Failed to load dashboard data');
         } finally {
             setLoading(false);
         }

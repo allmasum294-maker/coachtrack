@@ -54,21 +54,35 @@ export default function StudentAnalytics() {
     async function loadData() {
         try {
             const uid = userProfile.id;
-            const [activeBatches, allStudents, allAttendance, allExams, allHomeworks] = await Promise.all([
-                batchService.getBatches(uid, true),
+            
+            // Fetch batches first independently
+            try {
+                const activeBatches = await batchService.getBatches(uid, true);
+                setBatches(activeBatches);
+            } catch (batchErr) {
+                console.error('Error loading batches:', batchErr);
+            }
+
+            const [allStudentsRes, allAttendanceRes, allExamsRes, allHomeworksRes] = await Promise.allSettled([
                 studentService.getStudentsByTeacher(uid),
                 attendanceService.getAttendanceByTeacher(uid),
                 examService.getExams(uid),
                 homeworkService.getHomeworkByTeacher(uid),
             ]);
 
-            setBatches(activeBatches);
-            setStudents(allStudents.filter(s => s.status === 'enrolled'));
-            setAttendance(allAttendance);
-            setExams(allExams);
-            setHomeworks(allHomeworks);
+            if (allStudentsRes.status === 'fulfilled') {
+                // Remove strict 'enrolled' filter to ensure all teacher students are visible
+                setStudents(allStudentsRes.value || []);
+            } else {
+                console.error('Error loading students:', allStudentsRes.reason);
+            }
+
+            if (allAttendanceRes.status === 'fulfilled') setAttendance(allAttendanceRes.value || []);
+            if (allExamsRes.status === 'fulfilled') setExams(allExamsRes.value || []);
+            if (allHomeworksRes.status === 'fulfilled') setHomeworks(allHomeworksRes.value || []);
+
         } catch (err) {
-            console.error('Error loading data:', err);
+            console.error('Global error loading data:', err);
         } finally {
             setLoading(false);
         }
@@ -274,7 +288,7 @@ export default function StudentAnalytics() {
         if (!selectedStudent) return { strengths: [], weaknesses: [] };
         const topicsPerformance = {};
         exams.forEach(e => {
-            if (!selectedStudent.batchIds?.includes(e.batchId)) return;
+            if (!selectedStudent.batchIds?.includes(e.batch_id)) return;
             const ed = safeToDate(e.date);
             if (!ed || !isInDateRange(ed)) return;
             const sScore = (e.scores || []).find(sc => sc.studentId === selectedStudent.id);

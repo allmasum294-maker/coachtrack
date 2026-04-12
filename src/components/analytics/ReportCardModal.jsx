@@ -77,8 +77,12 @@ export default function ReportCardModal({ student, batches, attendance, exams, h
                     
                     // Unified submission check
                     const sub = (hw.submissions || {})[student.id];
-                    if (sub && (sub.status === 'completed' || sub.status === 'late')) {
-                        completedHomework++;
+                    if (sub) {
+                        if (sub.status === 'completed') {
+                            completedHomework += 1;
+                        } else if (sub.status === 'late') {
+                            completedHomework += 0.7; // 70% credit for late homework
+                        }
                     }
                 }
             }

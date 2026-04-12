@@ -28,6 +28,7 @@ export default function SessionLog() {
         batchId: defaultBatchId,
         scheduleId: defaultScheduleId,
         date: format(new Date(), 'yyyy-MM-dd'),
+        classTitle: '',
         topicsCovered: '',
         notes: '',
         homeworkAssigned: ''
@@ -74,7 +75,7 @@ export default function SessionLog() {
         setEditingLog(null);
         setForm({
             batchId: filterBatch, scheduleId: '', date: format(new Date(), 'yyyy-MM-dd'),
-            topicsCovered: '', notes: '', homeworkAssigned: ''
+            classTitle: '', topicsCovered: '', notes: '', homeworkAssigned: ''
         });
         setShowModal(true);
     }
@@ -85,7 +86,8 @@ export default function SessionLog() {
             batchId: log.batch_id || '',
             scheduleId: log.schedule_id || '',
             date: log.date,
-            topicsCovered: log.topics_covered || '',
+            classTitle: log.classTitle || '',
+            topicsCovered: log.topicsCovered || '',
             notes: log.notes || '',
             homeworkAssigned: log.homework_assigned || ''
         });
@@ -109,6 +111,7 @@ export default function SessionLog() {
                 batchId: form.batchId,
                 batchName: batches.find((b) => b.id === form.batchId)?.name || '',
                 scheduleId: form.scheduleId || null,
+                classTitle: form.classTitle,
                 date: form.date,
                 topicsCovered: form.topicsCovered,
                 notes: form.notes,
@@ -361,10 +364,18 @@ export default function SessionLog() {
                     )}
 
                     <div className="form-group" style={{ marginBottom: 'var(--space-4)' }}>
+                        <label className="form-label">Class Title <span style={{ color: 'var(--color-danger)' }}>*</span></label>
+                        <div style={{ position: 'relative' }}>
+                            <FileEdit size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }} />
+                            <input className="form-input" style={{ paddingLeft: '40px' }} value={form.classTitle} onChange={(e) => setForm({ ...form, classTitle: e.target.value })} placeholder="e.g., Intro to Algebra" required />
+                        </div>
+                    </div>
+
+                    <div className="form-group" style={{ marginBottom: 'var(--space-4)' }}>
                         <label className="form-label">Topics Covered <span style={{ color: 'var(--color-danger)' }}>*</span></label>
                         <div style={{ position: 'relative' }}>
                             <BookOpen size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }} />
-                            <input className="form-input" style={{ paddingLeft: '40px' }} value={form.topicsCovered} onChange={(e) => setForm({ ...form, topicsCovered: e.target.value })} placeholder="What was taught today?" required />
+                            <input className="form-input" style={{ paddingLeft: '40px' }} value={form.topicsCovered} onChange={(e) => setForm({ ...form, topicsCovered: e.target.value })} placeholder="What specific sections were taught?" required />
                         </div>
                     </div>
 

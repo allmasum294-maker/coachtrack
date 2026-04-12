@@ -46,7 +46,7 @@ export default function Leaderboard() {
                 homeworkService.getHomeworkByTeacher(uid)
             ]);
             
-            setStudents(allStudents.filter(s => s.status === 'enrolled'));
+            setStudents(allStudents || []);
             setBatches(activeBatches);
             
             if (activeBatches.length > 0 && !selectedBatchId) {
@@ -127,8 +127,12 @@ export default function Leaderboard() {
                 if (isWithinInterval(d, filteredRange)) {
                     hwPossible++;
                     const sub = (hw.submissions || {})[student.id];
-                    if (sub && (sub.status === 'completed' || sub.status === 'late')) {
-                        hwDone++;
+                    if (sub) {
+                        if (sub.status === 'completed') {
+                            hwDone += 1;
+                        } else if (sub.status === 'late') {
+                            hwDone += 0.7; // 70% credit for late homework
+                        }
                     }
                 }
             });

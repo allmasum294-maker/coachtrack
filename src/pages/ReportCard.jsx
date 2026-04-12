@@ -39,7 +39,7 @@ export default function ReportCard() {
                 examService.getExams(uid),
                 homeworkService.getHomeworkByTeacher(uid),
             ]);
-            setStudents(allStudents.filter(s => s.status === 'enrolled'));
+            setStudents(allStudents || []);
             setBatches(activeBatches);
             setAttendance(allAttendance);
             setExams(allExams);
@@ -52,7 +52,7 @@ export default function ReportCard() {
     }
 
     const filteredStudents = useMemo(() => {
-        let list = students.filter(s => s.status === 'enrolled');
+        let list = students;
         if (selectedBatchId) {
             list = list.filter(s => s.batchIds?.includes(selectedBatchId));
         }

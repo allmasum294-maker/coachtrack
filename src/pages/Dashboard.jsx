@@ -38,7 +38,7 @@ export default function Dashboard() {
             const weekEnd = endOfWeek(now, { weekStartsOn: 0 });
 
             const allStudents = await studentService.getStudentsByTeacher(uid);
-            const studentIds = allStudents.filter(s => s.status === 'enrolled').map(s => s.id);
+            const studentIds = (allStudents || []).map(s => s.id);
             const studentsMap = {};
             allStudents.forEach(s => { studentsMap[s.id] = s; });
 

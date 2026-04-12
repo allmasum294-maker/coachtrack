@@ -43,7 +43,7 @@ export default function StudentTimeline() {
                 supabase.from('session_logs').select('*').eq('teacher_id', uid),
                 homeworkService.getHomeworkByTeacher(uid),
             ]);
-            setStudents(allStudents.filter(s => s.status === 'enrolled'));
+            setStudents(allStudents || []);
             setBatches(activeBatches);
             setAttendance(allAttendance);
             setExams(allExams);
@@ -69,7 +69,7 @@ export default function StudentTimeline() {
     }
 
     const filteredStudents = useMemo(() => {
-        let list = students.filter(s => s.status === 'enrolled');
+        let list = students;
         if (filterBatch) {
             list = list.filter(s => s.batchIds?.includes(filterBatch));
         }

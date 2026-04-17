@@ -13,6 +13,7 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import { notificationService } from '../services/notificationService';
+import { scheduleService } from '../services/scheduleService';
 import { 
     Plus, X, Calendar as CalIcon, Clock, AlertCircle, 
     RefreshCw, Info, CheckCircle2, UserCheck, CalendarDays, 

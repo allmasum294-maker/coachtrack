@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient';
+import { withCache, invalidateCache } from '../utils/serviceCache';
 
 /**
  * Fetch all enrolled students for a given batch.
@@ -67,6 +68,10 @@ export async function setStudentStatus(studentId, batchId, status) {
     });
 
   if (error) throw error;
+  
+  // Invalidate list cache on change
+  const uid = (await supabase.auth.getUser()).data.user?.id;
+  if (uid) invalidateCache(`students_teacher_${uid}`);
 }
 
 /**
@@ -98,25 +103,27 @@ export async function getStudentsBySchool(batchId, schoolName) {
  * Fetch all students for a teacher with their batch associations.
  */
 export async function getStudentsByTeacher(teacherId) {
-  const { data, error } = await supabase
-    .from('students')
-    .select(`
-      *,
-      school_id,
-      schools (name),
-      student_batches (
-        batch_id
-      )
-    `)
-    .eq('teacher_id', teacherId);
+  return withCache(`students_teacher_${teacherId}`, async () => {
+    const { data, error } = await supabase
+      .from('students')
+      .select(`
+        *,
+        school_id,
+        schools (name),
+        student_batches (
+          batch_id
+        )
+      `)
+      .eq('teacher_id', teacherId);
 
-  if (error) throw error;
-  
-  // Transform to match the UI expectation (batchIds array)
-  return data.map(s => ({
-    ...s,
-    batchIds: s.student_batches?.map(sb => sb.batch_id) || []
-  }));
+    if (error) throw error;
+    
+    // Transform to match the UI expectation (batchIds array)
+    return data.map(s => ({
+      ...s,
+      batchIds: s.student_batches?.map(sb => sb.batch_id) || []
+    }));
+  });
 }
 
 /**
@@ -130,6 +137,9 @@ export async function enrollStudentInBatch(studentId, batchId) {
       batch_id: batchId
     });
   if (error) throw error;
+  
+  const uid = (await supabase.auth.getUser()).data.user?.id;
+  if (uid) invalidateCache(`students_teacher_${uid}`);
 }
 
 /**
@@ -142,6 +152,9 @@ export async function unenrollStudentFromBatch(studentId, batchId) {
     .eq('student_id', studentId)
     .eq('batch_id', batchId);
   if (error) throw error;
+  
+  const uid = (await supabase.auth.getUser()).data.user?.id;
+  if (uid) invalidateCache(`students_teacher_${uid}`);
 }
 
 export const studentService = {

@@ -68,10 +68,21 @@ export function AuthProvider({ children }) {
     async function fetchUserProfile(user) {
         if (!user) {
             setUserProfile(null);
+            sessionStorage.removeItem('ct_profile');
             return;
         }
 
-        console.log('[Auth Profile] Fetching for user:', user.id);
+        // Try to load from cache first for instant UI
+        const cached = sessionStorage.getItem('ct_profile');
+        if (cached) {
+            try {
+                setUserProfile(JSON.parse(cached));
+            } catch (e) {
+                console.warn('[Snapshot] Cache corrupt');
+            }
+        }
+
+        console.log('[Auth Profile] Syncing for user:', user.id);
         
         const queryPromise = supabase
             .from('users')
@@ -80,16 +91,14 @@ export function AuthProvider({ children }) {
             .single();
 
         const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Profile query timed out')), 5000)
+            setTimeout(() => reject(new Error('Profile query timed out')), 8000)
         );
 
         try {
             const { data, error } = await Promise.race([queryPromise, timeoutPromise]);
 
             if (error) {
-                console.error('[Auth Profile] Error:', error.message);
                 if (error.code === 'PGRST116') { // No profile found
-                    console.log('[Auth Profile] No profile, attempting to create...');
                     const profileData = {
                         id: user.id,
                         email: user.email,
@@ -101,37 +110,37 @@ export function AuthProvider({ children }) {
                     
                     const { error: insertError } = await supabase.from('users').upsert(profileData);
                     if (insertError) throw insertError;
+                    
                     setUserProfile(profileData);
+                    sessionStorage.setItem('ct_profile', JSON.stringify(profileData));
                 } else {
                     throw error;
                 }
             } else {
-                console.log('[Auth Profile] Profile loaded successfully');
                 setUserProfile(data);
+                sessionStorage.setItem('ct_profile', JSON.stringify(data));
             }
         } catch (err) {
-            console.error('[Auth Profile] Fallback triggered:', err.message);
-            setUserProfile({
-                id: user.id,
-                email: user.email,
-                display_name: user.user_metadata?.display_name || user.user_metadata?.full_name || 'Teacher',
-                role: 'tutor',
-                is_approved: true
-            });
+            console.error('[Auth Profile] Sync fallback:', err.message);
+            
+            // If we don't even have a cached profile, set a basic one from metadata
+            if (!sessionStorage.getItem('ct_profile')) {
+                const basicProfile = {
+                    id: user.id,
+                    email: user.email,
+                    display_name: user.user_metadata?.display_name || user.user_metadata?.full_name || 'Teacher',
+                    role: 'tutor',
+                    is_approved: true
+                };
+                setUserProfile(basicProfile);
+                sessionStorage.setItem('ct_profile', JSON.stringify(basicProfile));
+            }
         }
     }
 
     useEffect(() => {
         let isMounted = true;
         
-        // Safety timeout to prevent infinite spinner
-        const safetyTimeout = setTimeout(() => {
-            if (isMounted) {
-                console.warn('Auth initialization taking too long, forcing loading to false');
-                setLoading(false);
-            }
-        }, 3000);
-
         async function initAuth() {
             try {
                 // 1. Get initial session
@@ -140,17 +149,17 @@ export function AuthProvider({ children }) {
                 
                 if (isMounted) {
                     setCurrentUser(user);
+                    // Set loading false immediately to allow app rendering
+                    setLoading(false);
+                    
                     if (user) {
-                        await fetchUserProfile(user);
+                        // Fetch/Sync profile in background
+                        fetchUserProfile(user);
                     }
                 }
             } catch (err) {
                 console.error('Auth initialization error:', err);
-            } finally {
-                if (isMounted) {
-                    setLoading(false);
-                    clearTimeout(safetyTimeout);
-                }
+                if (isMounted) setLoading(false);
             }
         }
 
@@ -165,9 +174,10 @@ export function AuthProvider({ children }) {
                 setCurrentUser(user);
                 
                 if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
-                    await fetchUserProfile(user);
+                    fetchUserProfile(user);
                 } else if (event === 'SIGNED_OUT') {
                     setUserProfile(null);
+                    sessionStorage.removeItem('ct_profile');
                 }
                 
                 setLoading(false);
@@ -177,7 +187,6 @@ export function AuthProvider({ children }) {
         return () => {
             isMounted = false;
             subscription.unsubscribe();
-            clearTimeout(safetyTimeout);
         };
     }, []);
 

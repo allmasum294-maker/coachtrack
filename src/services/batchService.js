@@ -1,30 +1,36 @@
 import { supabase } from './supabaseClient';
+import { withCache, invalidateCache } from '../utils/serviceCache';
 
 /**
  * Fetch all batches for a teacher.
  * If includeClosed is false (default), only fetches active batches.
  */
 export async function getBatches(teacherId, includeClosed = false) {
-  let query = supabase
-    .from('batches')
-    .select('*')
-    .eq('teacher_id', teacherId);
+  // Use a cache key that accounts for the teacher and visibility filter
+  const cacheKey = `batches_teacher_${teacherId}_${includeClosed}`;
   
-  if (!includeClosed) {
-    query = query.eq('is_closed', false);
-  }
-  
-  const { data, error } = await query;
-  if (error) throw error;
+  return withCache(cacheKey, async () => {
+    let query = supabase
+      .from('batches')
+      .select('*')
+      .eq('teacher_id', teacherId);
+    
+    if (!includeClosed) {
+      query = query.eq('is_closed', false);
+    }
+    
+    const { data, error } = await query;
+    if (error) throw error;
 
-  if (!data) return [];
+    if (!data) return [];
 
-  return data.map(batch => ({
-    ...batch,
-    isClosed: batch.is_closed || false,
-    closedAt: batch.closed_at || null,
-    targetClasses: batch.target_classes || []
-  }));
+    return data.map(batch => ({
+      ...batch,
+      isClosed: batch.is_closed || false,
+      closedAt: batch.closed_at || null,
+      targetClasses: batch.target_classes || []
+    }));
+  });
 }
 
 /**
@@ -40,6 +46,13 @@ export async function closeBatch(batchId) {
     .eq('id', batchId);
 
   if (error) throw error;
+  
+  // Invalidate all variants of batch cache for this teacher
+  const uid = (await supabase.auth.getUser()).data.user?.id;
+  if (uid) {
+    invalidateCache(`batches_teacher_${uid}_true`);
+    invalidateCache(`batches_teacher_${uid}_false`);
+  }
 }
 
 /**
@@ -55,6 +68,12 @@ export async function reactivateBatch(batchId) {
     .eq('id', batchId);
 
   if (error) throw error;
+  
+  const uid = (await supabase.auth.getUser()).data.user?.id;
+  if (uid) {
+    invalidateCache(`batches_teacher_${uid}_true`);
+    invalidateCache(`batches_teacher_${uid}_false`);
+  }
 }
 
 /**
@@ -76,6 +95,10 @@ export async function transitionStudentsToBatch(studentIds, fromBatchId, toBatch
     .eq('batch_id', fromBatchId)
     .in('student_id', studentIds);
   if (err2) throw err2;
+  
+  // Invalidate student caches as their batch links have changed
+  const uid = (await supabase.auth.getUser()).data.user?.id;
+  if (uid) invalidateCache(`students_teacher_${uid}`);
 }
 
 export const batchService = {

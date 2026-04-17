@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { supabase } from '../services/supabaseClient';
 import { lessonPlanService } from '../services/lessonPlanService';
 import { 
     BookOpen, Plus, Edit2, Trash2, ChevronRight, ChevronDown, 

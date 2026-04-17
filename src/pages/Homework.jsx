@@ -72,8 +72,10 @@ export default function Homework() {
         } finally {
             setLoading(false);
         }
-        // Consolidated Assignments (Grouped by group_id)
-        const groupedAssignments = useMemo(() => {
+    }
+
+    // Consolidated Assignments (Grouped by group_id)
+    const groupedAssignments = useMemo(() => {
             const groups = {};
 
             assignments.forEach(hw => {
@@ -570,6 +572,5 @@ export default function Homework() {
                     )}
                 </Modal>
             </div>
-        );
-    }
+    );
 }

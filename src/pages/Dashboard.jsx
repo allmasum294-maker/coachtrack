@@ -42,7 +42,7 @@ export default function Dashboard() {
             const studentsMap = {};
             allStudents.forEach(s => { studentsMap[s.id] = s; });
 
-            const activeBatches = await batchService.getBatches(uid, true);
+            const activeBatches = await batchService.getBatches(uid);
             const activeBatchIds = activeBatches.map(b => b.id);
             const activeBatchMap = {};
             activeBatches.forEach(b => { activeBatchMap[b.id] = b; });

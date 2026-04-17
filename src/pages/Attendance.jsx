@@ -39,7 +39,7 @@ export default function Attendance() {
         try {
             const uid = userProfile.id;
             const [activeBatches, allStudents] = await Promise.all([
-                batchService.getBatches(uid, true),
+                batchService.getBatches(uid),
                 studentService.getStudentsByTeacher(uid)
             ]);
             setBatches(activeBatches);

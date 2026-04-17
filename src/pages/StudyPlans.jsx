@@ -32,7 +32,7 @@ export default function StudyPlans() {
             const uid = userProfile.id;
             const [allStudents, activeBatches, examsData] = await Promise.all([
                 studentService.getStudentsByTeacher(uid),
-                batchService.getBatches(uid, true),
+                batchService.getBatches(uid),
                 supabase.from('exams').select('*').eq('teacher_id', uid)
             ]);
             

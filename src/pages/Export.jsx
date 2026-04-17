@@ -37,7 +37,7 @@ export default function Export() {
     async function loadBatches() {
         try {
             // Only export data for active batches by default
-            const activeBatches = await batchService.getBatches(userProfile.id, true);
+            const activeBatches = await batchService.getBatches(userProfile.id);
             setBatches(activeBatches);
         } catch (err) { 
             console.error('Error loading batches:', err); 

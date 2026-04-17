@@ -38,7 +38,7 @@ export default function Lessons() {
             // Parallel fetch
             const [data, batchList] = await Promise.all([
                 lessonPlanService.getFullHierarchy(uid),
-                supabase.from('batches').select('*').eq('teacher_id', uid).eq('status', 'active')
+                supabase.from('batches').select('*').eq('teacher_id', uid).eq('is_closed', false)
             ]);
 
             setRawItems(data || []);

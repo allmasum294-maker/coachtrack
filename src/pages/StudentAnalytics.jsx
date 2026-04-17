@@ -57,7 +57,7 @@ export default function StudentAnalytics() {
             
             // Fetch batches first independently
             try {
-                const activeBatches = await batchService.getBatches(uid, true);
+                const activeBatches = await batchService.getBatches(uid);
                 setBatches(activeBatches);
             } catch (batchErr) {
                 console.error('Error loading batches:', batchErr);

@@ -39,7 +39,7 @@ export default function Leaderboard() {
         try {
             const uid = userProfile.id;
             const [activeBatches, allStudents, allAttendance, allExams, allHw] = await Promise.all([
-                batchService.getBatches(uid, true),
+                batchService.getBatches(uid),
                 studentService.getStudentsByTeacher(uid),
                 attendanceService.getAttendanceByTeacher(uid),
                 examService.getExams(uid),

@@ -73,7 +73,7 @@ export default function Schedule() {
             
             // Fetch batches first and separately to ensure UI stability
             try {
-                const activeBatches = await batchService.getBatches(uid, true);
+                const activeBatches = await batchService.getBatches(uid);
                 setBatches(activeBatches);
             } catch (batchErr) {
                 console.error('Error loading batches:', batchErr);

@@ -46,7 +46,7 @@ export default function SessionLog() {
             const uid = userProfile.id;
             const [logList, activeBatches, schedResult, hierarchyResult, hwResult] = await Promise.all([
                 lessonPlanService.getLessonsByTeacher(uid),
-                batchService.getBatches(uid, true),
+                batchService.getBatches(uid),
                 supabase.from('schedules').select('*').eq('teacher_id', uid),
                 lessonPlanService.getFullHierarchy(uid),
                 homeworkService.getHomeworkByTeacher(uid)
@@ -164,6 +164,7 @@ export default function SessionLog() {
                 if (form.homeworkAssigned && form.homeworkAssigned.trim()) {
                     const dueDate = addDays(new Date(form.date), 3);
                     await homeworkService.saveHomework({
+                        group_id: crypto.randomUUID(),
                         title: form.homeworkAssigned.substring(0, 80),
                         description: form.homeworkAssigned,
                         batch_id: form.batchId,

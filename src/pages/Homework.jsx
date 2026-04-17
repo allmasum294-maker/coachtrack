@@ -12,10 +12,10 @@ import { schoolService } from '../services/schoolService';
 import Modal from '../components/Modal';
 
 const STATUSES = [
-    { value: 'completed', label: '✅ Completed', color: 'var(--color-success)' },
-    { value: 'late', label: '⏰ Late', color: 'var(--color-warning)' },
-    { value: 'partial', label: '½ Partial', color: 'var(--color-primary)' },
-    { value: 'not_submitted', label: '❌ Not Submitted', color: 'var(--color-danger)' },
+    { value: 'completed', label: 'Completed', icon: <CheckSquare size={16} />, color: 'var(--color-success)' },
+    { value: 'late', label: 'Late', icon: <Clock size={16} />, color: 'var(--color-warning)' },
+    { value: 'partial', label: 'Partial', icon: <Layers size={16} />, color: 'var(--color-primary)' },
+    { value: 'not_submitted', label: 'Not Submitted', icon: <Square size={16} />, color: 'var(--color-danger)' },
 ];
 
 export default function Homework() {
@@ -27,9 +27,9 @@ export default function Homework() {
     const [sessionLogs, setSessionLogs] = useState([]);
     const [loading, setLoading] = useState(true);
     const [filterBatch, setFilterBatch] = useState('');
-    const [filterStatus, setFilterStatus] = useState('all'); // all, pending, overdue, completed
+    const [filterStatus, setFilterStatus] = useState('pending'); // all, pending, overdue, completed
     const [currentPage, setCurrentPage] = useState(1);
-    const pageSize = 10;
+    const pageSize = 12; // Adjusted for grid
 
     const [showModal, setShowModal] = useState(false);
     const [editingAssignment, setEditingAssignment] = useState(null);
@@ -54,7 +54,7 @@ export default function Homework() {
 
             const [hwRes, btRes, stRes, lgRes, schRes] = await Promise.allSettled([
                 homeworkService.getHomeworkByTeacher(uid),
-                batchService.getBatches(uid, true),
+                batchService.getBatches(uid),
                 studentService.getStudentsByTeacher(uid),
                 lessonPlanService.getLessonsByTeacher(uid),
                 schoolService.getSchools(uid)
@@ -101,26 +101,27 @@ export default function Homework() {
                 Object.assign(groups[gid].allSubmissions, hw.submissions || {});
             });
 
-            const list = Object.values(groups).map(g => {
-                // Calculate aggregate stats
-                const assignedStudents = students.filter(s => {
-                    const inBatch = (s.batchIds || []).includes(g.batchId);
-                    const targetedSchools = g.variants.map(v => v.schoolId).filter(Boolean);
-                    const matchesSchool = targetedSchools.length === 0 || targetedSchools.includes(s.school_id);
-                    return inBatch && matchesSchool;
-                });
-
-                let completed = 0, late = 0, partial = 0, notSubmitted = 0;
-                assignedStudents.forEach(s => {
-                    const sub = g.allSubmissions[s.id];
-                    if (!sub || !sub.status || sub.status === 'not_submitted') notSubmitted++;
-                    else if (sub.status === 'completed') completed++;
-                    else if (sub.status === 'late') late++;
-                    else if (sub.status === 'partial') partial++;
-                });
-
-                const total = assignedStudents.length;
-                const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
+                const list = Object.values(groups).map(g => {
+                    // DYNAMIC STUDENT LISTING (Isolation logic)
+                    const targetedSchoolIds = g.variants.map(v => v.schoolId).filter(Boolean);
+                    
+                    const assignedStudents = students.filter(s => {
+                        const inBatch = (s.batchIds || []).includes(g.batchId);
+                        const matchesSchool = targetedSchoolIds.length === 0 || targetedSchoolIds.includes(s.school_id);
+                        return inBatch && matchesSchool;
+                    });
+    
+                    let completed = 0, late = 0, partial = 0, notSubmitted = 0;
+                    assignedStudents.forEach(s => {
+                        const sub = g.allSubmissions[s.id];
+                        if (!sub || !sub.status || sub.status === 'not_submitted') notSubmitted++;
+                        else if (sub.status === 'completed') completed++;
+                        else if (sub.status === 'late') late++;
+                        else if (sub.status === 'partial') partial++;
+                    });
+    
+                    const total = assignedStudents.length;
+                    const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
 
                 // Determine Status
                 const d = new Date(g.dueDate);
@@ -293,60 +294,92 @@ export default function Homework() {
                 </div>
 
                 {paginatedAssignments.length === 0 ? (
-                    <div className="glass-card" style={{ padding: '80px', textAlign: 'center' }}>
-                        <BookOpen size={48} style={{ opacity: 0.1, marginBottom: '20px' }} />
-                        <h3>No assignments found</h3>
-                        <p className="text-muted">Try adjusting your filters or create a new assignment.</p>
+                    <div className="glass-card animate-scale-up" style={{ padding: '100px 20px', textAlign: 'center', background: 'rgba(255,255,255,0.01)' }}>
+                        <div style={{ position: 'relative', display: 'inline-block', marginBottom: '24px' }}>
+                            <BookOpen size={64} style={{ opacity: 0.1 }} />
+                            <Sparkles size={24} style={{ position: 'absolute', top: -10, right: -10, color: 'var(--color-accent)', opacity: 0.5 }} />
+                        </div>
+                        <h3 style={{ fontSize: '24px', fontWeight: 700, marginBottom: '8px' }}>
+                            {filterStatus === 'pending' ? 'All Clear!' : 'No Assignments Found'}
+                        </h3>
+                        <p className="text-muted" style={{ maxWidth: '400px', margin: '0 auto' }}>
+                            {filterStatus === 'pending' 
+                                ? "Great job! There are no pending assignments to track right now. Relax or create a new one." 
+                                : "Adjust your filters or start by creating a new homework assignment for your students."}
+                        </p>
                     </div>
                 ) : (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))', gap: '24px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))', gap: '30px' }}>
                         {paginatedAssignments.map(group => {
                             const isOverdue = group.status === 'overdue';
                             return (
-                                <div key={group.id} className={`glass-card homework-card ${group.isFinished ? 'finished' : ''}`} style={{ borderColor: isOverdue ? 'rgba(239, 68, 68, 0.3)' : '' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
-                                        <div style={{ display: 'flex', gap: '8px' }}>
-                                            {group.isFinished ? (
-                                                <span className="badge badge-success">COMPLETED</span>
-                                            ) : isOverdue ? (
-                                                <span className="badge badge-danger heartbeat">OVERDUE</span>
-                                            ) : (
-                                                <span className="badge badge-warning">DUE {format(new Date(group.dueDate), 'MMM d')}</span>
-                                            )}
+                                <div key={group.id} className={`glass-card homework-card-v2 ${group.isFinished ? 'finished' : ''}`} style={{ 
+                                    padding: '28px',
+                                    borderLeft: `4px solid ${isOverdue ? 'var(--color-danger)' : group.isFinished ? 'var(--color-success)' : 'var(--color-accent)'}`,
+                                    position: 'relative',
+                                    overflow: 'hidden'
+                                }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px', alignItems: 'flex-start' }}>
+                                        <div>
+                                            <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                                                {group.isFinished ? (
+                                                    <span className="badge badge-success" style={{ padding: '4px 12px', borderRadius: '20px' }}>COMPLETED</span>
+                                                ) : isOverdue ? (
+                                                    <span className="badge badge-danger heartbeat" style={{ padding: '4px 12px', borderRadius: '20px' }}>OVERDUE</span>
+                                                ) : (
+                                                    <span className="badge badge-warning" style={{ padding: '4px 12px', borderRadius: '20px' }}>DUE {format(new Date(group.dueDate), 'MMM d')}</span>
+                                                )}
+                                            </div>
+                                            <h3 style={{ fontSize: '22px', fontWeight: 800, letterSpacing: '-0.02em', marginBottom: '4px' }}>{group.title}</h3>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--color-accent)', fontWeight: 700 }}>
+                                                <Users size={12} />
+                                                {getBatchName(group.batchId)}
+                                            </div>
                                         </div>
-                                        <div style={{ display: 'flex', gap: '4px' }}>
-                                            <button className="btn-icon-sm" onClick={() => toggleFinished(group)} title={group.isFinished ? "Unmark" : "Mark as Finished"}>
-                                                <CheckSquare size={16} color={group.isFinished ? 'var(--color-success)' : 'var(--color-text-muted)'} />
+                                        <div style={{ display: 'flex', gap: '6px' }}>
+                                            <button className="btn-icon-v2" onClick={() => toggleFinished(group)} title={group.isFinished ? "Unmark" : "Mark as Finished"}>
+                                                <CheckSquare size={18} color={group.isFinished ? 'var(--color-success)' : 'rgba(255,255,255,0.2)'} />
                                             </button>
-                                            <button className="btn-icon-sm" onClick={() => openEdit(group)}><Edit2 size={14} /></button>
-                                            <button className="btn-icon-sm delete" onClick={() => handleDelete(group.id)}><Trash2 size={14} /></button>
+                                            <button className="btn-icon-v2" onClick={() => openEdit(group)}><Edit2 size={16} /></button>
+                                            <button className="btn-icon-v2 delete" onClick={() => handleDelete(group.id)}><Trash2 size={16} /></button>
                                         </div>
                                     </div>
 
-                                    <h3 style={{ fontSize: '20px', marginBottom: '4px' }}>{group.title}</h3>
-                                    <div style={{ fontSize: '12px', color: 'var(--color-accent)', marginBottom: '16px', fontWeight: 700 }}>{getBatchName(group.batchId)}</div>
-
-                                    {/* Variants List */}
-                                    <div style={{ background: 'rgba(255,255,255,0.02)', borderRadius: '12px', padding: '12px', marginBottom: '20px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                    {/* Task Variants (Grouped) */}
+                                    <div className="homework-variants-list" style={{ marginBottom: '24px' }}>
                                         {group.variants.map((v, i) => (
-                                            <div key={v.id} style={{ marginBottom: i < group.variants.length - 1 ? '12px' : 0, paddingBottom: i < group.variants.length - 1 ? '12px' : 0, borderBottom: i < group.variants.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
-                                                <div style={{ fontSize: '10px', fontWeight: 900, color: 'var(--color-text-muted)', marginBottom: '4px' }}>{getSchoolName(v.schoolId).toUpperCase()}</div>
-                                                <div style={{ fontSize: '13px', lineHeight: 1.4 }}>{v.description}</div>
+                                            <div key={v.id} style={{ 
+                                                padding: '12px 16px', 
+                                                background: 'rgba(255,255,255,0.02)', 
+                                                borderRadius: '12px',
+                                                marginBottom: '8px',
+                                                border: '1px solid rgba(255,255,255,0.03)'
+                                            }}>
+                                                <div style={{ fontSize: '10px', fontWeight: 900, color: 'var(--color-accent)', marginBottom: '6px', opacity: 0.8 }}>
+                                                    {getSchoolName(v.schoolId).toUpperCase()}
+                                                </div>
+                                                <div style={{ fontSize: '13px', lineHeight: 1.5, color: 'rgba(255,255,255,0.8)' }}>{v.description}</div>
                                             </div>
                                         ))}
                                     </div>
 
-                                    {/* Progress */}
-                                    <div style={{ marginTop: 'auto' }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontWeight: 800, marginBottom: '6px' }}>
-                                            <span style={{ color: 'var(--color-text-muted)' }}>SESSION PROGRESS</span>
-                                            <span>{group.stats.completed}/{group.stats.total} STUDENTS</span>
+                                    {/* Progress Footer */}
+                                    <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '20px', marginTop: 'auto' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                                            <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--color-text-muted)' }}>TEAM PROGRESS</div>
+                                            <div style={{ fontSize: '13px', fontWeight: 900 }}>{group.stats.progress}%</div>
                                         </div>
-                                        <div className="progress-mini" style={{ height: '6px', background: 'rgba(255,255,255,0.05)', borderRadius: '3px', overflow: 'hidden', marginBottom: '16px' }}>
-                                            <div style={{ width: `${group.stats.progress}%`, height: '100%', background: group.isFinished ? 'var(--color-success)' : 'var(--color-accent)', boxShadow: '0 0 10px rgba(0,0,0,0.5)' }} />
+                                        <div className="progress-mini" style={{ height: '8px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', overflow: 'hidden', marginBottom: '20px' }}>
+                                            <div style={{ 
+                                                width: `${group.stats.progress}%`, 
+                                                height: '100%', 
+                                                background: group.isFinished ? 'var(--color-success)' : 'linear-gradient(90deg, var(--color-accent), var(--color-primary))',
+                                                boxShadow: '0 0 15px rgba(20, 184, 166, 0.3)',
+                                                transition: 'width 0.8s cubic-bezier(0.4, 0, 0.2, 1)'
+                                            }} />
                                         </div>
-                                        <button className="btn btn-secondary btn-comfort" style={{ width: '100%' }} onClick={() => setTrackingAssignment(group)}>
-                                            Check Student Progress
+                                        <button className="btn btn-primary-glass" style={{ width: '100%', borderRadius: '12px' }} onClick={() => setTrackingAssignment(group)}>
+                                            Review Submissions
                                         </button>
                                     </div>
                                 </div>
@@ -499,7 +532,7 @@ export default function Homework() {
                     </form>
                 </Modal>
 
-                {/* Tracking Modal */}
+                {/* Tracking Modal (V2 - Icons Only) */}
                 <Modal
                     isOpen={!!trackingAssignment}
                     onClose={() => setTrackingAssignment(null)}
@@ -508,44 +541,58 @@ export default function Homework() {
                 >
                     {trackingAssignment && (
                         <div style={{ padding: '4px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: 'var(--space-6)', padding: '12px', background: 'var(--color-bg-elevated)', borderRadius: '12px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: 'var(--space-6)', padding: '12px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                                 <div style={{ width: '40px', height: '40px', background: 'var(--color-accent-soft)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-accent)' }}>
                                     <Users size={20} />
                                 </div>
-                                <div>
+                                <div style={{ flex: 1 }}>
                                     <div style={{ fontSize: '14px', fontWeight: 700 }}>{getBatchName(trackingAssignment.batchId)}</div>
-                                    <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>Status tracking for all students in this batch</div>
+                                    <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)', display: 'flex', justifyContent: 'space-between' }}>
+                                        <span>Targeting specific schools in this session</span>
+                                        <span style={{ fontWeight: 800, color: 'var(--color-accent)' }}>{trackingAssignment.stats.completed}/{trackingAssignment.stats.total} SUBMITTED</span>
+                                    </div>
                                 </div>
                             </div>
 
-                            <div style={{ maxHeight: '450px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', paddingRight: '4px' }}>
+                            <div style={{ maxHeight: '450px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px', paddingRight: '4px' }}>
                                 {(() => {
-                                    const assignedStudents = students.filter(s => (s.batchIds || []).includes(trackingAssignment.batchId));
+                                    // DYNAMIC FILTERING: Only show students from schools targeted in this group/session
+                                    const targetedSchoolIds = trackingAssignment.variants.map(v => v.schoolId).filter(Boolean);
+                                    
+                                    const assignedStudents = students.filter(s => {
+                                        const inBatch = (s.batchIds || []).includes(trackingAssignment.batchId);
+                                        const matchesSchool = targetedSchoolIds.length === 0 || targetedSchoolIds.includes(s.school_id);
+                                        return inBatch && matchesSchool;
+                                    });
 
                                     if (assignedStudents.length === 0) {
                                         return (
                                             <div style={{ padding: '80px', textAlign: 'center' }}>
                                                 <Info size={32} style={{ color: 'var(--color-text-muted)', marginBottom: '8px', opacity: 0.3 }} />
-                                                <p style={{ color: 'var(--color-text-muted)' }}>No enrolled students in this batch.</p>
+                                                <p style={{ color: 'var(--color-text-muted)' }}>No students from the targeted schools found in this batch.</p>
                                             </div>
                                         );
                                     }
 
                                     return assignedStudents.map(student => {
-                                        // Find which variant applies to this student
-                                        const variant = trackingAssignment.variants.find(v => !v.schoolId || v.schoolId === student.school_id) || trackingAssignment.variants[0];
+                                        const variant = trackingAssignment.variants.find(v => v.schoolId === student.school_id) || trackingAssignment.variants[0];
                                         const sub = trackingAssignment.allSubmissions[student.id];
                                         const currentStatus = sub?.status || 'not_submitted';
 
                                         return (
-                                            <div key={student.id} className="glass-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px' }}>
+                                            <div key={student.id} className="submission-row" style={{ 
+                                                display: 'flex', 
+                                                alignItems: 'center', 
+                                                justifyContent: 'space-between', 
+                                                padding: '10px 14px',
+                                                background: 'rgba(255,255,255,0.01)',
+                                                borderRadius: '10px',
+                                                border: '1px solid rgba(255,255,255,0.02)'
+                                            }}>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                                    <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'linear-gradient(135deg, var(--color-bg-elevated), var(--color-bg-secondary))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, border: '1px solid rgba(255,255,255,0.05)', color: 'var(--color-accent)' }}>
-                                                        {student.name.charAt(0).toUpperCase()}
-                                                    </div>
-                                                    <div>
-                                                        <div style={{ fontWeight: 600, fontSize: '14px' }}>{student.name}</div>
-                                                        <div style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>{getSchoolName(student.school_id)}</div>
+                                                    <div style={{ fontSize: '14px', fontWeight: 600 }}>{student.name}</div>
+                                                    <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: '4px' }}>
+                                                        {getSchoolName(student.school_id)}
                                                     </div>
                                                 </div>
                                                 <div style={{ display: 'flex', gap: '4px' }}>
@@ -554,20 +601,23 @@ export default function Homework() {
                                                             key={st.value}
                                                             type="button"
                                                             onClick={() => setStudentSubmissionStatus(student.id, variant.id, st.value)}
-                                                            className={`btn-status-chip ${currentStatus === st.value ? 'active' : ''}`}
+                                                            className={`status-icon-btn ${currentStatus === st.value ? 'active' : ''}`}
+                                                            title={st.label}
                                                             style={{
-                                                                padding: '6px 10px',
-                                                                fontSize: '11px',
+                                                                width: '32px',
+                                                                height: '32px',
                                                                 borderRadius: '8px',
-                                                                background: currentStatus === st.value ? `${st.color}20` : 'rgba(255,255,255,0.03)',
-                                                                color: currentStatus === st.value ? st.color : 'var(--color-text-muted)',
-                                                                border: `1px solid ${currentStatus === st.value ? `${st.color}40` : 'rgba(255,255,255,0.05)'}`,
-                                                                fontWeight: currentStatus === st.value ? 700 : 500,
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'center',
+                                                                background: currentStatus === st.value ? `${st.color}20` : 'transparent',
+                                                                color: currentStatus === st.value ? st.color : 'rgba(255,255,255,0.1)',
+                                                                border: `1px solid ${currentStatus === st.value ? `${st.color}40` : 'transparent'}`,
                                                                 cursor: 'pointer',
-                                                                transition: 'all 0.2s ease'
+                                                                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
                                                             }}
                                                         >
-                                                            {st.label.split(' ')[1] || st.label}
+                                                            {st.icon}
                                                         </button>
                                                     ))}
                                                 </div>
@@ -578,7 +628,7 @@ export default function Homework() {
                             </div>
 
                             <button className="btn btn-primary" style={{ width: '100%', marginTop: 'var(--space-6)', borderRadius: '12px', boxShadow: 'var(--shadow-primary)' }} onClick={() => setTrackingAssignment(null)}>
-                                Done
+                                Save & Finish
                             </button>
                         </div>
                     )}

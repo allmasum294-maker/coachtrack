@@ -37,7 +37,7 @@ export default function StudentTimeline() {
             const uid = userProfile.id;
             const [allStudents, activeBatches, allAttendance, allExams, sessionRes, allHomeworks] = await Promise.all([
                 studentService.getStudentsByTeacher(uid),
-                batchService.getBatches(uid, true),
+                batchService.getBatches(uid),
                 attendanceService.getAttendanceByTeacher(uid),
                 examService.getExams(uid),
                 supabase.from('session_logs').select('*').eq('teacher_id', uid),

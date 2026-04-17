@@ -45,7 +45,7 @@ export default function Exams() {
             const uid = userProfile.id;
             const [examsList, activeBatches, allStudents] = await Promise.all([
                 examService.getExams(uid),
-                batchService.getBatches(uid, true),
+                batchService.getBatches(uid),
                 studentService.getStudentsByTeacher(uid)
             ]);
             setExams(examsList);

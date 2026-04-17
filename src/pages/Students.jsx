@@ -52,7 +52,7 @@ export default function Students() {
             const uid = userProfile.id;
             const [studentData, allBatches, attData, examData, hwData, schoolData] = await Promise.all([
                 studentService.getStudentsByTeacher(uid),
-                batchService.getBatches(uid, true),
+                batchService.getBatches(uid),
                 attendanceService.getAttendanceByTeacher(uid),
                 examService.getExams(uid),
                 homeworkService.getHomeworkByTeacher(uid),

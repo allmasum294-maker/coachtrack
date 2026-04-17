@@ -34,7 +34,7 @@ export default function ReportCard() {
             const uid = userProfile.id;
             const [allStudents, activeBatches, allAttendance, allExams, allHomeworks] = await Promise.all([
                 studentService.getStudentsByTeacher(uid),
-                batchService.getBatches(uid, true),
+                batchService.getBatches(uid),
                 attendanceService.getAttendanceByTeacher(uid),
                 examService.getExams(uid),
                 homeworkService.getHomeworkByTeacher(uid),

@@ -1,11 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../services/supabaseClient';
-import { Bell, CheckCircle, AlertCircle, Calendar, Info, Check, Sparkles } from 'lucide-react';
+import { Bell, CheckCircle, AlertCircle, Calendar, Info, Check, Sparkles, CheckCircle2, XCircle, ChevronRight } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { useNavigate } from 'react-router-dom';
+import { notificationService } from '../services/notificationService';
+import { scheduleService } from '../services/scheduleService';
+import toast from 'react-hot-toast';
 
 export default function Notifications() {
     const { userProfile } = useAuth();
+    const navigate = useNavigate();
     const [notifications, setNotifications] = useState([]);
     const [loading, setLoading] = useState(true);
     const [tab, setTab] = useState('all');
@@ -171,6 +176,38 @@ export default function Notifications() {
                                     {!notif.is_read && (
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '12px', color: accent, fontSize: '11px', fontWeight: 900, textTransform: 'uppercase' }}>
                                             <Sparkles size={12} /> New
+                                        </div>
+                                    )}
+
+                                    {notif.type === 'schedule_prompt' && (
+                                        <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
+                                            <button 
+                                                className="btn btn-primary" 
+                                                style={{ fontSize: '11px', height: '34px', padding: '0 16px', borderRadius: '8px' }}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    navigate('/schedule');
+                                                }}
+                                            >
+                                                <CheckCircle2 size={14} style={{ marginRight: '6px' }} />
+                                                CHECK CLASS
+                                            </button>
+                                            <button 
+                                                className="btn btn-ghost" 
+                                                style={{ fontSize: '11px', height: '34px', padding: '0 16px', borderRadius: '8px', color: 'var(--color-danger)' }}
+                                                onClick={async (e) => {
+                                                    e.stopPropagation();
+                                                    if (confirm('Cancel this class session?')) {
+                                                        await scheduleService.updateScheduleStatus(notif.schedule_id, 'cancelled');
+                                                        await notificationService.deleteNotificationBySchedule(notif.schedule_id);
+                                                        toast.success('Class cancelled');
+                                                        loadNotifications();
+                                                    }
+                                                }}
+                                            >
+                                                <XCircle size={14} style={{ marginRight: '6px' }} />
+                                                CANCEL
+                                            </button>
                                         </div>
                                     )}
                                 </div>

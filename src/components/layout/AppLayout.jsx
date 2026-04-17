@@ -3,6 +3,7 @@ import Sidebar from './Sidebar';
 import TopHeader from './TopHeader';
 import { useState } from 'react';
 import AuroraBackground from '../common/AuroraBackground';
+import AlertManager from '../AlertManager';
 
 export default function AppLayout() {
     const [mobileOpen, setMobileOpen] = useState(false);
@@ -10,6 +11,7 @@ export default function AppLayout() {
     return (
         <div className="app-layout">
             <AuroraBackground />
+            <AlertManager />
             <Sidebar mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
             
             <main className="app-main">

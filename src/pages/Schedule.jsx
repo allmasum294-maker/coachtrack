@@ -12,7 +12,7 @@ import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
-import { scheduleService } from '../services/scheduleService';
+import { notificationService } from '../services/notificationService';
 import { 
     Plus, X, Calendar as CalIcon, Clock, AlertCircle, 
     RefreshCw, Info, CheckCircle2, UserCheck, CalendarDays, 
@@ -58,6 +58,13 @@ export default function Schedule() {
     useEffect(() => {
         if (userProfile?.id) loadData();
     }, [userProfile]);
+
+    useEffect(() => {
+        // Cleanup notification if session successfully finished
+        if (showCompleteModal === false && editingSchedule) {
+            notificationService.deleteNotificationBySchedule(editingSchedule.id);
+        }
+    }, [showCompleteModal, editingSchedule]);
 
     async function loadData() {
         try {

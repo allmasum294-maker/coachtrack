@@ -1,12 +1,13 @@
 import { Menu, Bell, Search, Sun, Moon } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 export default function TopHeader({ onMenuClick }) {
     const { userProfile } = useAuth();
     const { theme, toggleTheme } = useTheme();
     const location = useLocation();
+    const navigate = useNavigate();
 
     // Map path to readable title
     const getTitle = (path) => {
@@ -54,7 +55,7 @@ export default function TopHeader({ onMenuClick }) {
                     {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
                 </button>
                 
-                <button className="btn btn-ghost btn-icon" style={{ position: 'relative' }}>
+                <button className="btn btn-ghost btn-icon" style={{ position: 'relative' }} onClick={() => navigate('/notifications')}>
                     <Bell size={18} />
                     <span style={{ 
                         position: 'absolute', top: '8px', right: '8px', 

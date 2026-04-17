@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../services/supabaseClient';
-import { FileEdit, Plus, Edit2, Trash2, X, Clock, Link2, Filter, BookOpen, Calendar, ChevronRight, Info } from 'lucide-react';
+import { FileEdit, Plus, Edit2, Trash2, X, Clock, Link2, Filter, BookOpen, Calendar, ChevronRight, Info, Star } from 'lucide-react';
 import { format, addDays } from 'date-fns';
 import toast from 'react-hot-toast';
 import { batchService } from '../services/batchService';
@@ -33,6 +33,9 @@ export default function SessionLog() {
         notes: '',
         homeworkAssigned: ''
     });
+    const [hierarchy, setHierarchy] = useState([]);
+    const [selectedLessonIds, setSelectedLessonIds] = useState(new Set());
+    const [allHomeworks, setAllHomeworks] = useState([]);
 
     useEffect(() => {
         if (userProfile?.id) loadData();
@@ -41,14 +44,18 @@ export default function SessionLog() {
     async function loadData() {
         try {
             const uid = userProfile.id;
-            const [logList, activeBatches, schedResult] = await Promise.all([
+            const [logList, activeBatches, schedResult, hierarchyResult, hwResult] = await Promise.all([
                 lessonPlanService.getLessonsByTeacher(uid),
                 batchService.getBatches(uid, true),
                 supabase.from('schedules').select('*').eq('teacher_id', uid),
+                lessonPlanService.getFullHierarchy(uid),
+                homeworkService.getHomeworkByTeacher(uid)
             ]);
             setLogs(logList || []);
             setBatches(activeBatches);
             setSchedules(schedResult.data || []);
+            setHierarchy(hierarchyResult || []);
+            setAllHomeworks(hwResult || []);
         } catch (err) {
             console.error('Error:', err);
         } finally {
@@ -77,6 +84,7 @@ export default function SessionLog() {
             batchId: filterBatch, scheduleId: '', date: format(new Date(), 'yyyy-MM-dd'),
             classTitle: '', topicsCovered: '', notes: '', homeworkAssigned: ''
         });
+        setSelectedLessonIds(new Set());
         setShowModal(true);
     }
 
@@ -91,6 +99,7 @@ export default function SessionLog() {
             notes: log.notes || '',
             homeworkAssigned: log.homework_assigned || ''
         });
+        setSelectedLessonIds(new Set((log.coveredLessons || []).map(l => l.id)));
         setShowModal(true);
     }
 
@@ -120,7 +129,7 @@ export default function SessionLog() {
             };
 
             if (editingLog) {
-                const { error } = await supabase
+                await supabase
                     .from('session_logs')
                     .update({
                         batch_id: data.batchId,
@@ -132,9 +141,16 @@ export default function SessionLog() {
                         homework_assigned: data.homeworkAssigned
                     })
                     .eq('id', editingLog.id);
-                if (error) throw error;
+                
+                if (selectedLessonIds.size > 0) {
+                    await lessonPlanService.linkLessonsToSession(editingLog.id, Array.from(selectedLessonIds));
+                }
             } else {
                 const logId = await lessonPlanService.logSession(data);
+                
+                if (selectedLessonIds.size > 0) {
+                    await lessonPlanService.linkLessonsToSession(logId, Array.from(selectedLessonIds));
+                }
                 
                 // Mark the schedule as completed
                 if (form.scheduleId) {
@@ -266,22 +282,58 @@ export default function SessionLog() {
                                             {log.classTitle || log.topicsCovered || 'Untitled Class'}
                                         </h3>
                                         
-                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px' }}>
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
                                             <div>
-                                                <span style={{ fontSize: '10px', fontWeight: 900, color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.1em', display: 'block', marginBottom: '8px' }}>Topics Covered</span>
-                                                <p style={{ fontSize: '14px', color: 'rgba(255,100,2014, 0.8)', margin: 0, lineHeight: 1.5 }}>
-                                                    {log.topicsCovered || 'No topics specified'}
-                                                </p>
+                                                <span style={{ fontSize: '10px', fontWeight: 900, color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.1em', display: 'block', marginBottom: '12px' }}>Syllabus Coverage</span>
+                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                                    {(log.coveredLessons || []).map(lesson => {
+                                                        // Find breadcrumb path
+                                                        const path = [];
+                                                        let curr = lesson;
+                                                        while (curr) {
+                                                            path.unshift(curr.title);
+                                                            curr = hierarchy.find(h => h.id === curr.parent_id);
+                                                        }
+                                                        return (
+                                                            <div key={lesson.id} className="glass-card" style={{ padding: '6px 12px', fontSize: '11px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                                                <span style={{ color: 'var(--color-primary)', fontWeight: 800 }}>{path.length > 1 ? path[path.length - 2] : 'Subject'}</span>
+                                                                <ChevronRight size={10} style={{ margin: '0 4px', opacity: 0.5 }} />
+                                                                <span style={{ fontWeight: 600 }}>{lesson.title}</span>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                    {(!log.coveredLessons || log.coveredLessons.length === 0) && (
+                                                        <p style={{ fontSize: '14px', color: 'rgba(255, 255, 255, 0.8)', margin: 0, lineHeight: 1.5 }}>
+                                                            {log.topicsCovered || 'No topics specified'}
+                                                        </p>
+                                                    )}
+                                                </div>
                                             </div>
 
-                                            {log.homeworkAssigned && (
-                                                <div style={{ padding: '12px', background: 'rgba(236, 72, 153, 0.05)', borderRadius: '12px', border: '1px solid rgba(236, 72, 153, 0.1)' }}>
-                                                    <span style={{ fontSize: '10px', fontWeight: 900, color: '#ec4899', textTransform: 'uppercase', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                                                        <Star size={12} fill="#ec4899" /> Homework Assigned
-                                                    </span>
-                                                    <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)', margin: 0 }}>{log.homeworkAssigned}</p>
-                                                </div>
-                                            )}
+                                            {(() => {
+                                                const hwGroup = allHomeworks.filter(h => h.session_log_id === log.id);
+                                                if (hwGroup.length === 0 && !log.homeworkAssigned) return null;
+                                                
+                                                return (
+                                                    <div style={{ padding: '16px', background: 'rgba(236, 72, 153, 0.05)', borderRadius: '16px', border: '1px solid rgba(236, 72, 153, 0.1)' }}>
+                                                        <span style={{ fontSize: '10px', fontWeight: 900, color: '#ec4899', textTransform: 'uppercase', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
+                                                            <Star size={12} fill="#ec4899" /> Homework Variants
+                                                        </span>
+                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                                            {hwGroup.length > 0 ? hwGroup.map(hw => (
+                                                                <div key={hw.id} style={{ display: 'flex', gap: '10px' }}>
+                                                                    <div style={{ fontSize: '11px', fontWeight: 800, color: 'white', background: 'rgba(236, 72, 153, 0.2)', padding: '2px 8px', borderRadius: '6px', height: 'fit-content' }}>
+                                                                        {hw.target_school_id ? (batches.find(b => b.id === hw.batch_id)?.schools?.find(s => s.id === hw.target_school_id)?.name || 'School') : 'All'}
+                                                                    </div>
+                                                                    <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', margin: 0 }}>{hw.description}</p>
+                                                                </div>
+                                                            )) : (
+                                                                <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', margin: 0 }}>{log.homeworkAssigned}</p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })()}
                                         </div>
 
                                         {log.notes && (
@@ -372,7 +424,42 @@ export default function SessionLog() {
                     </div>
 
                     <div className="form-group" style={{ marginBottom: 'var(--space-4)' }}>
-                        <label className="form-label">Topics Covered <span style={{ color: 'var(--color-danger)' }}>*</span></label>
+                        <label className="form-label" style={{ fontWeight: 800, fontSize: '11px', color: 'var(--color-primary)', textTransform: 'uppercase' }}>Select Topics from Syllabus</label>
+                        <div className="glass-panel" style={{ maxHeight: '180px', overflowY: 'auto', padding: '12px', background: 'rgba(255,255,255,0.02)', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                            {(function renderHierarchy(parentId = null, depth = 0) {
+                                const items = hierarchy.filter(h => h.parent_id === parentId);
+                                if (items.length === 0) return null;
+                                return items.map(item => (
+                                    <div key={item.id} style={{ marginLeft: depth * 16 }}>
+                                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 0', cursor: 'pointer', fontSize: '13px' }}>
+                                            <input 
+                                                type="checkbox" 
+                                                checked={selectedLessonIds.has(item.id)}
+                                                onChange={(e) => {
+                                                    const next = new Set(selectedLessonIds);
+                                                    if (e.target.checked) next.add(item.id);
+                                                    else next.delete(item.id);
+                                                    setSelectedLessonIds(next);
+                                                    
+                                                    const selectedTitles = hierarchy.filter(h => next.has(h.id)).map(h => h.title);
+                                                    setForm(prev => ({ ...prev, topicsCovered: selectedTitles.join(', ') }));
+                                                }}
+                                                style={{ width: '16px', height: '16px', borderRadius: '4px' }}
+                                            />
+                                            <span style={{ 
+                                                color: item.level === 0 ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+                                                fontWeight: item.level === 0 ? 800 : 500 
+                                            }}>{item.title}</span>
+                                        </label>
+                                        {renderHierarchy(item.id, depth + 1)}
+                                    </div>
+                                ));
+                            })()}
+                        </div>
+                    </div>
+
+                    <div className="form-group" style={{ marginBottom: 'var(--space-4)' }}>
+                        <label className="form-label">Summary Text <span style={{ color: 'var(--color-danger)' }}>*</span></label>
                         <div style={{ position: 'relative' }}>
                             <BookOpen size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }} />
                             <input className="form-input" style={{ paddingLeft: '40px' }} value={form.topicsCovered} onChange={(e) => setForm({ ...form, topicsCovered: e.target.value })} placeholder="What specific sections were taught?" required />

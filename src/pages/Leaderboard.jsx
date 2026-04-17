@@ -140,7 +140,7 @@ export default function Leaderboard() {
 
             // Final Weighted Calculation
             // Scale to 1000 points for a cleaner leaderboard display
-            totalWeightedScore = Math.round(((attRate * 0.3) + (examRate * 0.5) + (hwRate * 0.2)) * 1000);
+            totalWeightedScore = Math.round(((attRate * 0.3) + (examRate * 0.5) + (hwRate * 0.2)) * 1000) || 0;
 
             return {
                 ...student,

@@ -41,6 +41,8 @@ export default function Schedule() {
     const [editingSchedule, setEditingSchedule] = useState(null);
     const [attendanceRecords, setAttendanceRecords] = useState({});
     const [completeForm, setCompleteForm] = useState({ topicsCovered: '', notes: '', homeworkAssigned: '' });
+    const [hierarchy, setHierarchy] = useState([]);
+    const [selectedLessonIds, setSelectedLessonIds] = useState(new Set());
     const [form, setForm] = useState({
         title: '', batchId: '', date: '', startTime: '', endTime: '', status: 'scheduled', notes: '',
     });
@@ -74,13 +76,15 @@ export default function Schedule() {
                 studentResult,
                 examResult,
                 logResult,
-                hwResult
+                hwResult,
+                hierarchyResult
             ] = await Promise.all([
                 scheduleService.getSchedules(uid).catch(() => []),
                 studentService.getStudentsByTeacher(uid).catch(() => []),
                 examService.getExams(uid).catch(() => []),
                 lessonPlanService.getLessonsByTeacher(uid).catch(() => []),
-                homeworkService.getHomeworkByTeacher(uid).catch(() => [])
+                homeworkService.getHomeworkByTeacher(uid).catch(() => []),
+                lessonPlanService.getFullHierarchy(uid).catch(() => [])
             ]);
             
             setSchedules(allSchedules);
@@ -88,6 +92,7 @@ export default function Schedule() {
             setExams(examResult);
             setSessionLogs(logResult);
             setHomeworks(hwResult);
+            setHierarchy(hierarchyResult || []);
         } catch (err) {
             console.error('Error loading schedules data:', err);
         } finally {
@@ -302,6 +307,7 @@ export default function Schedule() {
             recs[s.id] = 'present';
         });
         setAttendanceRecords(recs);
+        setSelectedLessonIds(new Set());
         setShowModal(false);
         setShowCompleteModal(true);
     }
@@ -325,6 +331,10 @@ export default function Schedule() {
             };
             
             const logId = await lessonPlanService.logSession(sessionData);
+
+            if (selectedLessonIds.size > 0) {
+                await lessonPlanService.linkLessonsToSession(logId, Array.from(selectedLessonIds));
+            }
 
             if (completeForm.homeworkAssigned && completeForm.homeworkAssigned.trim()) {
                 const baseDate = new Date(dateVal);
@@ -719,19 +729,61 @@ export default function Schedule() {
                                         <h3 style={{ fontSize: '16px', fontWeight: 800, margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Class Summary</h3>
                                     </div>
                                     <div className="form-group">
-                                        <label className="form-label" style={{ fontWeight: 800, fontSize: '12px', color: 'var(--color-text-muted)' }}>TOPICS COVERED *</label>
-                                        <input className="form-input" value={completeForm.topicsCovered} placeholder="e.g., Introduction to Algebra" style={{ height: '52px', borderRadius: '14px', fontWeight: 700 }}
+                                        <label className="form-label" style={{ fontWeight: 800, fontSize: '11px', color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>SELECT TOPICS FROM SYLLABUS</label>
+                                        <div className="glass-panel" style={{ maxHeight: '200px', overflowY: 'auto', padding: '12px', background: 'rgba(255,255,255,0.02)', borderRadius: '16px' }}>
+                                            {(function renderHierarchy(parentId = null, depth = 0) {
+                                                const items = hierarchy.filter(h => h.parent_id === parentId);
+                                                if (items.length === 0) return null;
+                                                return items.map(item => (
+                                                    <div key={item.id} style={{ marginLeft: depth * 16 }}>
+                                                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 0', cursor: 'pointer', fontSize: '13px' }}>
+                                                            <input 
+                                                                type="checkbox" 
+                                                                checked={selectedLessonIds.has(item.id)}
+                                                                onChange={(e) => {
+                                                                    const next = new Set(selectedLessonIds);
+                                                                    if (e.target.checked) next.add(item.id);
+                                                                    else next.delete(item.id);
+                                                                    setSelectedLessonIds(next);
+                                                                    
+                                                                    // Auto-update topicsCovered text if empty or just list
+                                                                    if (!completeForm.topicsCovered || completeForm.topicsCovered.includes(item.title)) {
+                                                                        const selectedTitles = hierarchy.filter(h => next.has(h.id)).map(h => h.title);
+                                                                        setCompleteForm(prev => ({ ...prev, topicsCovered: selectedTitles.join(', ') }));
+                                                                    }
+                                                                }}
+                                                                style={{ width: '16px', height: '16px', borderRadius: '4px' }}
+                                                            />
+                                                            <span style={{ 
+                                                                color: item.level === 0 ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+                                                                fontWeight: item.level === 0 ? 800 : 500 
+                                                            }}>{item.title}</span>
+                                                        </label>
+                                                        {renderHierarchy(item.id, depth + 1)}
+                                                    </div>
+                                                ));
+                                            })()}
+                                            {hierarchy.length === 0 && (
+                                                <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', textAlign: 'center', padding: '20px' }}>
+                                                    No syllabus items created. Go to Lessons to add some.
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label" style={{ fontWeight: 800, fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>SUMMARY TEXT *</label>
+                                        <input className="form-input" value={completeForm.topicsCovered} placeholder="Summarize what was taught..." style={{ height: '52px', borderRadius: '14px', fontWeight: 700 }}
                                             onChange={(e) => setCompleteForm({...completeForm, topicsCovered: e.target.value})} required />
                                     </div>
                                     <div className="form-group">
-                                        <label className="form-label" style={{ fontWeight: 800, fontSize: '12px', color: 'var(--color-text-muted)' }}>HOMEWORK ASSIGNED</label>
+                                        <label className="form-label" style={{ fontWeight: 800, fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>HOMEWORK ASSIGNED</label>
                                         <textarea className="form-textarea" value={completeForm.homeworkAssigned} style={{ borderRadius: '18px', padding: '16px', fontWeight: 600 }}
-                                            onChange={(e) => setCompleteForm({...completeForm, homeworkAssigned: e.target.value})} rows={4} placeholder="Assign homework to students..." />
+                                            onChange={(e) => setCompleteForm({...completeForm, homeworkAssigned: e.target.value})} rows={3} placeholder="Tasks for next class..." />
                                     </div>
                                     <div className="form-group">
-                                        <label className="form-label" style={{ fontWeight: 800, fontSize: '12px', color: 'var(--color-text-muted)' }}>TEACHER NOTES</label>
+                                        <label className="form-label" style={{ fontWeight: 800, fontSize: '11px', color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>TEACHER NOTES</label>
                                         <textarea className="form-textarea" value={completeForm.notes} style={{ borderRadius: '18px', padding: '16px', fontWeight: 600 }}
-                                            onChange={(e) => setCompleteForm({...completeForm, notes: e.target.value})} rows={3} placeholder="Private notes about this class..." />
+                                            onChange={(e) => setCompleteForm({...completeForm, notes: e.target.value})} rows={2} placeholder="Class performance, behavior, etc." />
                                     </div>
                                 </div>
 

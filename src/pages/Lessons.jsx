@@ -1,337 +1,370 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { supabase } from '../services/supabaseClient';
-import { batchService } from '../services/batchService';
-import { BookOpen, Plus, Edit2, Trash2, Check, X, CheckCircle2, Circle, Clock } from 'lucide-react';
-import { format } from 'date-fns';
+import { lessonPlanService } from '../services/lessonPlanService';
+import { 
+    BookOpen, Plus, Edit2, Trash2, ChevronRight, ChevronDown, 
+    MoreVertical, FolderPlus, FilePlus, Sparkles, BookCheck, 
+    Layers, Search, GripVertical, AlertCircle, X, Info
+} from 'lucide-react';
 import toast from 'react-hot-toast';
+import Modal from '../components/Modal';
 
 export default function Lessons() {
     const { userProfile } = useAuth();
-    const [batches, setBatches] = useState([]);
-    const [lessons, setLessons] = useState([]);
-    const [selectedBatch, setSelectedBatch] = useState('');
+    const [rawItems, setRawItems] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [expandedIds, setExpandedIds] = useState(new Set());
+    const [searchQuery, setSearchQuery] = useState('');
+    const [selectedSubject, setSelectedSubject] = useState('English 1st Paper');
+
+    // Modal states
     const [showModal, setShowModal] = useState(false);
-    const [editingLesson, setEditingLesson] = useState(null);
-    const [form, setForm] = useState({ title: '', description: '', order: 1, status: 'planned', coveredOn: '' });
+    const [editingItem, setEditingItem] = useState(null);
+    const [form, setForm] = useState({ title: '', parentId: null, level: 0, subjectType: 'English 1st Paper' });
 
     useEffect(() => {
-        if (userProfile?.id) loadBatches();
+        if (userProfile?.id) loadData();
     }, [userProfile]);
 
-    useEffect(() => {
-        if (selectedBatch) loadLessons();
-    }, [selectedBatch]);
-
-    async function loadBatches() {
+    async function loadData() {
         try {
-            const data = await batchService.getBatches(userProfile.id, true);
-            setBatches(data);
-            if (data.length > 0 && !selectedBatch) setSelectedBatch(data[0].id);
+            setLoading(true);
+            const data = await lessonPlanService.getFullHierarchy(userProfile.id);
+            setRawItems(data || []);
+            
+            // Auto-expand top levels if empty
+            if (expandedIds.size === 0) {
+                const topLevelIds = data.filter(i => !i.parent_id).map(i => i.id);
+                setExpandedIds(new Set(topLevelIds));
+            }
         } catch (err) {
-            console.error('Error loading batches:', err);
+            console.error(err);
+            toast.error('Failed to load lesson plans');
         } finally {
             setLoading(false);
         }
     }
 
-    async function loadLessons() {
-        try {
-            const { data, error } = await supabase
-                .from('lessons')
-                .select('*')
-                .eq('teacher_id', userProfile.id)
-                .eq('batch_id', selectedBatch);
-            
-            if (error) throw error;
-            setLessons(data.sort((a, b) => (a.order || 0) - (b.order || 0)));
-        } catch (err) {
-            console.error('Error loading lessons:', err);
-        }
-    }
+    // Tree Construction
+    const treeData = useMemo(() => {
+        const buildTree = (parentId = null) => {
+            return rawItems
+                .filter(item => item.parent_id === parentId && (parentId || item.subject_type === selectedSubject))
+                .sort((a, b) => a.order_index - b.order_index)
+                .map(item => ({
+                    ...item,
+                    children: buildTree(item.id)
+                }));
+        };
+        return buildTree(null);
+    }, [rawItems, selectedSubject]);
 
-    function openCreate() {
-        setEditingLesson(null);
-        setForm({ title: '', description: '', order: lessons.length + 1, status: 'planned', coveredOn: '' });
-        setShowModal(true);
-    }
+    const subjects = useMemo(() => {
+        const set = new Set(rawItems.filter(i => !i.parent_id).map(i => i.subject_type));
+        // Default subjects if none exist
+        if (set.size === 0) return ['English 1st Paper', 'English 2nd Paper'];
+        return Array.from(set);
+    }, [rawItems]);
 
-    function openEdit(lesson) {
-        setEditingLesson(lesson);
+    const toggleExpand = (id) => {
+        setExpandedIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
+
+    const openCreate = (parent = null) => {
+        setEditingItem(null);
         setForm({
-            title: lesson.title, 
-            description: lesson.description || '', 
-            order: lesson.order || 1,
-            status: lesson.status || 'planned', 
-            coveredOn: lesson.covered_on || '',
+            title: '',
+            parentId: parent?.id || null,
+            level: parent ? parent.level + 1 : 0,
+            subjectType: parent ? parent.subject_type : selectedSubject
         });
         setShowModal(true);
-    }
+    };
+
+    const openEdit = (item) => {
+        setEditingItem(item);
+        setForm({
+            title: item.title,
+            parentId: item.parent_id,
+            level: item.level,
+            subjectType: item.subject_type
+        });
+        setShowModal(true);
+    };
 
     async function handleSave(e) {
         e.preventDefault();
         try {
-            const data = {
-                title: form.title,
-                description: form.description,
-                order: parseInt(form.order) || 1,
-                status: form.status,
-                covered_on: form.coveredOn || null,
-                batch_id: selectedBatch,
+            const payload = {
                 teacher_id: userProfile.id,
+                title: form.title,
+                parent_id: form.parentId,
+                level: form.level,
+                subject_type: form.subjectType,
+                order_index: editingItem ? editingItem.order_index : 0
             };
+            if (editingItem) payload.id = editingItem.id;
 
-            if (editingLesson) {
-                const { error } = await supabase
-                    .from('lessons')
-                    .update(data)
-                    .eq('id', editingLesson.id);
-                if (error) throw error;
-            } else {
-                const { error } = await supabase
-                    .from('lessons')
-                    .insert(data);
-                if (error) throw error;
-            }
+            await lessonPlanService.saveHierarchyItem(payload);
+            toast.success(editingItem ? 'Updated!' : 'Added!');
             setShowModal(false);
-            loadLessons();
-            toast.success(editingLesson ? 'Topic updated' : 'Topic added');
+            loadData();
         } catch (err) {
-            console.error('Error saving lesson:', err);
-            toast.error('Failed to save.');
+            console.error(err);
+            toast.error('Could not save item');
         }
     }
 
-    async function toggleCovered(lesson) {
+    async function handleDelete(id) {
+        if (!confirm('This will delete this item and ALL its sub-topics. Proceed?')) return;
         try {
-            const newStatus = lesson.status === 'covered' ? 'planned' : 'covered';
-            const { error } = await supabase
-                .from('lessons')
-                .update({
-                    status: newStatus,
-                    covered_on: newStatus === 'covered' ? format(new Date(), 'yyyy-MM-dd') : null,
-                })
-                .eq('id', lesson.id);
-            if (error) throw error;
-            loadLessons();
-            toast.success(newStatus === 'covered' ? 'Topic marked as covered!' : 'Topic unmarked.');
+            await lessonPlanService.deleteHierarchyItem(id);
+            toast.success('Deleted');
+            loadData();
         } catch (err) {
-            console.error('Error toggling status:', err);
+            console.error(err);
+            toast.error('Delete failed');
         }
     }
 
-    async function handleDelete(lessonId) {
-        if (!confirm('Are you sure you want to delete this topic?')) return;
-        try {
-            const { error } = await supabase
-                .from('lessons')
-                .delete()
-                .eq('id', lessonId);
-            if (error) throw error;
-            loadLessons();
-            toast.success('Topic removed');
-        } catch (err) {
-            console.error('Error deleting lesson:', err);
+    const renderTreeItem = (item, depth = 0) => {
+        const isExpanded = expandedIds.has(item.id);
+        const hasChildren = item.children && item.children.length > 0;
+        
+        // Skip if search doesn't match and no children match
+        if (searchQuery && !item.title.toLowerCase().includes(searchQuery.toLowerCase())) {
+            const childrenMatch = (nodes) => nodes.some(n => n.title.toLowerCase().includes(searchQuery.toLowerCase()) || childrenMatch(n.children));
+            if (!childrenMatch(item.children)) return null;
         }
-    }
 
-    const coveredCount = lessons.filter((l) => l.status === 'covered').length;
-    const coveragePercent = lessons.length > 0 ? Math.round((coveredCount / lessons.length) * 100) : 0;
+        const levelInfo = [
+            { label: 'SUBJECT', color: 'var(--color-primary)' },
+            { label: 'UNIT', color: 'var(--color-teal)' },
+            { label: 'LESSON', color: 'var(--color-warning)' },
+            { label: 'TOPIC', color: 'var(--color-accent)' },
+        ][item.level] || { label: 'ITEM', color: 'var(--color-text-muted)' };
+
+        return (
+            <div key={item.id} style={{ marginLeft: depth > 0 ? '24px' : '0' }}>
+                <div className={`tree-row level-${item.level} ${isExpanded ? 'active-row' : ''}`} style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    padding: '10px 16px', 
+                    borderRadius: '12px',
+                    marginBottom: '4px',
+                    background: isExpanded && depth === 0 ? 'rgba(255,255,255,0.03)' : 'transparent',
+                    border: '1px solid transparent',
+                    transition: 'all 0.2s ease',
+                    position: 'relative'
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', flex: 1, gap: '12px', overflow: 'hidden' }}>
+                        <button 
+                            onClick={(e) => { e.stopPropagation(); toggleExpand(item.id); }}
+                            style={{ 
+                                padding: 0, border: 'none', background: 'transparent', cursor: 'pointer',
+                                color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', opacity: hasChildren ? 1 : 0.2,
+                                pointerEvents: hasChildren ? 'auto' : 'none'
+                            }}
+                        >
+                            {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+                        </button>
+
+                        <div style={{ 
+                            fontSize: '9px', fontWeight: 900, color: levelInfo.color, 
+                            background: `${levelInfo.color}15`, padding: '2px 8px', borderRadius: '6px',
+                            minWidth: '60px', textAlign: 'center', flexShrink: 0, textTransform: 'uppercase'
+                        }}>
+                            {levelInfo.label}
+                        </div>
+
+                        <span style={{ 
+                            fontSize: item.level === 0 ? '16px' : '14px', 
+                            fontWeight: item.level === 0 ? 800 : 500,
+                            color: item.level === 0 ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis'
+                        }}>
+                            {item.title}
+                        </span>
+                    </div>
+
+                    <div className="tree-actions" style={{ display: 'flex', gap: '4px' }}>
+                        <button onClick={() => openCreate(item)} className="btn btn-ghost btn-icon btn-sm-action" title="Add Sub-topic"><Plus size={14} /></button>
+                        <button onClick={() => openEdit(item)} className="btn btn-ghost btn-icon btn-sm-action"><Edit2 size={14} /></button>
+                        <button onClick={() => handleDelete(item.id)} className="btn btn-ghost btn-icon btn-sm-action text-danger"><Trash2 size={14} /></button>
+                    </div>
+                </div>
+
+                {isExpanded && hasChildren && (
+                    <div className="tree-children" style={{ borderLeft: '1px dashed rgba(255,255,255,0.1)', marginLeft: '8px' }}>
+                        {item.children.map(child => renderTreeItem(child, depth + 1))}
+                    </div>
+                )}
+            </div>
+        );
+    };
 
     if (loading) return <div className="loading-page"><div className="loading-spinner" /></div>;
 
     return (
-        <div className="animate-fade-in">
-            <div className="page-header">
+        <div className="animate-fade-in" style={{ paddingBottom: 'var(--space-12)' }}>
+            {/* Header */}
+            <div className="page-header" style={{ marginBottom: 'var(--space-8)' }}>
                 <div>
-                    <h1 className="page-title">Topics</h1>
-                    <p className="page-subtitle">Track your teaching progress for each batch</p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                        <div style={{ padding: '8px', background: 'rgba(59, 130, 246, 0.1)', color: 'var(--color-primary)', borderRadius: '12px' }}>
+                            <BookCheck size={24} />
+                        </div>
+                        <h1 className="page-title" style={{ margin: 0 }}>Syllabus Workspace</h1>
+                    </div>
+                    <p className="page-subtitle">Build your hierarchical lesson templates for English papers</p>
                 </div>
-                <div className="tooltip-wrapper">
-                    <button className="btn btn-primary btn-comfort" onClick={openCreate} disabled={!selectedBatch}>
-                        <Plus size={24} />
-                    </button>
-                    <span className="tooltip">Add Topic</span>
+                <button className="btn btn-primary" onClick={() => openCreate(null)}>
+                    <Plus size={20} /> New Subject
+                </button>
+            </div>
+
+            {/* Controls */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 'var(--space-6)', marginBottom: 'var(--space-8)' }}>
+                <div className="glass-panel" style={{ padding: '8px', display: 'flex', gap: '4px', overflowX: 'auto', whiteSpace: 'nowrap' }}>
+                    {subjects.map(sub => (
+                        <button 
+                            key={sub}
+                            onClick={() => setSelectedSubject(sub)}
+                            style={{ 
+                                padding: '10px 24px', borderRadius: '12px', fontSize: '13px', fontWeight: 800, 
+                                border: 'none', cursor: 'pointer', transition: 'all 0.3s ease',
+                                background: selectedSubject === sub ? 'var(--color-primary)' : 'transparent',
+                                color: selectedSubject === sub ? 'white' : 'var(--color-text-muted)',
+                            }}
+                        >
+                            {sub}
+                        </button>
+                    ))}
+                    {subjects.length === 0 && <span style={{ padding: '10px', fontSize: '12px', opacity: 0.5 }}>No subjects found</span>}
+                </div>
+
+                <div className="glass-panel" style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                    <Search size={18} color="var(--color-text-muted)" />
+                    <input 
+                        className="form-input" 
+                        placeholder="Search topics..." 
+                        value={searchQuery}
+                        onChange={e => setSearchQuery(e.target.value)}
+                        style={{ background: 'transparent', border: 'none', height: '100%', padding: 0, fontWeight: 600 }}
+                    />
                 </div>
             </div>
 
-            <div className="glass-panel" style={{ padding: 'var(--space-4)', marginBottom: 'var(--space-6)' }}>
-                <div style={{ display: 'flex', gap: 'var(--space-4)', flexWrap: 'wrap', alignItems: 'center' }}>
-                    <div className="form-group" style={{ marginBottom: 0, minWidth: '240px' }}>
-                        <label className="form-label" style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 800 }}>Select Batch</label>
-                        <select className="form-select" value={selectedBatch} onChange={(e) => setSelectedBatch(e.target.value)}>
-                            {batches.length === 0 && <option value="">No active batches</option>}
-                            {batches.map((b) => (
-                                <option key={b.id} value={b.id}>{b.name}</option>
-                            ))}
-                        </select>
-                    </div>
-
-                    {selectedBatch && (
-                        <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 'var(--space-6)', minWidth: '300px' }}>
-                            <div style={{ flex: 1 }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                                    <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text-secondary)' }}>Class Progress</span>
-                                    <span style={{ fontSize: '13px', fontWeight: 800, color: 'var(--color-primary)' }}>{coveragePercent}%</span>
-                                </div>
-                                <div className="progress-bar" style={{ height: '8px', background: 'rgba(0,0,0,0.05)' }}>
-                                    <div className="progress-bar-fill" style={{ width: `${coveragePercent}%`, background: 'linear-gradient(90deg, var(--color-primary), var(--color-accent))' }} />
-                                </div>
-                            </div>
-                            <div className="glass-card" style={{ padding: '8px 16px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}>
-                                <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Stats</div>
-                                <div style={{ fontSize: '16px', fontWeight: 800 }}>{coveredCount} / {lessons.length} <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-muted)' }}>Topics</span></div>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            {!selectedBatch ? (
-                <div className="glass-card">
-                    <div className="empty-state">
-                        <div style={{ padding: '24px', background: 'var(--color-bg-secondary)', borderRadius: '24px', marginBottom: '20px', color: 'var(--color-text-muted)' }}>
-                            <BookOpen size={48} />
-                        </div>
-                        <div className="empty-state-title">No Active Batches</div>
-                        <div className="empty-state-text">You need an active batch to start tracking topics.</div>
-                    </div>
-                </div>
-            ) : lessons.length === 0 ? (
-                <div className="glass-card">
-                    <div className="empty-state">
-                        <div style={{ padding: '24px', background: 'var(--color-bg-secondary)', borderRadius: '24px', marginBottom: '20px', color: 'var(--color-text-muted)' }}>
-                            <BookOpen size={48} />
-                        </div>
-                        <div className="empty-state-title">No topics added yet</div>
-                        <div className="empty-state-text">Start by adding your first topic for this batch.</div>
-                        <button className="btn btn-primary" onClick={openCreate} style={{ marginTop: 'var(--space-4)' }}>
-                            <Plus size={18} /> Add First Topic
+            {/* Tree View */}
+            <div className="glass-card" style={{ padding: 'var(--space-8)', minHeight: '500px' }}>
+                {treeData.length === 0 ? (
+                    <div className="empty-state" style={{ padding: '100px 0' }}>
+                        <Layers size={48} style={{ opacity: 0.1, marginBottom: '20px' }} />
+                        <h3 style={{ fontSize: '20px', fontWeight: 800 }}>Empty Hierarchy</h3>
+                        <p style={{ color: 'var(--color-text-muted)', maxWidth: '400px', margin: '12px auto' }}>
+                            Start building your curriculum for <strong>{selectedSubject}</strong>. 
+                        </p>
+                        <button className="btn btn-secondary" onClick={() => openCreate(null)} style={{ marginTop: '20px' }}>
+                            <Plus size={18} /> Add Top Level Unit
                         </button>
                     </div>
-                </div>
-            ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                    {lessons.map((lesson) => (
-                        <div key={lesson.id} className="glass-card" style={{ 
-                            padding: 'var(--space-4)', 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            gap: 'var(--space-4)',
-                            background: lesson.status === 'covered' ? 'rgba(20, 184, 166, 0.02)' : 'rgba(255,255,255,0.1)',
-                            border: lesson.status === 'covered' ? '1px solid rgba(20, 184, 166, 0.1)' : '1px solid rgba(255,255,255,0.05)'
-                        }}>
-                            <div style={{ 
-                                width: 36, 
-                                height: 36, 
-                                borderRadius: '10px', 
-                                background: lesson.status === 'covered' ? 'var(--color-success-light)' : 'var(--color-bg-secondary)',
-                                color: lesson.status === 'covered' ? 'var(--color-success)' : 'var(--color-text-muted)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                fontWeight: 800,
-                                fontSize: '14px',
-                                flexShrink: 0
-                            }}>
-                                {lesson.order}
-                            </div>
-                            
-                            <div style={{ flex: 1 }}>
-                                <div style={{ 
-                                    fontSize: '16px', 
-                                    fontWeight: 700, 
-                                    color: lesson.status === 'covered' ? 'var(--color-text-secondary)' : 'var(--color-text-primary)',
-                                    textDecoration: lesson.status === 'covered' ? 'line-through' : 'none',
-                                    opacity: lesson.status === 'covered' ? 0.7 : 1,
-                                    marginBottom: '2px'
-                                }}>
-                                    {lesson.title}
-                                </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '12px', color: 'var(--color-text-muted)' }}>
-                                    {lesson.description && <span>{lesson.description}</span>}
-                                    {lesson.status === 'covered' && (
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--color-success)', fontWeight: 600 }}>
-                                            <Check size={12} /> Finished {lesson.coveredOn && `on ${lesson.coveredOn}`}
-                                        </div>
-                                    )}
-                                    {lesson.status === 'planned' && (
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                            <Clock size={12} /> Planned
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
+                ) : (
+                    <div className="tree-container">
+                        {treeData.map(item => renderTreeItem(item))}
+                    </div>
+                )}
+            </div>
 
-                            <div style={{ display: 'flex', gap: 'var(--space-1)' }}>
-                                <button 
-                                    className={`btn btn-sm btn-icon ${lesson.status === 'covered' ? 'btn-primary' : 'btn-ghost'}`}
-                                    onClick={() => toggleCovered(lesson)}
-                                    title={lesson.status === 'covered' ? 'Unmark' : 'Mark as finished'}
-                                    style={{ borderRadius: '8px' }}
-                                >
-                                    {lesson.status === 'covered' ? <CheckCircle2 size={16} /> : <Circle size={16} />}
-                                </button>
-                                <button className="btn btn-sm btn-ghost btn-icon" onClick={() => openEdit(lesson)} style={{ borderRadius: '8px' }}>
-                                    <Edit2 size={16} />
-                                </button>
-                                <button className="btn btn-sm btn-ghost btn-icon" onClick={() => handleDelete(lesson.id)} style={{ borderRadius: '8px' }}>
-                                    <Trash2 size={16} style={{ color: 'var(--color-danger)', opacity: 0.7 }} />
-                                </button>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            )}
+            <style>{`
+                .tree-row {
+                    transition: all 0.2s ease;
+                }
+                .tree-row:hover {
+                    background: rgba(255,255,255,0.05) !important;
+                    border: 1px solid rgba(59, 130, 246, 0.2) !important;
+                }
+                .tree-actions {
+                    opacity: 0;
+                    transition: opacity 0.2s ease;
+                }
+                .tree-row:hover .tree-actions {
+                    opacity: 1;
+                }
+                .tree-container {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 2px;
+                }
+                .btn-sm-action {
+                    width: 32px !important;
+                    height: 32px !important;
+                    padding: 0 !important;
+                    background: rgba(255,255,255,0.02) !important;
+                }
+                .btn-sm-action:hover {
+                    background: rgba(59, 130, 246, 0.1) !important;
+                    color: var(--color-primary) !important;
+                }
+                .loading-page {
+                    height: 60vh;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                }
+            `}</style>
 
             {/* Modal */}
-            {showModal && (
-                <div className="modal-overlay" onClick={() => setShowModal(false)}>
-                    <div className="modal glass-panel" onClick={(e) => e.stopPropagation()} style={{ border: '1px solid rgba(255,255,255,0.1)' }}>
-                        <div className="modal-header">
-                            <h2 className="modal-title">{editingLesson ? 'Edit Topic' : 'Add New Topic'}</h2>
-                            <button className="btn btn-ghost btn-icon" onClick={() => setShowModal(false)}><X size={20} /></button>
+            <Modal
+                isOpen={showModal}
+                onClose={() => setShowModal(false)}
+                title={editingItem ? 'Edit Lesson Item' : 'Add Lesson Item'}
+                maxWidth="480px"
+            >
+                <form onSubmit={handleSave} style={{ padding: 'var(--space-2)' }}>
+                    {form.parentId && (
+                        <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--color-primary)', display: 'flex', alignItems: 'center', gap: '8px', padding: '12px', background: 'rgba(59, 130, 246, 0.05)', borderRadius: '12px', marginBottom: '20px' }}>
+                            <Info size={14} /> 
+                            <span>Adding sub-topic to: <strong>{rawItems.find(i => i.id === form.parentId)?.title}</strong></span>
                         </div>
-                        <form onSubmit={handleSave}>
-                            <div className="modal-body">
-                                <div className="form-group">
-                                    <label className="form-label">Topic Title *</label>
-                                    <input className="form-input" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="e.g., Introduction to Calculus" required />
-                                </div>
-                                <div className="form-group">
-                                    <label className="form-label">Topic Description</label>
-                                    <textarea className="form-textarea" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={2} placeholder="Briefly explain what this topic is about..." />
-                                </div>
-                                <div className="form-row">
-                                    <div className="form-group">
-                                        <label className="form-label">Lesson Number</label>
-                                        <input className="form-input" type="number" min="1" value={form.order} onChange={(e) => setForm({ ...form, order: e.target.value })} />
-                                    </div>
-                                    <div className="form-group">
-                                        <label className="form-label">Current Status</label>
-                                        <select className="form-select" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
-                                            <option value="planned">Not Started</option>
-                                            <option value="covered">Finished</option>
-                                            <option value="skipped">Skipped</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                {form.status === 'covered' && (
-                                    <div className="form-group">
-                                        <label className="form-label">Finished On</label>
-                                        <input className="form-input" type="date" value={form.coveredOn} onChange={(e) => setForm({ ...form, coveredOn: e.target.value })} />
-                                    </div>
-                                )}
-                            </div>
-                            <div className="modal-footer" style={{ border: 'none' }}>
-                                <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
-                                <button type="submit" className="btn btn-primary">{editingLesson ? 'Save Topic' : 'Add Topic'}</button>
-                            </div>
-                        </form>
+                    )}
+                    <div className="form-group" style={{ marginBottom: '24px' }}>
+                        <label className="form-label">Title / Name *</label>
+                        <input 
+                            className="form-input" 
+                            value={form.title} 
+                            onChange={e => setForm({ ...form, title: e.target.value })} 
+                            placeholder={form.level === 0 ? "e.g. English 1st Paper" : "e.g. Unit 1: People or Institutions"}
+                            required 
+                            autoFocus
+                        />
                     </div>
-                </div>
-            )}
+                    {!form.parentId && (
+                        <div className="form-group">
+                            <label className="form-label">Category / Subject Label</label>
+                            <input 
+                                className="form-input" 
+                                value={form.subjectType} 
+                                onChange={e => setForm({ ...form, subjectType: e.target.value })} 
+                                placeholder="e.g. English 1st"
+                            />
+                        </div>
+                    )}
+                    
+                    <div style={{ display: 'flex', gap: '12px', marginTop: 'var(--space-8)' }}>
+                        <button type="button" className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setShowModal(false)}>Cancel</button>
+                        <button type="submit" className="btn btn-primary" style={{ flex: 2, boxShadow: 'var(--shadow-primary)' }}>
+                            {editingItem ? 'Save Changes' : 'Create Item'}
+                        </button>
+                    </div>
+                </form>
+            </Modal>
         </div>
     );
 }

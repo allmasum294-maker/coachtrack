@@ -10,6 +10,9 @@ import toast from 'react-hot-toast';
 import { studentService } from '../services/studentService';
 import { batchService } from '../services/batchService';
 import { schoolService } from '../services/schoolService';
+import { attendanceService } from '../services/attendanceService';
+import { homeworkService } from '../services/homeworkService';
+import { examService } from '../services/examService';
 import Modal from '../components/Modal';
 
 export default function Students() {
@@ -47,21 +50,21 @@ export default function Students() {
     async function loadData() {
         try {
             const uid = userProfile.id;
-            const [studentData, allBatches, attSnap, examSnap, hwSnap, schoolData] = await Promise.all([
+            const [studentData, allBatches, attData, examData, hwData, schoolData] = await Promise.all([
                 studentService.getStudentsByTeacher(uid),
                 batchService.getBatches(uid, true),
-                supabase.from('attendance_records').select('*').eq('teacher_id', uid),
-                supabase.from('exams').select('*').eq('teacher_id', uid),
-                supabase.from('homeworks').select('*').eq('teacher_id', uid),
+                attendanceService.getAttendanceByTeacher(uid),
+                examService.getExams(uid),
+                homeworkService.getHomeworkByTeacher(uid),
                 schoolService.getSchools(uid)
             ]);
             
             setStudents(studentData);
             setSchools(schoolData);
             setBatches(allBatches);
-            setAttendance(attSnap.data || []);
-            setExams(examSnap.data || []);
-            setHomeworks(hwSnap.data || []);
+            setAttendance(attData || []);
+            setExams(examData || []);
+            setHomeworks(hwData || []);
         } catch (err) {
             console.error('Error loading data:', err);
             toast.error('Could not load student data');
@@ -239,36 +242,67 @@ export default function Students() {
     const viewingStats = useMemo(() => {
         if (!viewingStudent) return null;
 
+        // 1. Attendance Calculation
         let totalClasses = 0;
         let presentClasses = 0;
         attendance.forEach((a) => {
             if (viewingStudent.batchIds?.includes(a.batch_id)) {
-                // Assuming attendance record logs are in a separate query or nested
-                // This logic might need refinement based on exact attendance storage
+                const record = (a.records || []).find(r => r.studentId === viewingStudent.id);
+                if (record) {
+                    totalClasses++;
+                    if (record.status === 'present') presentClasses++;
+                    else if (record.status === 'late') presentClasses += 0.5;
+                }
             }
         });
-
         const attRate = totalClasses > 0 ? Math.round((presentClasses / totalClasses) * 100) : 0;
 
+        // 2. Homework Calculation
         let totalHomeworks = 0;
         let completedHomeworks = 0;
         homeworks.forEach(hw => {
-            const isRelevantBatch = viewingStudent.batchIds?.includes(hw.batch_id);
-            const isRelevantSchool = !hw.target_school_id || hw.target_school_id === viewingStudent.school_id;
-
-            if (isRelevantBatch && isRelevantSchool) {
+            if (viewingStudent.batchIds?.includes(hw.batch_id)) {
                 totalHomeworks++;
-                // Check submissions
-                if (hw.submissions?.[viewingStudent.id]?.status === 'completed') {
-                    completedHomeworks++;
+                const sub = (hw.submissions || {})[viewingStudent.id];
+                if (sub) {
+                    if (sub.status === 'completed') completedHomeworks += 1;
+                    else if (sub.status === 'late') completedHomeworks += 0.7;
+                }
+            }
+        });
+        const hwRate = totalHomeworks > 0 ? Math.round((completedHomeworks / totalHomeworks) * 100) : 0;
+
+        // 3. Performance (Exams) Calculation
+        let totalExamWeight = 0;
+        let earnedExamWeight = 0;
+        let examsTaken = 0;
+
+        exams.forEach(e => {
+            if (viewingStudent.batchIds?.includes(e.batch_id)) {
+                const results = e.results || e.scores || [];
+                const res = results.find(r => r.studentId === viewingStudent.id);
+                if (res) {
+                    examsTaken++;
+                    totalExamWeight += e.totalMarks;
+                    earnedExamWeight += res.marksObtained;
                 }
             }
         });
 
-        const hwRate = totalHomeworks > 0 ? Math.round((completedHomeworks / totalHomeworks) * 100) : 0;
+        const avgScore = totalExamWeight > 0 ? Math.round((earnedExamWeight / totalExamWeight) * 100) : 0;
+        
+        let grade = 'N/A';
+        if (examsTaken > 0) {
+            if (avgScore >= 90) grade = 'A+';
+            else if (avgScore >= 80) grade = 'A';
+            else if (avgScore >= 70) grade = 'B+';
+            else if (avgScore >= 60) grade = 'B';
+            else if (avgScore >= 50) grade = 'C';
+            else grade = 'F';
+        }
 
-        return { attRate, hwRate, strengths: [], weaknesses: [] };
-    }, [viewingStudent, attendance, homeworks]);
+        return { attRate, hwRate, avgScore, grade, totalClasses, examsTaken };
+    }, [viewingStudent, attendance, homeworks, exams]);
 
     async function handleImportCSV() {
         if (csvPreview.length === 0) return toast.error('No student data found');
@@ -624,7 +658,7 @@ export default function Students() {
                                 </div>
                                 <div className="glass-panel" style={{ padding: '20px', textAlign: 'center' }}>
                                     <div style={{ fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', color: 'var(--color-text-muted)', marginBottom: '8px' }}>Performance</div>
-                                    <div style={{ fontSize: '20px', fontWeight: 900 }}>B+</div>
+                                    <div style={{ fontSize: '20px', fontWeight: 900 }}>{viewingStats?.grade}</div>
                                 </div>
                             </div>
                             

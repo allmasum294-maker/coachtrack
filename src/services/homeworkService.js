@@ -76,6 +76,22 @@ export const homeworkService = {
       .delete()
       .eq('id', id);
     if (error) throw error;
+  },
+
+  async deleteHomeworkGroup(groupId) {
+    const { error } = await supabase
+      .from('homeworks')
+      .delete()
+      .eq('group_id', groupId);
+    if (error) throw error;
+  },
+
+  async setFinishedStatus(groupId, isFinished) {
+    const { error } = await supabase
+      .from('homeworks')
+      .update({ is_finished: isFinished })
+      .eq('group_id', groupId);
+    if (error) throw error;
   }
 };
 

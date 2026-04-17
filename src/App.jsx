@@ -188,7 +188,7 @@ function App() {
               <Route path="/schools" element={<Schools />} />
               <Route path="/lessons" element={<Lessons />} />
               <Route path="/exams" element={<Exams />} />
-              <Route path="/sessions" element={<SessionLog />} />
+              <Route path="/session-logs" element={<SessionLog />} />
               <Route path="/analytics" element={<Analytics />} />
               <Route path="/student-analytics" element={<StudentAnalytics />} />
               <Route path="/timeline" element={<StudentTimeline />} />

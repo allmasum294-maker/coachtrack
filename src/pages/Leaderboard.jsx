@@ -4,7 +4,7 @@ import { supabase } from '../services/supabaseClient';
 import { 
     Award, Trophy, Star, Medal, ArrowUp, ArrowDown, 
     Minus, Filter, Info, TrendingUp, Zap, Sparkles, UserCheck,
-    Calendar, FileText, BarChart3, Clock
+    Calendar, FileText, BarChart3, Clock, GraduationCap
 } from 'lucide-react';
 import { format, subDays, startOfDay, endOfDay, isWithinInterval } from 'date-fns';
 import { batchService } from '../services/batchService';

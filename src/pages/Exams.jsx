@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Link } from 'react-router-dom';
 import { supabase } from '../services/supabaseClient';
-import { FileText, Plus, Edit2, Trash2, X, Eye, Trophy, TrendingUp, Users, ClipboardCheck, PlusCircle, Filter, Calendar, Clock, BarChart2 } from 'lucide-react';
+import { FileText, Plus, Edit2, Trash2, X, Eye, Trophy, TrendingUp, Users, ClipboardCheck, PlusCircle, Filter, Calendar, Clock, BarChart2, Info } from 'lucide-react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import SmartTimePicker from '../components/common/SmartTimePicker';

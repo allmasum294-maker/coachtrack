@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Link } from 'react-router-dom';
 import { supabase } from '../services/supabaseClient';
-import { GraduationCap, Plus, Edit2, Trash2, Users, BookOpen, X, CheckCircle, Sparkles, Filter, ChevronRight } from 'lucide-react';
+import { GraduationCap, Plus, Edit2, Trash2, Users, BookOpen, X, CheckCircle, Sparkles, Filter, ChevronRight, ArrowRightCircle } from 'lucide-react';
 import Modal from '../components/Modal';
 import { batchService } from '../services/batchService';
 import { studentService } from '../services/studentService';
@@ -17,6 +17,12 @@ export default function Batches() {
     const [form, setForm] = useState({ name: '', grade: '', subject: 'English', isClosed: false });
     const [viewMode, setViewMode] = useState('active'); // 'active' or 'closed'
     const [studentCounts, setStudentCounts] = useState({});
+    
+    const [showTransitionModal, setShowTransitionModal] = useState(false);
+    const [transitionFromBatch, setTransitionFromBatch] = useState(null);
+    const [transitionToBatchId, setTransitionToBatchId] = useState('');
+    const [studentsInSource, setStudentsInSource] = useState([]);
+    const [selectedStudents, setSelectedStudents] = useState([]);
 
     useEffect(() => {
         if (userProfile?.id) loadBatches();
@@ -56,6 +62,36 @@ export default function Batches() {
         setEditingBatch(batch);
         setForm({ name: batch.name, grade: String(batch.grade), subject: batch.subject, isClosed: !!batch.is_closed });
         setShowModal(true);
+    }
+    
+    async function openTransition(batch) {
+        setTransitionFromBatch(batch);
+        setTransitionToBatchId('');
+        try {
+            const studs = await studentService.getStudentsByTeacher(userProfile.id);
+            const sourceStuds = studs.filter(s => (s.batchIds || []).includes(batch.id));
+            setStudentsInSource(sourceStuds);
+            setSelectedStudents(sourceStuds.map(s => s.id)); // Select all by default
+            setShowTransitionModal(true);
+        } catch (err) {
+            console.error('Error fetching students for transition:', err);
+            toast.error('Could not load students');
+        }
+    }
+    
+    async function handleBulkTransition(e) {
+        e.preventDefault();
+        if (!transitionToBatchId || selectedStudents.length === 0) return;
+        
+        try {
+            await batchService.transitionStudentsToBatch(selectedStudents, transitionFromBatch.id, transitionToBatchId);
+            toast.success(`${selectedStudents.length} students transitioned successfully!`);
+            setShowTransitionModal(false);
+            loadBatches();
+        } catch (err) {
+            console.error(err);
+            toast.error('Failed to transition students');
+        }
     }
 
     async function handleSave(e) {
@@ -221,6 +257,14 @@ export default function Batches() {
                                         </button>
                                         <span className="tooltip">{batch.isClosed ? 'Unarchive' : 'Archive'}</span>
                                     </div>
+                                    {batch.isClosed && (
+                                        <div className="tooltip-wrapper">
+                                            <button className="btn btn-ghost btn-icon" onClick={() => openTransition(batch)} style={{ width: '36px', height: '36px', borderRadius: '10px' }}>
+                                                <ArrowRightCircle size={18} style={{ color: 'var(--color-primary)' }} />
+                                            </button>
+                                            <span className="tooltip">Promote Students</span>
+                                        </div>
+                                    )}
                                     <div className="tooltip-wrapper">
                                         <button className="btn btn-ghost btn-icon" onClick={() => openEdit(batch)} style={{ width: '36px', height: '36px', borderRadius: '10px' }}>
                                             <Edit2 size={18} />
@@ -324,6 +368,61 @@ export default function Batches() {
                     <div className="modal-footer" style={{ padding: '0', marginTop: '12px', border: 'none', display: 'flex', gap: '12px' }}>
                         <button type="button" className="btn btn-ghost" onClick={() => setShowModal(false)} style={{ flex: 1, height: '48px', fontWeight: 800, borderRadius: '12px' }}>Cancel</button>
                         <button type="submit" className="btn btn-primary" style={{ flex: 2, height: '48px', fontWeight: 900, borderRadius: '12px' }}>{editingBatch ? 'SAVE BATCH' : 'CREATE'}</button>
+                    </div>
+                </form>
+            </Modal>
+            
+            <Modal
+                isOpen={showTransitionModal}
+                onClose={() => setShowTransitionModal(false)}
+                title={`Promote Students from ${transitionFromBatch?.name}`}
+            >
+                <form onSubmit={handleBulkTransition} style={{ display: 'grid', gap: '24px' }}>
+                    <div className="form-group">
+                        <label className="form-label" style={{ fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', marginBottom: '8px', color: 'var(--color-text-muted)' }}>Target Batch</label>
+                        <select
+                            className="form-select"
+                            value={transitionToBatchId}
+                            onChange={(e) => setTransitionToBatchId(e.target.value)}
+                            required
+                            style={{ height: '48px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)' }}
+                        >
+                            <option value="">Select Target Batch</option>
+                            {batches.filter(b => !b.isClosed && b.id !== transitionFromBatch?.id).map(b => (
+                                <option key={b.id} value={b.id}>{b.name}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div className="form-group" style={{ maxHeight: '300px', overflowY: 'auto', background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                            <label className="form-label" style={{ fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', color: 'var(--color-text-muted)' }}>Select Students</label>
+                            <span style={{ fontSize: '11px', fontWeight: 900, color: 'var(--color-primary)' }}>{selectedStudents.length} Selected</span>
+                        </div>
+                        {studentsInSource.length === 0 ? (
+                            <div style={{ textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '13px', padding: '16px 0' }}>No students in this batch.</div>
+                        ) : (
+                            <div style={{ display: 'grid', gap: '8px' }}>
+                                {studentsInSource.map(student => (
+                                    <label key={student.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', padding: '8px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px' }}>
+                                        <input 
+                                            type="checkbox" 
+                                            style={{ width: '16px', height: '16px' }}
+                                            checked={selectedStudents.includes(student.id)}
+                                            onChange={(e) => {
+                                                if (e.target.checked) setSelectedStudents(prev => [...prev, student.id]);
+                                                else setSelectedStudents(prev => prev.filter(id => id !== student.id));
+                                            }}
+                                        />
+                                        <span style={{ fontSize: '14px', fontWeight: 600 }}>{student.name}</span>
+                                    </label>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                    <div className="modal-footer" style={{ padding: '0', marginTop: '12px', border: 'none', display: 'flex', gap: '12px' }}>
+                        <button type="button" className="btn btn-ghost" onClick={() => setShowTransitionModal(false)} style={{ flex: 1, height: '48px', fontWeight: 800, borderRadius: '12px' }}>Cancel</button>
+                        <button type="submit" className="btn btn-primary" disabled={studentsInSource.length === 0 || selectedStudents.length === 0 || !transitionToBatchId} style={{ flex: 2, height: '48px', fontWeight: 900, borderRadius: '12px' }}>Confirm Promotion</button>
                     </div>
                 </form>
             </Modal>

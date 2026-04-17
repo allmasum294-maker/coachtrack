@@ -32,7 +32,8 @@ import {
     TrendingUp,
     Trophy,
     FileDown,
-    UserCheck
+    UserCheck,
+    School
 } from 'lucide-react';
 
 const mainNavItems = [
@@ -45,6 +46,8 @@ const mainNavItems = [
 const managementNavItems = [
     { id: 'attendance', path: '/attendance', icon: UserCheck, label: 'Attendance' },
     { id: 'session-logs', path: '/session-logs', icon: BookOpen, label: 'Session Logs' },
+    { id: 'lessons', path: '/lessons', icon: BookOpen, label: 'Lessons' },
+    { id: 'study-plans', path: '/study-plans', icon: ClipboardCheck, label: 'Study Plans' },
     { id: 'homework', path: '/homework', icon: BookCheck, label: 'Homework' },
     { id: 'exams', path: '/exams', icon: GraduationCap, label: 'Exams' }
 ];
@@ -52,10 +55,13 @@ const managementNavItems = [
 const insightNavItems = [
     { id: 'analytics', path: '/analytics', icon: LineChart, label: 'Class Analytics' },
     { id: 'student-analytics', path: '/student-analytics', icon: BarChart3, label: 'Student Analytics' },
+    { id: 'timeline', path: '/timeline', icon: History, label: 'Student Timeline' },
+    { id: 'report-card', path: '/report-card', icon: FileText, label: 'Report Cards' },
     { id: 'leaderboard', path: '/leaderboard', icon: Trophy, label: 'Leaderboard' }
 ];
 
 const systemNavItems = [
+    { path: '/schools', icon: School, label: 'Schools/Colleges' },
     { path: '/notifications', icon: Bell, label: 'Notifications' },
     { path: '/export', icon: Download, label: 'Export Data' },
 ];

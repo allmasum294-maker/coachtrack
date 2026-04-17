@@ -57,10 +57,32 @@ export async function reactivateBatch(batchId) {
   if (error) throw error;
 }
 
+/**
+ * Bulk transition students from one batch to another.
+ * This moves them directly in the student_batches table.
+ */
+export async function transitionStudentsToBatch(studentIds, fromBatchId, toBatchId) {
+  if (!studentIds || studentIds.length === 0) return;
+  
+  // First, insert new enrollments
+  const upserts = studentIds.map(id => ({ student_id: id, batch_id: toBatchId, status: 'enrolled' }));
+  const { error: err1 } = await supabase.from('student_batches').upsert(upserts);
+  if (err1) throw err1;
+  
+  // Second, remove from old batch completely
+  const { error: err2 } = await supabase
+    .from('student_batches')
+    .delete()
+    .eq('batch_id', fromBatchId)
+    .in('student_id', studentIds);
+  if (err2) throw err2;
+}
+
 export const batchService = {
   getBatches,
   closeBatch,
-  reactivateBatch
+  reactivateBatch,
+  transitionStudentsToBatch
 };
 
 export default batchService;

@@ -167,7 +167,7 @@ export default function StudentAnalytics() {
 
             totalHomeworks++;
             // Note: Homework submissions in relational schema are handled differently, but service currently wraps them.
-            const sub = (hw.submissions || []).find(s => s.student_id === selectedStudent.id);
+            const sub = (hw.submissions || {})[selectedStudent.id];
             if (sub) {
                 if (sub.status === 'completed') completedHomeworks++;
                 else if (sub.status === 'late') lateHomeworks++;
@@ -248,7 +248,7 @@ export default function StudentAnalytics() {
             .sort((a, b) => new Date(a.due_date || a.created_at) - new Date(b.due_date || b.created_at))
             .slice(-10)
             .map(hw => {
-                const sub = (hw.submissions || []).find(s => s.student_id === selectedStudent.id);
+                const sub = (hw.submissions || {})[selectedStudent.id];
                 const isCompleted = sub?.status === 'completed' || sub?.status === 'late';
                 return {
                     name: hw.title.length > 15 ? hw.title.substring(0, 15) + '...' : hw.title,

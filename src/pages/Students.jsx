@@ -373,7 +373,7 @@ export default function Students() {
                             onClick={() => { setViewMode('unenrolled'); setCurrentPage(1); }}
                             style={{ borderRadius: '10px', padding: '8px 20px', fontSize: '13px', fontWeight: 800 }}
                         >
-                            Inactive
+                            Alumni
                         </button>
                     </div>
                     

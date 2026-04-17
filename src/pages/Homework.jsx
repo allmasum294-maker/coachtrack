@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../services/supabaseClient';
-import { BookOpen, Plus, Edit2, Trash2, X, CheckSquare, Square, Calendar, Clock, AlertTriangle, FileEdit, Filter, ChevronRight, Info, Users, Layers } from 'lucide-react';
+import { BookOpen, Plus, Edit2, Trash2, X, CheckSquare, Square, Calendar, Clock, AlertTriangle, FileEdit, Filter, ChevronRight, Info, Users, Layers, MoreVertical } from 'lucide-react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import { batchService } from '../services/batchService';
@@ -29,6 +29,7 @@ export default function Homework() {
     const [filterBatch, setFilterBatch] = useState('');
     const [filterStatus, setFilterStatus] = useState('pending'); // all, pending, overdue, completed
     const [currentPage, setCurrentPage] = useState(1);
+    const [activeMenuId, setActiveMenuId] = useState(null);
     const pageSize = 12; // Adjusted for grid
 
     const [showModal, setShowModal] = useState(false);
@@ -309,77 +310,96 @@ export default function Homework() {
                         </p>
                     </div>
                 ) : (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))', gap: '30px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '24px' }}>
                         {paginatedAssignments.map(group => {
                             const isOverdue = group.status === 'overdue';
+                            const isMenuOpen = activeMenuId === group.id;
+
                             return (
-                                <div key={group.id} className={`glass-card homework-card-v2 ${group.isFinished ? 'finished' : ''}`} style={{ 
-                                    padding: '28px',
-                                    borderLeft: `4px solid ${isOverdue ? 'var(--color-danger)' : group.isFinished ? 'var(--color-success)' : 'var(--color-accent)'}`,
-                                    position: 'relative',
-                                    overflow: 'hidden'
-                                }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px', alignItems: 'flex-start' }}>
+                                <div key={group.id} className={`homework-card-v3 ${group.isFinished ? 'finished' : ''} ${isOverdue ? 'overdue' : ''}`}>
+                                    {/* Action Header */}
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', alignItems: 'flex-start' }}>
                                         <div>
-                                            <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                                            <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
                                                 {group.isFinished ? (
-                                                    <span className="badge badge-success" style={{ padding: '4px 12px', borderRadius: '20px' }}>COMPLETED</span>
+                                                    <span className="badge badge-success" style={{ fontSize: '10px', padding: '2px 8px' }}>COMPLETED</span>
                                                 ) : isOverdue ? (
-                                                    <span className="badge badge-danger heartbeat" style={{ padding: '4px 12px', borderRadius: '20px' }}>OVERDUE</span>
+                                                    <span className="badge badge-danger heartbeat" style={{ fontSize: '10px', padding: '2px 8px' }}>OVERDUE</span>
                                                 ) : (
-                                                    <span className="badge badge-warning" style={{ padding: '4px 12px', borderRadius: '20px' }}>DUE {format(new Date(group.dueDate), 'MMM d')}</span>
+                                                    <span className="badge badge-warning" style={{ fontSize: '10px', padding: '2px 8px' }}>DUE {format(new Date(group.dueDate), 'MMM d')}</span>
                                                 )}
                                             </div>
-                                            <h3 style={{ fontSize: '22px', fontWeight: 800, letterSpacing: '-0.02em', marginBottom: '4px' }}>{group.title}</h3>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--color-accent)', fontWeight: 700 }}>
+                                            <h3 style={{ fontSize: '18px', fontWeight: 800, letterSpacing: '-0.01em', marginBottom: '4px', color: 'var(--color-text-primary)' }}>{group.title}</h3>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--color-accent)', fontWeight: 700, opacity: 0.9 }}>
                                                 <Users size={12} />
                                                 {getBatchName(group.batchId)}
                                             </div>
                                         </div>
-                                        <div style={{ display: 'flex', gap: '6px' }}>
-                                            <button className="btn-icon-v2" onClick={() => toggleFinished(group)} title={group.isFinished ? "Unmark" : "Mark as Finished"}>
-                                                <CheckSquare size={18} color={group.isFinished ? 'var(--color-success)' : 'rgba(255,255,255,0.2)'} />
+
+                                        <div className="action-menu-container">
+                                            <button 
+                                                className="btn-icon-v2" 
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setActiveMenuId(isMenuOpen ? null : group.id);
+                                                }}
+                                                style={{ background: isMenuOpen ? 'rgba(255,255,255,0.1)' : 'transparent' }}
+                                            >
+                                                <MoreVertical size={18} />
                                             </button>
-                                            <button className="btn-icon-v2" onClick={() => openEdit(group)}><Edit2 size={16} /></button>
-                                            <button className="btn-icon-v2 delete" onClick={() => handleDelete(group.id)}><Trash2 size={16} /></button>
+
+                                            {isMenuOpen && (
+                                                <div className="action-menu-dropdown animate-fade-in">
+                                                    <div className="action-menu-item" onClick={() => { toggleFinished(group); setActiveMenuId(null); }}>
+                                                        <CheckSquare size={14} color={group.isFinished ? 'var(--color-success)' : 'inherit'} />
+                                                        {group.isFinished ? 'Mark Active' : 'Mark Finished'}
+                                                    </div>
+                                                    <div className="action-menu-item" onClick={() => { openEdit(group); setActiveMenuId(null); }}>
+                                                        <Edit2 size={14} /> Edit Details
+                                                    </div>
+                                                    <div className="action-menu-item danger" onClick={() => { handleDelete(group.id); setActiveMenuId(null); }}>
+                                                        <Trash2 size={14} /> Delete Case
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
 
-                                    {/* Task Variants (Grouped) */}
-                                    <div className="homework-variants-list" style={{ marginBottom: '24px' }}>
+                                    {/* Task Variants */}
+                                    <div style={{ marginBottom: '20px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                         {group.variants.map((v, i) => (
                                             <div key={v.id} style={{ 
-                                                padding: '12px 16px', 
-                                                background: 'rgba(255,255,255,0.02)', 
+                                                padding: '10px 14px', 
+                                                background: 'rgba(255,255,255,0.015)', 
                                                 borderRadius: '12px',
-                                                marginBottom: '8px',
                                                 border: '1px solid rgba(255,255,255,0.03)'
                                             }}>
-                                                <div style={{ fontSize: '10px', fontWeight: 900, color: 'var(--color-accent)', marginBottom: '6px', opacity: 0.8 }}>
-                                                    {getSchoolName(v.schoolId).toUpperCase()}
+                                                <div style={{ fontSize: '9px', fontWeight: 900, color: 'var(--color-text-muted)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                                    {getSchoolName(v.schoolId)}
                                                 </div>
-                                                <div style={{ fontSize: '13px', lineHeight: 1.5, color: 'rgba(255,255,255,0.8)' }}>{v.description}</div>
+                                                <div style={{ fontSize: '12px', lineHeight: 1.4, color: 'rgba(255,255,255,0.7)', fontWeight: 500 }}>{v.description}</div>
                                             </div>
                                         ))}
                                     </div>
 
-                                    {/* Progress Footer */}
-                                    <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '20px', marginTop: 'auto' }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                                            <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--color-text-muted)' }}>TEAM PROGRESS</div>
-                                            <div style={{ fontSize: '13px', fontWeight: 900 }}>{group.stats.progress}%</div>
+                                    {/* Progress Section */}
+                                    <div style={{ marginTop: 'auto', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.03)' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                            <div style={{ fontSize: '10px', fontWeight: 900, color: 'var(--color-text-muted)', letterSpacing: '0.05em' }}>TEAM PROGRESS</div>
+                                            <div style={{ fontSize: '12px', fontWeight: 900, color: group.isFinished ? 'var(--color-success)' : 'var(--color-text-primary)' }}>{group.stats.progress}%</div>
                                         </div>
-                                        <div className="progress-mini" style={{ height: '8px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', overflow: 'hidden', marginBottom: '20px' }}>
-                                            <div style={{ 
-                                                width: `${group.stats.progress}%`, 
-                                                height: '100%', 
-                                                background: group.isFinished ? 'var(--color-success)' : 'linear-gradient(90deg, var(--color-accent), var(--color-primary))',
-                                                boxShadow: '0 0 15px rgba(20, 184, 166, 0.3)',
-                                                transition: 'width 0.8s cubic-bezier(0.4, 0, 0.2, 1)'
+                                        <div className="progress-container-v2" style={{ marginBottom: '16px' }}>
+                                            <div className="progress-bar-v2" style={{ 
+                                                width: `${group.stats.progress}%`,
+                                                background: group.isFinished ? 'var(--color-success)' : undefined
                                             }} />
                                         </div>
-                                        <button className="btn btn-primary-glass" style={{ width: '100%', borderRadius: '12px' }} onClick={() => setTrackingAssignment(group)}>
-                                            Review Submissions
+                                        <button 
+                                            className="btn btn-primary-glass" 
+                                            style={{ width: '100%', borderRadius: '12px', fontSize: '12px', height: '38px', fontWeight: 800 }} 
+                                            onClick={() => setTrackingAssignment(group)}
+                                        >
+                                            REVIEW SUBMISSIONS
                                         </button>
                                     </div>
                                 </div>

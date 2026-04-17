@@ -196,10 +196,22 @@ export default function Homework() {
             } catch (err) {
                 console.error(err);
                 toast.error('Failed to delete');
-            }
         }
+    }
 
-        async function toggleFinished(group) {
+    function openCreate() {
+        setEditingAssignment(null);
+        setForm({
+            title: '',
+            batchId: '',
+            dueDate: format(new Date(), 'yyyy-MM-dd'),
+            sessionLogId: '',
+            variants: [{ schoolId: '', description: '' }]
+        });
+        setShowModal(true);
+    }
+
+    async function toggleFinished(group) {
             try {
                 const next = !group.isFinished;
                 await homeworkService.setFinishedStatus(group.id, next);

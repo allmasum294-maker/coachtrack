@@ -427,7 +427,8 @@ export default function SessionLog() {
                         <label className="form-label" style={{ fontWeight: 800, fontSize: '11px', color: 'var(--color-primary)', textTransform: 'uppercase' }}>Select Topics from Syllabus</label>
                         <div className="glass-panel" style={{ maxHeight: '180px', overflowY: 'auto', padding: '12px', background: 'rgba(255,255,255,0.02)', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.05)' }}>
                             {(function renderHierarchy(parentId = null, depth = 0) {
-                                const items = hierarchy.filter(h => h.parent_id === parentId);
+                                // Filter by parent AND batch_id (for root items)
+                                const items = hierarchy.filter(h => h.parent_id === parentId && (parentId || h.batch_id === form.batchId));
                                 if (items.length === 0) return null;
                                 return items.map(item => (
                                     <div key={item.id} style={{ marginLeft: depth * 16 }}>

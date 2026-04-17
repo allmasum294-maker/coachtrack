@@ -12,15 +12,18 @@ import Modal from '../components/Modal';
 export default function Lessons() {
     const { userProfile } = useAuth();
     const [rawItems, setRawItems] = useState([]);
+    const [batches, setBatches] = useState([]);
     const [loading, setLoading] = useState(true);
     const [expandedIds, setExpandedIds] = useState(new Set());
     const [searchQuery, setSearchQuery] = useState('');
-    const [selectedSubject, setSelectedSubject] = useState('English 1st Paper');
+    const [selectedBatchId, setSelectedBatchId] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const pageSize = 5; // Subjects per page
 
     // Modal states
     const [showModal, setShowModal] = useState(false);
     const [editingItem, setEditingItem] = useState(null);
-    const [form, setForm] = useState({ title: '', parentId: null, level: 0, subjectType: 'English 1st Paper' });
+    const [form, setForm] = useState({ title: '', parentId: null, level: 0, batchId: '' });
 
     useEffect(() => {
         if (userProfile?.id) loadData();
@@ -29,14 +32,25 @@ export default function Lessons() {
     async function loadData() {
         try {
             setLoading(true);
-            const data = await lessonPlanService.getFullHierarchy(userProfile.id);
-            setRawItems(data || []);
+            const uid = userProfile.id;
             
-            // Auto-expand top levels if empty
-            if (expandedIds.size === 0) {
-                const topLevelIds = data.filter(i => !i.parent_id).map(i => i.id);
-                setExpandedIds(new Set(topLevelIds));
+            // Parallel fetch
+            const [data, batchList] = await Promise.all([
+                lessonPlanService.getFullHierarchy(uid),
+                supabase.from('batches').select('*').eq('teacher_id', uid).eq('status', 'active')
+            ]);
+
+            setRawItems(data || []);
+            setBatches(batchList.data || []);
+            
+            // Select first batch if none selected
+            if (!selectedBatchId && batchList.data?.length > 0) {
+                setSelectedBatchId(batchList.data[0].id);
             }
+
+            // Auto-expand top levels
+            const topLevelIds = (data || []).filter(i => !i.parent_id).map(i => i.id);
+            setExpandedIds(new Set(topLevelIds));
         } catch (err) {
             console.error(err);
             toast.error('Failed to load lesson plans');
@@ -45,26 +59,56 @@ export default function Lessons() {
         }
     }
 
-    // Tree Construction
+    // Tree Construction & Filtering
     const treeData = useMemo(() => {
         const buildTree = (parentId = null) => {
             return rawItems
-                .filter(item => item.parent_id === parentId && (parentId || item.subject_type === selectedSubject))
+                .filter(item => {
+                    const isChildOfParent = item.parent_id === parentId;
+                    const matchesBatch = parentId || (item.batch_id === selectedBatchId);
+                    return isChildOfParent && matchesBatch;
+                })
                 .sort((a, b) => a.order_index - b.order_index)
                 .map(item => ({
                     ...item,
                     children: buildTree(item.id)
                 }));
         };
-        return buildTree(null);
-    }, [rawItems, selectedSubject]);
+        const fullTree = buildTree(null);
 
-    const subjects = useMemo(() => {
-        const set = new Set(rawItems.filter(i => !i.parent_id).map(i => i.subject_type));
-        // Default subjects if none exist
-        if (set.size === 0) return ['English 1st Paper', 'English 2nd Paper'];
-        return Array.from(set);
-    }, [rawItems]);
+        // Smart Search: Preserve parent if child matches
+        if (!searchQuery) return fullTree;
+        
+        const filterTree = (nodes) => {
+            return nodes.filter(node => {
+                const matches = node.title.toLowerCase().includes(searchQuery.toLowerCase());
+                const filteredChildren = filterTree(node.children);
+                if (matches || filteredChildren.length > 0) {
+                    node.children = filteredChildren;
+                    return true;
+                }
+                return false;
+            });
+        };
+        return filterTree(JSON.parse(JSON.stringify(fullTree))); // Deep copy to avoid mutating cache
+    }, [rawItems, selectedBatchId, searchQuery]);
+
+    // Pagination for Level 0 Subjects
+    const paginatedTree = useMemo(() => {
+        const start = (currentPage - 1) * pageSize;
+        return treeData.slice(start, start + pageSize);
+    }, [treeData, currentPage]);
+
+    const totalPages = Math.ceil(treeData.length / pageSize);
+
+    const toggleAll = (expand) => {
+        if (expand) {
+            setExpandedIds(new Set(rawItems.map(i => i.id)));
+        } else {
+            setExpandedIds(new Set(rawItems.filter(i => !i.parent_id).map(i => i.id)));
+        }
+    };
+
 
     const toggleExpand = (id) => {
         setExpandedIds(prev => {
@@ -81,7 +125,7 @@ export default function Lessons() {
             title: '',
             parentId: parent?.id || null,
             level: parent ? parent.level + 1 : 0,
-            subjectType: parent ? parent.subject_type : selectedSubject
+            batchId: parent ? parent.batch_id : selectedBatchId
         });
         setShowModal(true);
     };
@@ -92,7 +136,7 @@ export default function Lessons() {
             title: item.title,
             parentId: item.parent_id,
             level: item.level,
-            subjectType: item.subject_type
+            batchId: item.batch_id
         });
         setShowModal(true);
     };
@@ -105,7 +149,7 @@ export default function Lessons() {
                 title: form.title,
                 parent_id: form.parentId,
                 level: form.level,
-                subject_type: form.subjectType,
+                batch_id: form.batchId,
                 order_index: editingItem ? editingItem.order_index : 0
             };
             if (editingItem) payload.id = editingItem.id;
@@ -231,56 +275,94 @@ export default function Lessons() {
             </div>
 
             {/* Controls */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 'var(--space-6)', marginBottom: 'var(--space-8)' }}>
-                <div className="glass-panel" style={{ padding: '8px', display: 'flex', gap: '4px', overflowX: 'auto', whiteSpace: 'nowrap' }}>
-                    {subjects.map(sub => (
-                        <button 
-                            key={sub}
-                            onClick={() => setSelectedSubject(sub)}
-                            style={{ 
-                                padding: '10px 24px', borderRadius: '12px', fontSize: '13px', fontWeight: 800, 
-                                border: 'none', cursor: 'pointer', transition: 'all 0.3s ease',
-                                background: selectedSubject === sub ? 'var(--color-primary)' : 'transparent',
-                                color: selectedSubject === sub ? 'white' : 'var(--color-text-muted)',
-                            }}
-                        >
-                            {sub}
-                        </button>
-                    ))}
-                    {subjects.length === 0 && <span style={{ padding: '10px', fontSize: '12px', opacity: 0.5 }}>No subjects found</span>}
-                </div>
-
-                <div className="glass-panel" style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 'var(--space-4)', marginBottom: 'var(--space-8)', alignItems: 'center' }}>
+                <div className="glass-panel" style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '12px', border: '1px solid rgba(255,255,255,0.05)', flex: 1 }}>
                     <Search size={18} color="var(--color-text-muted)" />
                     <input 
                         className="form-input" 
-                        placeholder="Search topics..." 
+                        placeholder="Search syllabus..." 
                         value={searchQuery}
                         onChange={e => setSearchQuery(e.target.value)}
-                        style={{ background: 'transparent', border: 'none', height: '100%', padding: 0, fontWeight: 600 }}
+                        style={{ background: 'transparent', border: 'none', height: '100%', padding: 0, fontWeight: 600, flex: 1 }}
                     />
+                </div>
+
+                <select 
+                    className="form-select" 
+                    value={selectedBatchId} 
+                    onChange={(e) => { setSelectedBatchId(e.target.value); setCurrentPage(1); }}
+                    style={{ width: '220px', height: '52px', borderRadius: '14px', fontWeight: 700 }}
+                >
+                    <option value="">Select Batch...</option>
+                    {batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                </select>
+
+                <div style={{ display: 'flex', gap: '8px' }}>
+                    <button className="btn btn-ghost" onClick={() => toggleAll(true)} style={{ fontSize: '11px', fontWeight: 800 }}>Expand All</button>
+                    <button className="btn btn-ghost" onClick={() => toggleAll(false)} style={{ fontSize: '11px', fontWeight: 800 }}>Collapse All</button>
                 </div>
             </div>
 
             {/* Tree View */}
-            <div className="glass-card" style={{ padding: 'var(--space-8)', minHeight: '500px' }}>
-                {treeData.length === 0 ? (
+            <div className="glass-card" style={{ padding: 'var(--space-8)', minHeight: '500px', background: 'rgba(255, 255, 255, 0.01)' }}>
+                {paginatedTree.length === 0 ? (
                     <div className="empty-state" style={{ padding: '100px 0' }}>
                         <Layers size={48} style={{ opacity: 0.1, marginBottom: '20px' }} />
-                        <h3 style={{ fontSize: '20px', fontWeight: 800 }}>Empty Hierarchy</h3>
+                        <h3 style={{ fontSize: '20px', fontWeight: 800 }}>{selectedBatchId ? 'No Syllabus Items' : 'Select a Batch First'}</h3>
                         <p style={{ color: 'var(--color-text-muted)', maxWidth: '400px', margin: '12px auto' }}>
-                            Start building your curriculum for <strong>{selectedSubject}</strong>. 
+                            {selectedBatchId 
+                                ? 'Start building your curriculum hierarchy for this batch.' 
+                                : 'Choose a batch from the dropdown above to manage its specific syllabus.'}
                         </p>
-                        <button className="btn btn-secondary" onClick={() => openCreate(null)} style={{ marginTop: '20px' }}>
-                            <Plus size={18} /> Add Top Level Unit
-                        </button>
+                        {selectedBatchId && (
+                            <button className="btn btn-primary btn-comfort" onClick={() => openCreate(null)} style={{ marginTop: '20px', borderRadius: '14px' }}>
+                                <Plus size={18} /> Add Top Level Unit
+                            </button>
+                        )}
                     </div>
                 ) : (
                     <div className="tree-container">
-                        {treeData.map(item => renderTreeItem(item))}
+                        {paginatedTree.map(item => renderTreeItem(item))}
                     </div>
                 )}
             </div>
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+                <div style={{ display: 'flex', justifyContent: 'center', marginTop: '32px', gap: '12px' }}>
+                    <button 
+                        className="btn btn-ghost" 
+                        disabled={currentPage === 1} 
+                        onClick={() => setCurrentPage(p => p - 1)}
+                        style={{ borderRadius: '12px' }}
+                    >
+                        Previous
+                    </button>
+                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                        {Array.from({ length: totalPages }).map((_, i) => (
+                            <button 
+                                key={i}
+                                onClick={() => setCurrentPage(i + 1)}
+                                style={{ 
+                                    width: '40px', height: '40px', borderRadius: '10px', fontSize: '14px', fontWeight: 900,
+                                    background: currentPage === i + 1 ? 'var(--color-primary)' : 'rgba(255,255,255,0.05)',
+                                    color: 'white', border: 'none', cursor: 'pointer', transition: 'all 0.2s'
+                                }}
+                            >
+                                {i + 1}
+                            </button>
+                        ))}
+                    </div>
+                    <button 
+                        className="btn btn-ghost" 
+                        disabled={currentPage === totalPages} 
+                        onClick={() => setCurrentPage(p => p + 1)}
+                        style={{ borderRadius: '12px' }}
+                    >
+                        Next
+                    </button>
+                </div>
+            )}
 
             <style>{`
                 .tree-row {

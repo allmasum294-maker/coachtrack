@@ -72,21 +72,35 @@ export const lessonPlanService = {
   /**
    * Hierarchical Plan Management
    */
-  async getFullHierarchy(teacherId) {
-    const { data, error } = await supabase
+  async getFullHierarchy(teacherId, batchId = null) {
+    let query = supabase
       .from('lesson_plan_items')
       .select('*')
-      .eq('teacher_id', teacherId)
-      .order('order_index', { ascending: true });
+      .eq('teacher_id', teacherId);
+    
+    if (batchId) {
+      // For isolation, we only want items linked to this batch or children of those items
+      // In a flat table with parent_id, we fetch all and then filter in UI, 
+      // but to be efficient we fetch by batch_id if it's a Level 0 item.
+      // However, children might not have batch_id. 
+      // BEST: level 0 has batch_id, we fetch all for teacher and filter tree in UI.
+      // OR: we tag all items with batch_id.
+    }
+
+    const { data, error } = await query.order('order_index', { ascending: true });
 
     if (error) throw error;
     return data || [];
   },
 
   async saveHierarchyItem(item) {
+    // Ensure batch_id is present for root items
     const { data, error } = await supabase
       .from('lesson_plan_items')
-      .upsert(item)
+      .upsert({
+        ...item,
+        batch_id: item.batch_id || item.batchId // Support both cases
+      })
       .select()
       .single();
 

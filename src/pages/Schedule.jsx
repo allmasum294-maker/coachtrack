@@ -258,6 +258,7 @@ export default function Schedule() {
     async function handleSave(e) {
         e.preventDefault();
         try {
+            const batch = batches.find(b => b.id === form.batchId);
             const data = {
                 title: form.title || batch?.name || 'Class',
                 batch_id: form.batchId,
@@ -737,10 +738,9 @@ export default function Schedule() {
                                         <h3 style={{ fontSize: '16px', fontWeight: 800, margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Class Summary</h3>
                                     </div>
                                     <div className="form-group">
-                                        <label className="form-label" style={{ fontWeight: 800, fontSize: '11px', color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>SELECT TOPICS FROM SYLLABUS</label>
                                         <div className="glass-panel" style={{ maxHeight: '200px', overflowY: 'auto', padding: '12px', background: 'rgba(255,255,255,0.02)', borderRadius: '16px' }}>
                                             {(function renderHierarchy(parentId = null, depth = 0) {
-                                                const items = hierarchy.filter(h => h.parent_id === parentId);
+                                                const items = hierarchy.filter(h => h.parent_id === parentId && (parentId || h.batch_id === editingSchedule.batchId));
                                                 if (items.length === 0) return null;
                                                 return items.map(item => (
                                                     <div key={item.id} style={{ marginLeft: depth * 16 }}>

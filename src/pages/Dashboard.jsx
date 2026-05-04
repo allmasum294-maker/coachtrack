@@ -187,7 +187,7 @@ export default function Dashboard() {
                 ))}
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '30px', flexWrap: 'wrap' }}>
+            <div className="dashboard-grid">
                 {/* Upcoming Classes */}
                 <div className="glass-panel" style={{ padding: '30px', background: 'rgba(255, 255, 255, 0.02)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>

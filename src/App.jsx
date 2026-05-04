@@ -112,7 +112,7 @@ function PublicRoute({ children }) {
     );
   }
 
-  if (currentUser && isApproved) {
+  if (currentUser) {
     return <Navigate to="/dashboard" replace />;
   }
 

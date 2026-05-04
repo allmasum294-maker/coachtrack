@@ -1,9 +1,11 @@
 import { Link } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
 import { useState } from 'react';
+import { useAuth } from '../../context/AuthContext';
 
 export default function Navbar() {
     const [isOpen, setIsOpen] = useState(false);
+    const { currentUser } = useAuth();
 
     return (
         <nav className="glass-panel" style={{ 
@@ -39,8 +41,14 @@ export default function Navbar() {
                 <Link to="/#features" style={{ textDecoration: 'none', color: 'var(--color-text-secondary)', fontWeight: 700, fontSize: '14px' }}>Features</Link>
                 <Link to="/about" style={{ textDecoration: 'none', color: 'var(--color-text-secondary)', fontWeight: 700, fontSize: '14px' }}>About</Link>
                 <div style={{ width: '1px', height: '20px', background: 'var(--color-border)', margin: '0 8px' }} />
-                <Link to="/login" style={{ textDecoration: 'none', color: 'var(--color-text-primary)', fontWeight: 800, fontSize: '14px' }}>Login</Link>
-                <Link to="/register" className="btn btn-primary" style={{ padding: '0 24px', height: '42px', borderRadius: '10px', fontWeight: 900, boxShadow: '0 10px 20px -5px rgba(59, 130, 246, 0.3)' }}>GET STARTED</Link>
+                {currentUser ? (
+                    <Link to="/dashboard" className="btn btn-primary" style={{ padding: '0 24px', height: '42px', borderRadius: '10px', fontWeight: 900, boxShadow: '0 10px 20px -5px rgba(59, 130, 246, 0.3)' }}>DASHBOARD</Link>
+                ) : (
+                    <>
+                        <Link to="/login" style={{ textDecoration: 'none', color: 'var(--color-text-primary)', fontWeight: 800, fontSize: '14px' }}>Login</Link>
+                        <Link to="/register" className="btn btn-primary" style={{ padding: '0 24px', height: '42px', borderRadius: '10px', fontWeight: 900, boxShadow: '0 10px 20px -5px rgba(59, 130, 246, 0.3)' }}>GET STARTED</Link>
+                    </>
+                )}
             </div>
 
             {/* Mobile Toggle */}
@@ -62,8 +70,14 @@ export default function Navbar() {
                 }}>
                     <Link to="/#features" onClick={() => setIsOpen(false)} style={{ fontSize: '24px', fontWeight: 800, textDecoration: 'none', color: 'var(--color-text-primary)' }}>Features</Link>
                     <Link to="/about" onClick={() => setIsOpen(false)} style={{ fontSize: '24px', fontWeight: 800, textDecoration: 'none', color: 'var(--color-text-primary)' }}>About</Link>
-                    <Link to="/login" onClick={() => setIsOpen(false)} style={{ fontSize: '24px', fontWeight: 800, textDecoration: 'none', color: 'var(--color-text-primary)' }}>Login</Link>
-                    <Link to="/register" onClick={() => setIsOpen(false)} className="btn btn-primary" style={{ height: '56px', borderRadius: '14px', fontWeight: 900, fontSize: '18px' }}>GET STARTED</Link>
+                    {currentUser ? (
+                        <Link to="/dashboard" onClick={() => setIsOpen(false)} className="btn btn-primary" style={{ height: '56px', borderRadius: '14px', fontWeight: 900, fontSize: '18px' }}>DASHBOARD</Link>
+                    ) : (
+                        <>
+                            <Link to="/login" onClick={() => setIsOpen(false)} style={{ fontSize: '24px', fontWeight: 800, textDecoration: 'none', color: 'var(--color-text-primary)' }}>Login</Link>
+                            <Link to="/register" onClick={() => setIsOpen(false)} className="btn btn-primary" style={{ height: '56px', borderRadius: '14px', fontWeight: 900, fontSize: '18px' }}>GET STARTED</Link>
+                        </>
+                    )}
                 </div>
             )}
         </nav>

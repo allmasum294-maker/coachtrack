@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import {
     GraduationCap,
     Users,
@@ -70,6 +71,8 @@ const stats = [
 ];
 
 export default function Landing() {
+    const { currentUser } = useAuth();
+
     return (
         <div className="landing-page" style={{ overflow: 'hidden' }}>
             {/* Hero Section */}
@@ -126,12 +129,20 @@ export default function Landing() {
                     </p>
 
                     <div style={{ display: 'flex', gap: '20px', justifyContent: 'center', flexWrap: 'wrap' }}>
-                        <Link to="/register" className="btn btn-primary" style={{ padding: '0 48px', height: '72px', borderRadius: '20px', fontSize: '20px', fontWeight: 900, boxShadow: '0 25px 50px -12px rgba(59, 130, 246, 0.5)', gap: '12px' }}>
-                            <Zap size={24} /> GET STARTED FREE
-                        </Link>
-                        <Link to="/login" className="btn btn-ghost" style={{ padding: '0 48px', height: '72px', borderRadius: '20px', fontSize: '20px', fontWeight: 800, border: '1px solid var(--color-border)', background: 'var(--color-bg-glass)' }}>
-                            TEACHER LOGIN
-                        </Link>
+                        {currentUser ? (
+                            <Link to="/dashboard" className="btn btn-primary" style={{ padding: '0 48px', height: '72px', borderRadius: '20px', fontSize: '20px', fontWeight: 900, boxShadow: '0 25px 50px -12px rgba(59, 130, 246, 0.5)', gap: '12px' }}>
+                                <Zap size={24} /> GO TO DASHBOARD
+                            </Link>
+                        ) : (
+                            <>
+                                <Link to="/register" className="btn btn-primary" style={{ padding: '0 48px', height: '72px', borderRadius: '20px', fontSize: '20px', fontWeight: 900, boxShadow: '0 25px 50px -12px rgba(59, 130, 246, 0.5)', gap: '12px' }}>
+                                    <Zap size={24} /> GET STARTED FREE
+                                </Link>
+                                <Link to="/login" className="btn btn-ghost" style={{ padding: '0 48px', height: '72px', borderRadius: '20px', fontSize: '20px', fontWeight: 800, border: '1px solid var(--color-border)', background: 'var(--color-bg-glass)' }}>
+                                    TEACHER LOGIN
+                                </Link>
+                            </>
+                        )}
                     </div>
                 </div>
 

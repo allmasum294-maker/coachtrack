@@ -116,8 +116,8 @@ export default function ReportCard() {
         homework.forEach(hw => {
             if (selectedStudent.batchIds?.includes(hw.batch_id)) {
                 totalHomework++;
-                const submissions = hw.submissions || [];
-                const sub = submissions.find(s => s.student_id === selectedStudent.id);
+                const submissions = hw.submissions || {};
+                const sub = submissions[selectedStudent.id];
                 if (sub && (sub.status === 'completed' || sub.status === 'late')) {
                     completedHomework++;
                 }

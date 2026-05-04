@@ -170,8 +170,8 @@ export default function StudentTimeline() {
         homeworks.forEach(hw => {
             if (!selectedStudent.batchIds?.includes(hw.batch_id)) return;
             const dueDate = hw.due_date ? toDate(hw.due_date) : null;
-            const submissions = hw.submissions || [];
-            const sub = submissions.find(s => s.student_id === selectedStudent.id);
+            const submissions = hw.submissions || {};
+            const sub = submissions[selectedStudent.id];
 
             if (sub) {
                 const d = sub.date ? new Date(sub.date) : (dueDate || toDate(hw.created_at));

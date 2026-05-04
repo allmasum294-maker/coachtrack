@@ -7,8 +7,19 @@ import {
 import { format, startOfDay, endOfDay, isWithinInterval, subDays } from 'date-fns';
 
 export default function ReportCardModal({ student, batches, attendance, exams, homeworks, onClose }) {
-    const [dateFrom, setDateFrom] = useState(format(subDays(new Date(), 30), 'yyyy-MM-dd'));
-    const [dateTo, setDateTo] = useState(format(new Date(), 'yyyy-MM-dd'));
+    const [dateFrom, setDateFrom] = useState(() => {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        return `${year}-${month}-01`;
+    });
+    const [dateTo, setDateTo] = useState(() => {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    });
     const [remarks, setRemarks] = useState('');
 
     const stats = useMemo(() => {

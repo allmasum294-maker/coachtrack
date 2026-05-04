@@ -23,8 +23,19 @@ export default function Export() {
     const { userProfile } = useAuth();
     const [selectedType, setSelectedType] = useState('attendance');
     const [selectedBatch, setSelectedBatch] = useState('');
-    const [dateFrom, setDateFrom] = useState('');
-    const [dateTo, setDateTo] = useState('');
+    const [dateFrom, setDateFrom] = useState(() => {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        return `${year}-${month}-01`;
+    });
+    const [dateTo, setDateTo] = useState(() => {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    });
     const [exportFormat, setExportFormat] = useState('csv');
     const [batches, setBatches] = useState([]);
     const [loading, setLoading] = useState(true);

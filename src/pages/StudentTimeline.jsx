@@ -24,8 +24,19 @@ export default function StudentTimeline() {
     const [loading, setLoading] = useState(true);
     const [selectedStudentId, setSelectedStudentId] = useState('');
     const [filterBatch, setFilterBatch] = useState('');
-    const [dateFrom, setDateFrom] = useState('');
-    const [dateTo, setDateTo] = useState('');
+    const [dateFrom, setDateFrom] = useState(() => {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        return `${year}-${month}-01`;
+    });
+    const [dateTo, setDateTo] = useState(() => {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    });
     const [filterType, setFilterType] = useState('all');
 
     useEffect(() => {
@@ -278,7 +289,14 @@ export default function StudentTimeline() {
                 </div>
                 {(dateFrom || dateTo) && (
                     <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-                        <button className="btn btn-ghost btn-sm" style={{ fontWeight: 800 }} onClick={() => { setDateFrom(''); setDateTo(''); }}>
+                        <button className="btn btn-ghost btn-sm" style={{ fontWeight: 800 }} onClick={() => {
+                            const now = new Date();
+                            const year = now.getFullYear();
+                            const month = String(now.getMonth() + 1).padStart(2, '0');
+                            const day = String(now.getDate()).padStart(2, '0');
+                            setDateFrom(`${year}-${month}-01`);
+                            setDateTo(`${year}-${month}-${day}`);
+                        }}>
                             RESET DATE FILTER
                         </button>
                     </div>

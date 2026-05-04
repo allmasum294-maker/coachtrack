@@ -26,7 +26,16 @@ export default function Leaderboard() {
     
     // Period Filtering
     const [timePeriod, setTimePeriod] = useState('30'); // '7', '30', '90', 'all'
-    const [customDateRange, setCustomDateRange] = useState({ from: '', to: '' });
+    const [customDateRange, setCustomDateRange] = useState(() => {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        return {
+            from: `${year}-${month}-01`,
+            to: `${year}-${month}-${day}`
+        };
+    });
     
     // Modals
     const [selectedStudentForReport, setSelectedStudentForReport] = useState(null);

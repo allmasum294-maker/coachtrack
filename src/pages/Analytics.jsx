@@ -30,8 +30,19 @@ export default function Analytics() {
     const [schedules, setSchedules] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedBatch, setSelectedBatch] = useState('');
-    const [startDate, setStartDate] = useState(format(subDays(new Date(), 30), 'yyyy-MM-dd'));
-    const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+    const [startDate, setStartDate] = useState(() => {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        return `${year}-${month}-01`;
+    });
+    const [endDate, setEndDate] = useState(() => {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    });
     const [targetClasses, setTargetClasses] = useState('');
 
     const enrolledStudentIds = useMemo(() => new Set(students.map(s => s.id)), [students]);

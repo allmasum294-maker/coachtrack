@@ -23,8 +23,19 @@ export default function StudentAnalytics() {
     const [loading, setLoading] = useState(true);
     const [selectedBatchId, setSelectedBatchId] = useState('');
     const [selectedStudentId, setSelectedStudentId] = useState('');
-    const [dateFrom, setDateFrom] = useState('');
-    const [dateTo, setDateTo] = useState('');
+    const [dateFrom, setDateFrom] = useState(() => {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        return `${year}-${month}-01`;
+    });
+    const [dateTo, setDateTo] = useState(() => {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    });
     const [showExamTable, setShowExamTable] = useState(false);
 
     useEffect(() => {
@@ -366,7 +377,14 @@ export default function StudentAnalytics() {
                 </div>
                 {(dateFrom || dateTo) && (
                     <div style={{ marginTop: 'var(--space-4)', display: 'flex', justifyContent: 'flex-end' }}>
-                        <button className="btn btn-ghost" style={{ fontSize: 'var(--font-size-xs)' }} onClick={() => { setDateFrom(''); setDateTo(''); }}>
+                        <button className="btn btn-ghost" style={{ fontSize: 'var(--font-size-xs)' }} onClick={() => {
+                            const now = new Date();
+                            const year = now.getFullYear();
+                            const month = String(now.getMonth() + 1).padStart(2, '0');
+                            const day = String(now.getDate()).padStart(2, '0');
+                            setDateFrom(`${year}-${month}-01`);
+                            setDateTo(`${year}-${month}-${day}`);
+                        }}>
                             Clear Date Filter
                         </button>
                     </div>

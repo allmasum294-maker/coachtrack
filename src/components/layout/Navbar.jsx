@@ -55,7 +55,13 @@ export default function Navbar() {
             <button 
                 className="mobile-only btn btn-ghost btn-icon" 
                 onClick={() => setIsOpen(!isOpen)}
-                style={{ color: 'var(--color-text-primary)' }}
+                style={{ 
+                    color: 'var(--color-text-primary)',
+                    width: '44px', height: '44px',
+                    borderRadius: '12px', background: 'rgba(255,255,255,0.03)',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                }}
             >
                 {isOpen ? <X size={24} /> : <Menu size={24} />}
             </button>
@@ -64,19 +70,59 @@ export default function Navbar() {
             {isOpen && (
                 <div style={{ 
                     position: 'fixed', top: '72px', left: 0, right: 0, bottom: 0,
-                    background: 'var(--color-bg-primary)',
-                    zIndex: 999, padding: '40px 24px',
-                    display: 'flex', flexDirection: 'column', gap: '24px'
+                    background: 'rgba(2, 6, 23, 0.98)',
+                    backdropFilter: 'blur(30px) saturate(200%)',
+                    WebkitBackdropFilter: 'blur(30px) saturate(200%)',
+                    zIndex: 999, padding: '32px 20px',
+                    display: 'flex', flexDirection: 'column', gap: '16px',
+                    borderTop: '1px solid rgba(255, 255, 255, 0.05)',
+                    animation: 'fadeIn var(--transition-fast)'
                 }}>
-                    <Link to="/#features" onClick={() => setIsOpen(false)} style={{ fontSize: '24px', fontWeight: 800, textDecoration: 'none', color: 'var(--color-text-primary)' }}>Features</Link>
-                    <Link to="/about" onClick={() => setIsOpen(false)} style={{ fontSize: '24px', fontWeight: 800, textDecoration: 'none', color: 'var(--color-text-primary)' }}>About</Link>
+                    <Link to="/" onClick={() => setIsOpen(false)} style={{ 
+                        fontSize: '18px', fontWeight: 700, textDecoration: 'none', 
+                        color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', gap: '14px',
+                        padding: '16px 20px', borderRadius: '16px', background: 'rgba(255, 255, 255, 0.02)',
+                        border: '1px solid rgba(255, 255, 255, 0.04)'
+                    }}>
+                        Home
+                    </Link>
+                    <Link to="/#features" onClick={() => setIsOpen(false)} style={{ 
+                        fontSize: '18px', fontWeight: 700, textDecoration: 'none', 
+                        color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', gap: '14px',
+                        padding: '16px 20px', borderRadius: '16px', background: 'rgba(255, 255, 255, 0.02)',
+                        border: '1px solid rgba(255, 255, 255, 0.04)'
+                    }}>
+                        Features
+                    </Link>
+                    <Link to="/about" onClick={() => setIsOpen(false)} style={{ 
+                        fontSize: '18px', fontWeight: 700, textDecoration: 'none', 
+                        color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', gap: '14px',
+                        padding: '16px 20px', borderRadius: '16px', background: 'rgba(255, 255, 255, 0.02)',
+                        border: '1px solid rgba(255, 255, 255, 0.04)'
+                    }}>
+                        About
+                    </Link>
+
+                    <div style={{ height: '1px', background: 'rgba(255,255,255,0.06)', margin: '8px 0' }} />
+
                     {currentUser ? (
-                        <Link to="/dashboard" onClick={() => setIsOpen(false)} className="btn btn-primary" style={{ height: '56px', borderRadius: '14px', fontWeight: 900, fontSize: '18px' }}>DASHBOARD</Link>
+                        <Link to="/dashboard" onClick={() => setIsOpen(false)} className="btn btn-primary" style={{ height: '56px', borderRadius: '14px', fontWeight: 900, fontSize: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
+                            DASHBOARD
+                        </Link>
                     ) : (
-                        <>
-                            <Link to="/login" onClick={() => setIsOpen(false)} style={{ fontSize: '24px', fontWeight: 800, textDecoration: 'none', color: 'var(--color-text-primary)' }}>Login</Link>
-                            <Link to="/register" onClick={() => setIsOpen(false)} className="btn btn-primary" style={{ height: '56px', borderRadius: '14px', fontWeight: 900, fontSize: '18px' }}>GET STARTED</Link>
-                        </>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                            <Link to="/login" onClick={() => setIsOpen(false)} style={{ 
+                                fontSize: '18px', fontWeight: 700, textDecoration: 'none', 
+                                color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', gap: '14px',
+                                padding: '16px 20px', borderRadius: '16px', background: 'rgba(255, 255, 255, 0.02)',
+                                border: '1px solid rgba(255, 255, 255, 0.04)'
+                            }}>
+                                Login
+                            </Link>
+                            <Link to="/register" onClick={() => setIsOpen(false)} className="btn btn-primary" style={{ height: '56px', borderRadius: '14px', fontWeight: 900, fontSize: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
+                                GET STARTED
+                            </Link>
+                        </div>
                     )}
                 </div>
             )}
